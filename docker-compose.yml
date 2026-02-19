@@ -1,4 +1,3 @@
-
 services:
   # ── Tor daemon ──────────────────────────────────────────────────────────────
   tor:
@@ -34,7 +33,7 @@ services:
       - scanner_net
     command: ["python", "-m", "darkweb_scanner.main", "scan"]
     profiles:
-      - scan   # only runs with: docker compose --profile scan up
+      - scan
 
   # ── Dashboard ───────────────────────────────────────────────────────────────
   dashboard:
@@ -49,15 +48,38 @@ services:
     volumes:
       - ./config:/app/config:ro
       - app_data:/app/data
-    ports:
-      - "${DASHBOARD_PORT:-8080}:8080"
+    expose:
+      - "8080"
     networks:
       - scanner_net
     command: ["python", "-m", "darkweb_scanner.dashboard.app"]
 
+  # ── Nginx SSL reverse proxy ─────────────────────────────────────────────────
+  nginx:
+    build:
+      context: ./docker/nginx
+    restart: unless-stopped
+    depends_on:
+      - dashboard
+    environment:
+      - DOMAIN=${DOMAIN:-}
+      - SSL_EMAIL=${SSL_EMAIL:-}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - nginx_certs:/etc/nginx/certs
+      - letsencrypt:/etc/letsencrypt
+      - certbot_webroot:/var/www/certbot
+    networks:
+      - scanner_net
+
 volumes:
   tor_data:
   app_data:
+  nginx_certs:
+  letsencrypt:
+  certbot_webroot:
 
 networks:
   scanner_net:

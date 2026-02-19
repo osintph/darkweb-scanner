@@ -2,21 +2,21 @@
 # =============================================================================
 #  darkweb-scanner — Zero-prerequisite deployment script
 #  Repo: https://github.com/osintph/darkweb-scanner
-#  Assumes nothing installed — installs Docker, clones repo, configures & runs.
 #
 #  Usage:
 #    sudo bash deploy.sh
 #
 #  Optional env overrides:
 #    INSTALL_DIR=/opt/darkweb-scanner sudo bash deploy.sh
-#    DASHBOARD_PORT=9090 sudo bash deploy.sh
-#    INSTALL_TIMER=1 sudo bash deploy.sh    # enable 6-hour systemd scan timer
+#    DOMAIN=scanner.example.com SSL_EMAIL=you@example.com sudo bash deploy.sh
+#    INSTALL_TIMER=1 sudo bash deploy.sh
 # =============================================================================
 set -euo pipefail
 
 REPO_URL="https://github.com/osintph/darkweb-scanner"
 INSTALL_DIR="${INSTALL_DIR:-$HOME/darkweb-scanner}"
-DASHBOARD_PORT="${DASHBOARD_PORT:-8080}"
+DOMAIN="${DOMAIN:-}"
+SSL_EMAIL="${SSL_EMAIL:-}"
 RUN_USER="${SUDO_USER:-$(whoami)}"
 
 RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'; CYAN='\033[0;36m'; NC='\033[0m'
@@ -34,7 +34,6 @@ echo -e "${CYAN}╚════════════════════�
 echo ""
 
 # ── Detect OS ────────────────────────────────────────────────────────────────
-info "Detecting OS..."
 [[ -f /etc/os-release ]] || error "Cannot detect OS — /etc/os-release missing."
 source /etc/os-release
 OS_ID="${ID,,}"
@@ -46,7 +45,7 @@ is_fedora_like() { [[ "$OS_ID" =~ ^(fedora)$ ]]; }
 is_rhel_like()   { [[ "$OS_ID" =~ ^(rhel|centos|almalinux|rocky|ol)$ ]] || [[ "$OS_LIKE" =~ rhel ]]; }
 
 # ── Install base packages ─────────────────────────────────────────────────────
-info "Installing base packages (curl, git, make, gnupg)..."
+info "Installing base packages..."
 if is_debian_like; then
   apt-get update -qq
   apt-get install -y --no-install-recommends curl git make ca-certificates gnupg lsb-release openssl
@@ -84,18 +83,14 @@ else
   success "Docker already installed: $(docker --version)"
 fi
 
-# ── Start Docker daemon ───────────────────────────────────────────────────────
-info "Enabling Docker daemon..."
 systemctl enable docker --now
 success "Docker daemon running."
 
-# ── Add user to docker group ──────────────────────────────────────────────────
 if [[ "$RUN_USER" != "root" ]]; then
   usermod -aG docker "$RUN_USER"
   success "User '$RUN_USER' added to docker group (log out/in to take effect)."
 fi
 
-# ── Verify docker compose plugin ─────────────────────────────────────────────
 docker compose version &>/dev/null || error "docker compose plugin not found."
 success "docker compose: $(docker compose version --short)"
 
@@ -119,16 +114,22 @@ cp -n config/keywords.example.yaml config/keywords.yaml  2>/dev/null || true
 cp -n config/seeds.example.txt config/seeds.txt          2>/dev/null || true
 success "Config files ready."
 
-# ── Patch .env defaults ───────────────────────────────────────────────────────
-sed -i "s/^DASHBOARD_PORT=.*/DASHBOARD_PORT=${DASHBOARD_PORT}/" .env
-
+# ── Patch .env ────────────────────────────────────────────────────────────────
 SECRET_KEY="$(openssl rand -hex 32)"
 sed -i "s/^DASHBOARD_SECRET_KEY=.*/DASHBOARD_SECRET_KEY=${SECRET_KEY}/" .env
-success "Dashboard secret key generated."
 
-# ── Generate & inject Tor control password ────────────────────────────────────
-# We build the tor image first (lightweight, fast), use it to generate the hash,
-# then inject it into torrc before building the final image.
+# Set domain and SSL email if provided
+if [[ -n "$DOMAIN" ]]; then
+  sed -i "s/^DOMAIN=.*/DOMAIN=${DOMAIN}/" .env
+  info "Domain set to: $DOMAIN"
+fi
+if [[ -n "$SSL_EMAIL" ]]; then
+  sed -i "s/^SSL_EMAIL=.*/SSL_EMAIL=${SSL_EMAIL}/" .env
+fi
+
+success "Configuration patched."
+
+# ── Generate Tor control password ─────────────────────────────────────────────
 info "Building Tor image to generate control password hash..."
 docker compose build tor
 
@@ -136,45 +137,40 @@ TOR_PLAIN_PASS="$(openssl rand -hex 16)"
 TOR_HASH="$(docker run --rm darkweb-scanner-tor tor --hash-password "${TOR_PLAIN_PASS}" 2>/dev/null | grep '^16:' | tail -1)"
 
 if [[ -n "$TOR_HASH" ]]; then
-  # Inject hash into torrc (replaces the comment placeholder line)
   sed -i "s|^# HashedControlPassword is injected.*|HashedControlPassword ${TOR_HASH}|" docker/tor/torrc
-  # Also add it if the line wasn't found (safety fallback)
   grep -q "^HashedControlPassword" docker/tor/torrc || echo "HashedControlPassword ${TOR_HASH}" >> docker/tor/torrc
-  # Update .env with the plain text password
   sed -i "s/^TOR_CONTROL_PASSWORD=.*/TOR_CONTROL_PASSWORD=${TOR_PLAIN_PASS}/" .env
   success "Tor control password configured."
 else
-  warn "Could not generate Tor hash — control password will not be set. Circuit rotation may not work."
-  # Remove the placeholder comment so torrc is still valid
+  warn "Could not generate Tor hash — circuit rotation may not work."
   sed -i '/^# HashedControlPassword is injected/d' docker/tor/torrc
 fi
 
-# ── Build all Docker images ───────────────────────────────────────────────────
-info "Building Docker images..."
+# ── Build all images ──────────────────────────────────────────────────────────
+info "Building all Docker images (this may take a few minutes)..."
 docker compose build --no-cache
 success "Images built."
 
-# ── Start Tor + Dashboard ─────────────────────────────────────────────────────
-info "Starting containers (Tor + Dashboard)..."
+# ── Start all services ────────────────────────────────────────────────────────
+info "Starting all containers..."
 docker compose up -d
 success "Containers started."
 
 # ── Wait for dashboard ────────────────────────────────────────────────────────
-info "Waiting for dashboard on http://localhost:${DASHBOARD_PORT} ..."
+info "Waiting for services to be ready..."
 TIMEOUT=90; ELAPSED=0
-until curl -sf "http://localhost:${DASHBOARD_PORT}" -o /dev/null 2>/dev/null; do
-  [[ $ELAPSED -ge $TIMEOUT ]] && { warn "Dashboard not responding after ${TIMEOUT}s. Run: docker compose logs dashboard"; break; }
+until curl -sfk "https://localhost" -o /dev/null 2>/dev/null; do
+  [[ $ELAPSED -ge $TIMEOUT ]] && { warn "HTTPS not responding after ${TIMEOUT}s. Check: docker compose logs nginx"; break; }
   sleep 3; ELAPSED=$((ELAPSED + 3))
 done
-curl -sf "http://localhost:${DASHBOARD_PORT}" -o /dev/null 2>/dev/null && success "Dashboard is live!"
+curl -sfk "https://localhost" -o /dev/null 2>/dev/null && success "HTTPS is live!"
 
 # ── Wait for Tor to bootstrap ─────────────────────────────────────────────────
 info "Waiting for Tor to bootstrap (up to 3 minutes)..."
 ELAPSED=0
 until docker compose logs tor 2>/dev/null | grep -q "Bootstrapped 100%"; do
   if [[ $ELAPSED -ge 180 ]]; then
-    warn "Tor not fully bootstrapped yet — this can take time on a slow connection."
-    warn "Check progress with: docker compose logs tor | grep Bootstrapped"
+    warn "Tor still bootstrapping — check with: docker compose logs tor | grep Bootstrapped"
     break
   fi
   sleep 10; ELAPSED=$((ELAPSED + 10))
@@ -221,21 +217,26 @@ echo -e "${GREEN}║              ✅  Deployment Complete                      
 echo -e "${GREEN}╚══════════════════════════════════════════════════════════╝${NC}"
 echo ""
 echo -e "  📁 Install dir:  ${CYAN}${INSTALL_DIR}${NC}"
-echo -e "  🌐 Dashboard:    ${CYAN}http://localhost:${DASHBOARD_PORT}${NC}"
+if [[ -n "$DOMAIN" ]]; then
+  echo -e "  🌐 Dashboard:    ${CYAN}https://${DOMAIN}${NC}"
+else
+  echo -e "  🌐 Dashboard:    ${CYAN}https://YOUR_SERVER_IP${NC}  (self-signed cert — accept browser warning)"
+  echo -e "  💡 For a real SSL cert, redeploy with:"
+  echo -e "     ${YELLOW}DOMAIN=yourdomain.com SSL_EMAIL=you@email.com sudo bash deploy.sh${NC}"
+fi
 echo ""
 echo -e "${YELLOW}Edit your configuration before running scans:${NC}"
-echo -e "  nano ${INSTALL_DIR}/.env                     # DB, alerting, Tor settings"
-echo -e "  nano ${INSTALL_DIR}/config/keywords.yaml     # keywords to watch for"
-echo -e "  nano ${INSTALL_DIR}/config/seeds.txt         # .onion seed URLs"
+echo -e "  nano ${INSTALL_DIR}/.env"
+echo -e "  nano ${INSTALL_DIR}/config/keywords.yaml"
+echo -e "  nano ${INSTALL_DIR}/config/seeds.txt"
 echo ""
 echo -e "${YELLOW}Useful commands (run from ${INSTALL_DIR}):${NC}"
 echo -e "  make scan          # run a crawl (foreground)"
 echo -e "  make check-tor     # verify Tor connectivity"
 echo -e "  make stats         # show scan statistics"
-echo -e "  make hits          # show keyword matches"
+echo -e "  make hits          # show keyword hits"
 echo -e "  make logs          # tail all container logs"
 echo -e "  make stop          # stop all containers"
-echo -e "  make shell         # open shell inside app container"
 echo ""
 if [[ "$RUN_USER" != "root" ]]; then
   echo -e "${YELLOW}⚠️  Log out and back in${NC} (or run 'newgrp docker') so"
