@@ -22,6 +22,25 @@ See [LEGAL.md](LEGAL.md) for the full disclaimer.
 
 ---
 
+## 🚀 Quick Deploy (fresh server — installs everything)
+```bash
+curl -fsSL https://raw.githubusercontent.com/osintph/darkweb-scanner/main/deploy.sh | sudo bash
+```
+
+Or clone first and run locally:
+```bash
+git clone https://github.com/osintph/darkweb-scanner
+cd darkweb-scanner
+sudo bash deploy.sh
+```
+
+Optional overrides:
+```bash
+INSTALL_DIR=/opt/darkweb-scanner sudo bash deploy.sh
+DASHBOARD_PORT=9090 sudo bash deploy.sh
+INSTALL_TIMER=1 sudo bash deploy.sh   # enable 6-hour scheduled scans
+```
+
 ## What It Does
 
 Dark Web Scanner crawls `.onion` sites through the Tor network and alerts you when your configured keywords appear. Useful for:
