@@ -67,7 +67,7 @@ class Alerter:
     def _format_webhook_payload(self, hit: KeywordHit) -> dict:
         """Slack/Discord compatible payload."""
         return {
-            "text": f"🚨 *Dark Web Keyword Alert*",
+            "text": "🚨 *Dark Web Keyword Alert*",
             "attachments": [
                 {
                     "color": "#ff4444",

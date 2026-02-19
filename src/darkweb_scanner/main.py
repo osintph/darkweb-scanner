@@ -3,7 +3,6 @@ Main entry point — orchestrates crawling, scanning, storage, and alerting.
 """
 
 import asyncio
-import json
 import logging
 import os
 import sys
@@ -11,7 +10,7 @@ from pathlib import Path
 
 import click
 
-from .alerting import AlertConfig, Alerter
+from .alerting import Alerter
 from .crawler import CrawlConfig, Crawler
 from .scanner import KeywordConfig, Scanner
 from .storage import Storage
@@ -167,13 +166,13 @@ def stats():
     storage = Storage()
     s = storage.get_stats()
     click.echo(f"\n{'='*40}")
-    click.echo(f"  Dark Web Scanner — Statistics")
+    click.echo("  Dark Web Scanner — Statistics")
     click.echo(f"{'='*40}")
     click.echo(f"  Sessions:    {s['total_sessions']}")
     click.echo(f"  Pages crawled: {s['total_pages']}")
     click.echo(f"  Keyword hits:  {s['total_hits']}")
     if s["top_keywords"]:
-        click.echo(f"\n  Top keywords:")
+        click.echo("\n  Top keywords:")
         for item in s["top_keywords"]:
             click.echo(f"    {item['keyword']:<40} {item['count']} hits")
     click.echo(f"{'='*40}\n")

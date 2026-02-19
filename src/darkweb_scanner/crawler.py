@@ -10,7 +10,7 @@ import os
 import random
 import re
 from collections import deque
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import AsyncIterator, Optional, Set
 from urllib.parse import urljoin, urlparse
 

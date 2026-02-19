@@ -4,8 +4,9 @@ Requires a running Tor daemon (skipped in CI unless TOR_INTEGRATION=1).
 """
 
 import os
+
 import pytest
-import asyncio
+
 from darkweb_scanner.tor_client import create_tor_client
 
 

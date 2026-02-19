@@ -2,13 +2,12 @@
 Web dashboard — Flask app for viewing scan results.
 """
 
-import json
 import os
 from datetime import datetime
 
 from flask import Flask, jsonify, render_template, request
 
-from ..storage import KeywordHitRecord, Storage
+from ..storage import Storage
 
 app = Flask(__name__)
 app.secret_key = os.getenv("DASHBOARD_SECRET_KEY", "change-me-in-production")
