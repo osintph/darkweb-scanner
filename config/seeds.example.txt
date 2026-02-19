@@ -1,0 +1,13 @@
+# ════════════════════════════════════════════════════════════
+#  Dark Web Scanner — Seed URLs
+#  Add .onion URLs to crawl, one per line.
+#  Lines starting with # are ignored.
+#  Copy this to seeds.txt and add your targets.
+# ════════════════════════════════════════════════════════════
+
+# Ahmia is a clearnet Tor search engine — use it to find .onion seeds
+# https://ahmia.fi
+
+# Example (replace with real .onion URLs):
+# http://examplexxx.onion
+# http://anotherexample.onion/forum

@@ -1,0 +1,34 @@
+# ════════════════════════════════════════════════════════════
+#  Dark Web Scanner — Keywords Configuration
+#  Copy this file to keywords.yaml and customise.
+#  keywords.yaml is in .gitignore — never commit real keywords.
+# ════════════════════════════════════════════════════════════
+
+keywords:
+
+  # Brand / organisation monitoring
+  brand_monitoring:
+    - "your company name"
+    - "yourdomain.com"
+    - "your product name"
+
+  # Credential / data leak detection
+  threat_intel:
+    - "credential dump"
+    - "database leak"
+    - "combolist"
+    - "fullz"
+    - "account takeover"
+
+  # Infrastructure monitoring
+  infrastructure:
+    - "your internal hostname"
+    - "your ip range"
+
+  # Custom keywords
+  custom: []
+
+settings:
+  case_sensitive: false
+  context_window: 200       # characters of context around each match
+  alert_on_first_hit_only: true   # don't flood alerts with duplicate hits per page

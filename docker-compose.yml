@@ -1,0 +1,65 @@
+version: "3.9"
+
+services:
+  # ── Tor daemon ──────────────────────────────────────────────────────────────
+  tor:
+    build:
+      context: ./docker/tor
+    restart: unless-stopped
+    volumes:
+      - tor_data:/var/lib/tor
+    networks:
+      - scanner_net
+    healthcheck:
+      test: ["CMD", "curl", "--socks5", "localhost:9050", "-s", "https://check.torproject.org/api/ip"]
+      interval: 30s
+      timeout: 15s
+      retries: 5
+      start_period: 20s
+
+  # ── Scanner / crawler ───────────────────────────────────────────────────────
+  scanner:
+    build:
+      context: .
+      dockerfile: docker/app/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      tor:
+        condition: service_healthy
+    env_file:
+      - .env
+    volumes:
+      - ./config:/app/config:ro
+      - app_data:/app/data
+    networks:
+      - scanner_net
+    command: ["python", "-m", "darkweb_scanner.main", "scan"]
+    profiles:
+      - scan   # only runs with: docker compose --profile scan up
+
+  # ── Dashboard ───────────────────────────────────────────────────────────────
+  dashboard:
+    build:
+      context: .
+      dockerfile: docker/app/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      - tor
+    env_file:
+      - .env
+    volumes:
+      - ./config:/app/config:ro
+      - app_data:/app/data
+    ports:
+      - "${DASHBOARD_PORT:-8080}:8080"
+    networks:
+      - scanner_net
+    command: ["python", "-m", "darkweb_scanner.dashboard.app"]
+
+volumes:
+  tor_data:
+  app_data:
+
+networks:
+  scanner_net:
+    driver: bridge

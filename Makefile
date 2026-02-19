@@ -1,0 +1,82 @@
+.PHONY: help install dev-install test lint format run stop logs shell stats hits check-tor clean
+
+help:  ## Show this help
+	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-20s\033[0m %s\n", $$1, $$2}'
+
+# ── Setup ───────────────────────────────────────────────────────────────────
+install:  ## Install production dependencies
+	pip install -e ".[all]"
+
+dev-install:  ## Install all dependencies including dev tools
+	pip install -e ".[dev,all]"
+	@echo "✅ Dev environment ready"
+
+setup:  ## First-time setup: copy config examples
+	@cp -n .env.example .env || true
+	@cp -n config/keywords.example.yaml config/keywords.yaml || true
+	@cp -n config/seeds.example.txt config/seeds.txt || true
+	@echo "✅ Config files created. Edit .env, config/keywords.yaml, and config/seeds.txt"
+
+# ── Testing ─────────────────────────────────────────────────────────────────
+test:  ## Run unit tests
+	pytest tests/unit/ -v
+
+test-all:  ## Run all tests including integration (requires Tor)
+	TOR_INTEGRATION=1 pytest tests/ -v
+
+test-cov:  ## Run tests with coverage report
+	pytest tests/unit/ --cov=darkweb_scanner --cov-report=html
+	@echo "Coverage report: htmlcov/index.html"
+
+# ── Code quality ─────────────────────────────────────────────────────────────
+lint:  ## Run ruff linter + mypy
+	ruff check src/ tests/
+	mypy src/
+
+format:  ## Auto-format code with ruff
+	ruff format src/ tests/
+
+security:  ## Run bandit security scanner
+	bandit -r src/ -ll
+
+# ── Docker ───────────────────────────────────────────────────────────────────
+build:  ## Build Docker images
+	docker compose build
+
+run:  ## Start dashboard (and Tor) in background
+	docker compose up -d
+	@echo "✅ Dashboard running at http://localhost:$${DASHBOARD_PORT:-8080}"
+
+scan:  ## Run a crawl scan (foreground)
+	docker compose --profile scan run --rm scanner
+
+stop:  ## Stop all containers
+	docker compose down
+
+logs:  ## Tail logs from all containers
+	docker compose logs -f
+
+logs-scanner:  ## Tail scanner logs only
+	docker compose logs -f scanner
+
+shell:  ## Open shell in app container
+	docker compose exec dashboard bash
+
+# ── CLI shortcuts ─────────────────────────────────────────────────────────────
+check-tor:  ## Verify Tor connectivity
+	docker compose exec dashboard python -m darkweb_scanner.main check-tor
+
+stats:  ## Show scan statistics
+	docker compose exec dashboard python -m darkweb_scanner.main stats
+
+hits:  ## Show recent keyword hits
+	docker compose exec dashboard python -m darkweb_scanner.main hits
+
+# ── Maintenance ───────────────────────────────────────────────────────────────
+clean:  ## Remove build artifacts and cache
+	rm -rf dist/ build/ *.egg-info htmlcov/ .coverage .mypy_cache .ruff_cache
+	find . -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true
+
+clean-data:  ## ⚠️  Delete all scan data (irreversible)
+	@read -p "Delete all scan data? [y/N] " confirm; \
+	[ "$$confirm" = "y" ] && docker volume rm darkweb-scanner_app_data || echo "Aborted."

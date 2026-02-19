@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Dark Web Scanner — Dashboard</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #0d1117;
+      --surface: #161b22;
+      --surface2: #21262d;
+      --border: #30363d;
+      --text: #e6edf3;
+      --muted: #8b949e;
+      --accent: #58a6ff;
+      --red: #f85149;
+      --green: #3fb950;
+      --yellow: #d29922;
+      --font: 'Segoe UI', system-ui, sans-serif;
+      --mono: 'Cascadia Code', 'Fira Code', monospace;
+    }
+    body { background: var(--bg); color: var(--text); font-family: var(--font); min-height: 100vh; }
+
+    header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 16px 32px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    header h1 { font-size: 1.2rem; font-weight: 600; }
+    header .badge {
+      background: var(--red);
+      color: white;
+      font-size: 0.7rem;
+      padding: 2px 8px;
+      border-radius: 20px;
+      font-weight: 600;
+      letter-spacing: 0.05em;
+    }
+    .status-dot {
+      width: 8px; height: 8px; border-radius: 50%;
+      background: var(--green);
+      animation: pulse 2s infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
+    }
+
+    main { padding: 32px; max-width: 1400px; margin: 0 auto; }
+
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      margin-bottom: 32px;
+    }
+    .stat-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 20px;
+    }
+    .stat-card .label { color: var(--muted); font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 8px; }
+    .stat-card .value { font-size: 2rem; font-weight: 700; color: var(--accent); }
+
+    .panel {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      margin-bottom: 24px;
+      overflow: hidden;
+    }
+    .panel-header {
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .panel-header h2 { font-size: 0.95rem; font-weight: 600; }
+    .panel-body { padding: 0; }
+
+    .controls {
+      padding: 16px 20px;
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      border-bottom: 1px solid var(--border);
+      flex-wrap: wrap;
+    }
+    input[type="text"] {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text);
+      padding: 8px 12px;
+      font-size: 0.875rem;
+      width: 260px;
+    }
+    input[type="text"]:focus { outline: none; border-color: var(--accent); }
+    button {
+      background: var(--accent);
+      color: #0d1117;
+      border: none;
+      border-radius: 6px;
+      padding: 8px 16px;
+      font-size: 0.875rem;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    button:hover { opacity: 0.85; }
+    button.secondary {
+      background: var(--surface2);
+      color: var(--text);
+      border: 1px solid var(--border);
+    }
+
+    table { width: 100%; border-collapse: collapse; font-size: 0.875rem; }
+    th {
+      text-align: left;
+      padding: 12px 16px;
+      color: var(--muted);
+      font-weight: 500;
+      font-size: 0.8rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      border-bottom: 1px solid var(--border);
+    }
+    td { padding: 14px 16px; border-bottom: 1px solid var(--border); vertical-align: top; }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: var(--surface2); }
+
+    .keyword-tag {
+      display: inline-block;
+      background: rgba(88,166,255,0.15);
+      color: var(--accent);
+      border: 1px solid rgba(88,166,255,0.3);
+      border-radius: 4px;
+      padding: 2px 8px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      font-family: var(--mono);
+    }
+    .category-tag {
+      display: inline-block;
+      background: rgba(63,185,80,0.12);
+      color: var(--green);
+      border: 1px solid rgba(63,185,80,0.25);
+      border-radius: 4px;
+      padding: 2px 8px;
+      font-size: 0.75rem;
+    }
+    .url-cell {
+      font-family: var(--mono);
+      font-size: 0.78rem;
+      color: var(--accent);
+      word-break: break-all;
+      max-width: 280px;
+    }
+    .context-cell {
+      color: var(--muted);
+      font-size: 0.8rem;
+      font-family: var(--mono);
+      max-width: 400px;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+    .time-cell { color: var(--muted); font-size: 0.78rem; white-space: nowrap; }
+    .alerted-badge {
+      display: inline-block;
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: var(--green);
+    }
+
+    .empty-state {
+      padding: 60px;
+      text-align: center;
+      color: var(--muted);
+    }
+    .empty-state .icon { font-size: 3rem; margin-bottom: 12px; }
+    .empty-state p { font-size: 0.9rem; }
+
+    .top-keywords {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      padding: 16px 20px;
+    }
+    .kw-pill {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 4px 12px;
+      font-size: 0.8rem;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      cursor: pointer;
+    }
+    .kw-pill:hover { border-color: var(--accent); color: var(--accent); }
+    .kw-pill .count {
+      background: var(--accent);
+      color: #0d1117;
+      border-radius: 10px;
+      padding: 1px 7px;
+      font-size: 0.72rem;
+      font-weight: 700;
+    }
+
+    .loader {
+      text-align: center;
+      padding: 40px;
+      color: var(--muted);
+    }
+    .refresh-time { color: var(--muted); font-size: 0.78rem; }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="status-dot" id="statusDot"></div>
+    <h1>Dark Web Scanner</h1>
+    <span class="badge">THREAT INTEL</span>
+    <span class="refresh-time" id="lastRefresh" style="margin-left:auto"></span>
+  </header>
+
+  <main>
+    <div class="stats-grid" id="statsGrid">
+      <div class="stat-card"><div class="label">Crawl Sessions</div><div class="value" id="statSessions">—</div></div>
+      <div class="stat-card"><div class="label">Pages Crawled</div><div class="value" id="statPages">—</div></div>
+      <div class="stat-card"><div class="label">Keyword Hits</div><div class="value" id="statHits">—</div></div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-header">
+        <h2>Top Keywords</h2>
+      </div>
+      <div class="top-keywords" id="topKeywords">
+        <div class="loader">Loading...</div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-header">
+        <h2>Keyword Hits</h2>
+        <button class="secondary" onclick="loadHits()">↻ Refresh</button>
+      </div>
+      <div class="controls">
+        <input type="text" id="keywordFilter" placeholder="Filter by keyword..." />
+        <button onclick="applyFilter()">Search</button>
+        <button class="secondary" onclick="clearFilter()">Clear</button>
+      </div>
+      <div class="panel-body">
+        <div id="hitsContainer"><div class="loader">Loading...</div></div>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    let currentFilter = '';
+
+    async function fetchStats() {
+      try {
+        const res = await fetch('/api/stats');
+        const data = await res.json();
+        document.getElementById('statSessions').textContent = data.total_sessions.toLocaleString();
+        document.getElementById('statPages').textContent = data.total_pages.toLocaleString();
+        document.getElementById('statHits').textContent = data.total_hits.toLocaleString();
+
+        const topEl = document.getElementById('topKeywords');
+        if (!data.top_keywords || data.top_keywords.length === 0) {
+          topEl.innerHTML = '<span style="color:var(--muted);font-size:0.85rem">No hits yet.</span>';
+        } else {
+          topEl.innerHTML = data.top_keywords.map(k => `
+            <div class="kw-pill" onclick="filterByKeyword('${k.keyword}')">
+              ${k.keyword}
+              <span class="count">${k.count}</span>
+            </div>
+          `).join('');
+        }
+      } catch(e) {
+        document.getElementById('statusDot').style.background = 'var(--red)';
+      }
+    }
+
+    async function loadHits(keyword = '') {
+      const container = document.getElementById('hitsContainer');
+      container.innerHTML = '<div class="loader">Loading...</div>';
+      try {
+        const url = keyword
+          ? `/api/hits?limit=100&keyword=${encodeURIComponent(keyword)}`
+          : '/api/hits?limit=100';
+        const res = await fetch(url);
+        const hits = await res.json();
+
+        if (!hits.length) {
+          container.innerHTML = `
+            <div class="empty-state">
+              <div class="icon">🔍</div>
+              <p>No keyword hits found${keyword ? ` for "${keyword}"` : ''}.</p>
+              <p style="margin-top:8px">Start a crawl to begin monitoring.</p>
+            </div>`;
+          return;
+        }
+
+        container.innerHTML = `
+          <table>
+            <thead>
+              <tr>
+                <th>Keyword</th>
+                <th>Category</th>
+                <th>URL</th>
+                <th>Context</th>
+                <th>Depth</th>
+                <th>Found At</th>
+                <th>Alerted</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${hits.map(h => `
+                <tr>
+                  <td><span class="keyword-tag">${esc(h.keyword)}</span></td>
+                  <td><span class="category-tag">${esc(h.category)}</span></td>
+                  <td class="url-cell">${esc(h.url)}</td>
+                  <td class="context-cell">${esc(h.context ? h.context.slice(0, 300) : '')}</td>
+                  <td style="color:var(--muted)">${h.depth}</td>
+                  <td class="time-cell">${formatTime(h.found_at)}</td>
+                  <td style="text-align:center">${h.alerted ? '<span class="alerted-badge"></span>' : '—'}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>`;
+
+        document.getElementById('lastRefresh').textContent = `Last updated: ${new Date().toLocaleTimeString()}`;
+      } catch(e) {
+        container.innerHTML = '<div class="loader" style="color:var(--red)">Error loading hits.</div>';
+      }
+    }
+
+    function esc(str) {
+      if (!str) return '';
+      return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    }
+
+    function formatTime(iso) {
+      if (!iso) return '—';
+      const d = new Date(iso + 'Z');
+      return d.toLocaleDateString() + ' ' + d.toLocaleTimeString();
+    }
+
+    function filterByKeyword(kw) {
+      currentFilter = kw;
+      document.getElementById('keywordFilter').value = kw;
+      loadHits(kw);
+    }
+
+    function applyFilter() {
+      currentFilter = document.getElementById('keywordFilter').value.trim();
+      loadHits(currentFilter);
+    }
+
+    function clearFilter() {
+      currentFilter = '';
+      document.getElementById('keywordFilter').value = '';
+      loadHits();
+    }
+
+    // init
+    fetchStats();
+    loadHits();
+
+    // auto-refresh every 30s
+    setInterval(() => { fetchStats(); loadHits(currentFilter); }, 30000);
+  </script>
+</body>
+</html>
