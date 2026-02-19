@@ -1,13 +1,20 @@
 # Tor configuration for darkweb-scanner
+# This is a Tor CLIENT only — not a relay or exit node.
+# It routes scanner traffic through Tor to reach .onion sites.
 
 # SOCKS proxy — accessible to other containers on the Docker network
 SocksPort 0.0.0.0:9050
 
 # Control port — used by stem for circuit rotation
 ControlPort 0.0.0.0:9051
-HashedControlPassword {{HASHED_PASSWORD}}
+# HashedControlPassword is injected at deploy time by deploy.sh
+# To regenerate: docker run --rm darkweb-scanner-tor tor --hash-password 'yourpassword'
 
-# Data directory
+# Explicitly disable relay/exit functionality (client only)
+ExitPolicy reject *:*
+ExitRelay 0
+
+# Data directory (owned by debian-tor user)
 DataDirectory /var/lib/tor
 
 # Logging

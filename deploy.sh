@@ -96,7 +96,7 @@ if [[ "$RUN_USER" != "root" ]]; then
 fi
 
 # ── Verify docker compose plugin ─────────────────────────────────────────────
-docker compose version &>/dev/null || error "docker compose plugin not found. Please install docker-compose-plugin."
+docker compose version &>/dev/null || error "docker compose plugin not found."
 success "docker compose: $(docker compose version --short)"
 
 # ── Clone or update repo ──────────────────────────────────────────────────────
@@ -112,7 +112,7 @@ success "Repo ready at $INSTALL_DIR"
 
 cd "$INSTALL_DIR"
 
-# ── Copy example configs (make setup equivalent) ──────────────────────────────
+# ── Copy example configs ──────────────────────────────────────────────────────
 info "Copying example config files..."
 cp -n .env.example .env                                  2>/dev/null || true
 cp -n config/keywords.example.yaml config/keywords.yaml  2>/dev/null || true
@@ -122,39 +122,40 @@ success "Config files ready."
 # ── Patch .env defaults ───────────────────────────────────────────────────────
 sed -i "s/^DASHBOARD_PORT=.*/DASHBOARD_PORT=${DASHBOARD_PORT}/" .env
 
-# Generate a strong dashboard secret key
 SECRET_KEY="$(openssl rand -hex 32)"
 sed -i "s/^DASHBOARD_SECRET_KEY=.*/DASHBOARD_SECRET_KEY=${SECRET_KEY}/" .env
 success "Dashboard secret key generated."
 
-# ── Generate Tor control password hash ───────────────────────────────────────
-info "Generating Tor control password (using Docker)..."
+# ── Generate & inject Tor control password ────────────────────────────────────
+# We build the tor image first (lightweight, fast), use it to generate the hash,
+# then inject it into torrc before building the final image.
+info "Building Tor image to generate control password hash..."
+docker compose build tor
+
 TOR_PLAIN_PASS="$(openssl rand -hex 16)"
-TOR_HASH="$(docker run --rm debian:bookworm-slim bash -c \
-  "apt-get install -y tor -qq 2>/dev/null && tor --hash-password '${TOR_PLAIN_PASS}' 2>/dev/null | tail -1")" || TOR_HASH=""
+TOR_HASH="$(docker run --rm darkweb-scanner-tor tor --hash-password "${TOR_PLAIN_PASS}" 2>/dev/null | grep '^16:' | tail -1)"
 
 if [[ -n "$TOR_HASH" ]]; then
+  # Inject hash into torrc (replaces the comment placeholder line)
+  sed -i "s|^# HashedControlPassword is injected.*|HashedControlPassword ${TOR_HASH}|" docker/tor/torrc
+  # Also add it if the line wasn't found (safety fallback)
+  grep -q "^HashedControlPassword" docker/tor/torrc || echo "HashedControlPassword ${TOR_HASH}" >> docker/tor/torrc
+  # Update .env with the plain text password
   sed -i "s/^TOR_CONTROL_PASSWORD=.*/TOR_CONTROL_PASSWORD=${TOR_PLAIN_PASS}/" .env
-  TORRC="docker/tor/torrc"
-  if grep -q "HashedControlPassword" "$TORRC" 2>/dev/null; then
-    sed -i "s|^HashedControlPassword .*|HashedControlPassword ${TOR_HASH}|" "$TORRC"
-  else
-    echo "HashedControlPassword ${TOR_HASH}" >> "$TORRC"
-  fi
   success "Tor control password configured."
 else
-  warn "Could not auto-generate Tor hash. Update TOR_CONTROL_PASSWORD in .env and HashedControlPassword in docker/tor/torrc manually."
+  warn "Could not generate Tor hash — control password will not be set. Circuit rotation may not work."
+  # Remove the placeholder comment so torrc is still valid
+  sed -i '/^# HashedControlPassword is injected/d' docker/tor/torrc
 fi
 
-# ── Build Docker images ───────────────────────────────────────────────────────
-info "Building Docker images (first run may take a few minutes)..."
+# ── Build all Docker images ───────────────────────────────────────────────────
+info "Building Docker images..."
 docker compose build --no-cache
 success "Images built."
 
 # ── Start Tor + Dashboard ─────────────────────────────────────────────────────
 info "Starting containers (Tor + Dashboard)..."
-# Note: 'scanner' service uses the 'scan' profile and is NOT started here.
-# Start it manually with:  make scan   OR   docker compose --profile scan run --rm scanner
 docker compose up -d
 success "Containers started."
 
@@ -162,19 +163,23 @@ success "Containers started."
 info "Waiting for dashboard on http://localhost:${DASHBOARD_PORT} ..."
 TIMEOUT=90; ELAPSED=0
 until curl -sf "http://localhost:${DASHBOARD_PORT}" -o /dev/null 2>/dev/null; do
-  [[ $ELAPSED -ge $TIMEOUT ]] && { warn "Dashboard not responding after ${TIMEOUT}s. Run: docker compose logs"; break; }
+  [[ $ELAPSED -ge $TIMEOUT ]] && { warn "Dashboard not responding after ${TIMEOUT}s. Run: docker compose logs dashboard"; break; }
   sleep 3; ELAPSED=$((ELAPSED + 3))
 done
 curl -sf "http://localhost:${DASHBOARD_PORT}" -o /dev/null 2>/dev/null && success "Dashboard is live!"
 
-# ── Wait for Tor healthcheck ──────────────────────────────────────────────────
-info "Waiting for Tor healthcheck (up to 60s)..."
+# ── Wait for Tor to bootstrap ─────────────────────────────────────────────────
+info "Waiting for Tor to bootstrap (up to 3 minutes)..."
 ELAPSED=0
-until docker compose ps tor 2>/dev/null | grep -q "healthy"; do
-  [[ $ELAPSED -ge 60 ]] && { warn "Tor not healthy yet — check with: make check-tor"; break; }
-  sleep 5; ELAPSED=$((ELAPSED + 5))
+until docker compose logs tor 2>/dev/null | grep -q "Bootstrapped 100%"; do
+  if [[ $ELAPSED -ge 180 ]]; then
+    warn "Tor not fully bootstrapped yet — this can take time on a slow connection."
+    warn "Check progress with: docker compose logs tor | grep Bootstrapped"
+    break
+  fi
+  sleep 10; ELAPSED=$((ELAPSED + 10))
 done
-docker compose ps tor 2>/dev/null | grep -q "healthy" && success "Tor is healthy."
+docker compose logs tor 2>/dev/null | grep -q "Bootstrapped 100%" && success "Tor bootstrapped and ready."
 
 # ── Optional: systemd scan timer ─────────────────────────────────────────────
 if [[ "${INSTALL_TIMER:-}" == "1" ]]; then
@@ -224,7 +229,7 @@ echo -e "  nano ${INSTALL_DIR}/config/keywords.yaml     # keywords to watch for"
 echo -e "  nano ${INSTALL_DIR}/config/seeds.txt         # .onion seed URLs"
 echo ""
 echo -e "${YELLOW}Useful commands (run from ${INSTALL_DIR}):${NC}"
-echo -e "  make scan          # run a crawl (foreground, uses 'scan' profile)"
+echo -e "  make scan          # run a crawl (foreground)"
 echo -e "  make check-tor     # verify Tor connectivity"
 echo -e "  make stats         # show scan statistics"
 echo -e "  make hits          # show keyword matches"
