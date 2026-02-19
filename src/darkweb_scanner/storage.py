@@ -222,6 +222,6 @@ class Storage:
         with self.get_session() as session:
             return (
                 session.query(KeywordHitRecord)
-                .filter(KeywordHitRecord.alerted == False)
+                .filter(KeywordHitRecord.alerted.is_(False))
                 .all()
             )
