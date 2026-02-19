@@ -85,9 +85,7 @@ class TorClient:
         """Verify Tor is working by fetching the check.torproject.org endpoint."""
         try:
             session = await self.get_session()
-            async with session.get(
-                "https://check.torproject.org/api/ip", ssl=False
-            ) as resp:
+            async with session.get("https://check.torproject.org/api/ip", ssl=False) as resp:
                 data = await resp.json()
                 if data.get("IsTor"):
                     logger.info(f"Tor connectivity confirmed. Exit IP: {data.get('IP')}")

@@ -24,7 +24,7 @@ class CrawlSession(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     started_at = Column(DateTime, default=datetime.utcnow)
     ended_at = Column(DateTime, nullable=True)
-    seed_urls = Column(Text)          # JSON list
+    seed_urls = Column(Text)  # JSON list
     pages_crawled = Column(Integer, default=0)
     hits_found = Column(Integer, default=0)
     status = Column(String(50), default="running")  # running | completed | failed
@@ -98,6 +98,7 @@ class Storage:
 
     def create_crawl_session(self, seed_urls: list[str]) -> int:
         import json
+
         with self.get_session() as session:
             record = CrawlSession(seed_urls=json.dumps(seed_urls))
             session.add(record)
@@ -106,11 +107,7 @@ class Storage:
             return record.id
 
     def update_crawl_session(
-        self,
-        session_id: int,
-        pages_crawled: int,
-        hits_found: int,
-        status: str = "completed"
+        self, session_id: int, pages_crawled: int, hits_found: int, status: str = "completed"
     ):
         with self.get_session() as session:
             record = session.get(CrawlSession, session_id)
@@ -203,8 +200,7 @@ class Storage:
             total_sessions = session.query(func.count(CrawlSession.id)).scalar()
             top_keywords = (
                 session.query(
-                    KeywordHitRecord.keyword,
-                    func.count(KeywordHitRecord.id).label("count")
+                    KeywordHitRecord.keyword, func.count(KeywordHitRecord.id).label("count")
                 )
                 .group_by(KeywordHitRecord.keyword)
                 .order_by(func.count(KeywordHitRecord.id).desc())
@@ -220,8 +216,4 @@ class Storage:
 
     def get_unalerted_hits(self) -> list[KeywordHitRecord]:
         with self.get_session() as session:
-            return (
-                session.query(KeywordHitRecord)
-                .filter(KeywordHitRecord.alerted.is_(False))
-                .all()
-            )
+            return session.query(KeywordHitRecord).filter(KeywordHitRecord.alerted.is_(False)).all()

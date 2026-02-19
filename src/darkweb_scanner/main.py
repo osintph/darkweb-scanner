@@ -24,13 +24,16 @@ logging.basicConfig(
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
     handlers=[
         logging.StreamHandler(sys.stdout),
-        logging.FileHandler("/app/data/scanner.log") if os.path.exists("/app/data") else logging.NullHandler(),
+        logging.FileHandler("/app/data/scanner.log")
+        if os.path.exists("/app/data")
+        else logging.NullHandler(),
     ],
 )
 logger = logging.getLogger(__name__)
 
 
 # ── Core orchestration ─────────────────────────────────────────────────────────
+
 
 async def run_scan(
     seeds: list[str],
@@ -44,7 +47,9 @@ async def run_scan(
     crawler = Crawler(tor, crawl_config)
     scanner = Scanner(keyword_config)
 
-    logger.info(f"Starting scan with {len(seeds)} seed URL(s) and {scanner.keyword_count} keyword(s)")
+    logger.info(
+        f"Starting scan with {len(seeds)} seed URL(s) and {scanner.keyword_count} keyword(s)"
+    )
 
     if check_tor:
         logger.info("Checking Tor connectivity...")
@@ -109,6 +114,7 @@ async def run_scan(
 
 # ── CLI ────────────────────────────────────────────────────────────────────────
 
+
 @click.group()
 def cli():
     """Dark Web Scanner — keyword monitoring tool for .onion sites."""
@@ -150,14 +156,16 @@ def scan(seeds: str, keywords: str, depth: int, no_tor_check: bool):
     storage = Storage()
     alerter = Alerter()
 
-    asyncio.run(run_scan(
-        seeds=seed_urls,
-        keyword_config=keyword_config,
-        crawl_config=crawl_config,
-        storage=storage,
-        alerter=alerter,
-        check_tor=not no_tor_check,
-    ))
+    asyncio.run(
+        run_scan(
+            seeds=seed_urls,
+            keyword_config=keyword_config,
+            crawl_config=crawl_config,
+            storage=storage,
+            alerter=alerter,
+            check_tor=not no_tor_check,
+        )
+    )
 
 
 @cli.command()
@@ -165,9 +173,9 @@ def stats():
     """Print database statistics."""
     storage = Storage()
     s = storage.get_stats()
-    click.echo(f"\n{'='*40}")
+    click.echo(f"\n{'=' * 40}")
     click.echo("  Dark Web Scanner — Statistics")
-    click.echo(f"{'='*40}")
+    click.echo(f"{'=' * 40}")
     click.echo(f"  Sessions:    {s['total_sessions']}")
     click.echo(f"  Pages crawled: {s['total_pages']}")
     click.echo(f"  Keyword hits:  {s['total_hits']}")
@@ -175,7 +183,7 @@ def stats():
         click.echo("\n  Top keywords:")
         for item in s["top_keywords"]:
             click.echo(f"    {item['keyword']:<40} {item['count']} hits")
-    click.echo(f"{'='*40}\n")
+    click.echo(f"{'=' * 40}\n")
 
 
 @cli.command()
@@ -196,6 +204,7 @@ def hits(limit: int):
 @cli.command()
 def check_tor():
     """Verify Tor is reachable."""
+
     async def _check():
         tor = create_tor_client()
         ok = await tor.check_connectivity()

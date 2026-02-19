@@ -42,19 +42,21 @@ def api_hits():
     else:
         records = storage.get_recent_hits(limit=limit)
 
-    return jsonify([
-        {
-            "id": r.id,
-            "url": r.url,
-            "keyword": r.keyword,
-            "category": r.category,
-            "context": r.context,
-            "depth": r.depth,
-            "found_at": r.found_at.isoformat() if r.found_at else None,
-            "alerted": r.alerted,
-        }
-        for r in records
-    ])
+    return jsonify(
+        [
+            {
+                "id": r.id,
+                "url": r.url,
+                "keyword": r.keyword,
+                "category": r.category,
+                "context": r.context,
+                "depth": r.depth,
+                "found_at": r.found_at.isoformat() if r.found_at else None,
+                "alerted": r.alerted,
+            }
+            for r in records
+        ]
+    )
 
 
 @app.route("/api/health")

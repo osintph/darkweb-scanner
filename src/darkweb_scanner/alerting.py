@@ -79,7 +79,7 @@ class Alerter:
                         {
                             "title": "Context",
                             "value": hit.context[:500] + ("..." if len(hit.context) > 500 else ""),
-                            "short": False
+                            "short": False,
                         },
                     ],
                     "ts": int(datetime.utcnow().timestamp()),

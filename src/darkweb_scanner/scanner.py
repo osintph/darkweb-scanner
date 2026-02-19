@@ -17,8 +17,8 @@ class KeywordHit:
     url: str
     keyword: str
     category: str
-    context: str          # surrounding text window
-    position: int         # character offset in text
+    context: str  # surrounding text window
+    position: int  # character offset in text
     depth: int = 0
 
 
@@ -26,7 +26,7 @@ class KeywordHit:
 class KeywordConfig:
     categories: dict[str, list[str]] = field(default_factory=dict)
     case_sensitive: bool = False
-    context_window: int = 200     # chars on each side of hit
+    context_window: int = 200  # chars on each side of hit
     alert_on_first_hit_only: bool = True
 
     @classmethod
@@ -97,14 +97,16 @@ class Scanner:
                     break
 
                 context = self._get_context(text, match)
-                hits.append(KeywordHit(
-                    url=url,
-                    keyword=keyword,
-                    category=category,
-                    context=context,
-                    position=match.start(),
-                    depth=depth,
-                ))
+                hits.append(
+                    KeywordHit(
+                        url=url,
+                        keyword=keyword,
+                        category=category,
+                        context=context,
+                        position=match.start(),
+                        depth=depth,
+                    )
+                )
                 seen_keywords.add(keyword)
 
         if hits:

@@ -98,8 +98,13 @@ class Crawler:
                 content_type = resp.headers.get("Content-Type", "")
                 if not any(ct in content_type for ct in self.config.allowed_content_types):
                     return CrawlResult(
-                        url=url, status_code=resp.status, html="", text="",
-                        links=[], depth=0, error=f"Skipped content-type: {content_type}"
+                        url=url,
+                        status_code=resp.status,
+                        html="",
+                        text="",
+                        links=[],
+                        depth=0,
+                        error=f"Skipped content-type: {content_type}",
                     )
                 html = await resp.text(errors="replace")
                 soup = BeautifulSoup(html, "lxml")
@@ -109,19 +114,18 @@ class Crawler:
                 text = soup.get_text(separator=" ", strip=True)
                 links = self._extract_links(html, url)
                 return CrawlResult(
-                    url=url, status_code=resp.status, html=html,
-                    text=text, links=links, depth=0
+                    url=url, status_code=resp.status, html=html, text=text, links=links, depth=0
                 )
         except asyncio.TimeoutError:
-            return CrawlResult(url=url, status_code=0, html="", text="",
-                               links=[], depth=0, error="Timeout")
+            return CrawlResult(
+                url=url, status_code=0, html="", text="", links=[], depth=0, error="Timeout"
+            )
         except Exception as e:
-            return CrawlResult(url=url, status_code=0, html="", text="",
-                               links=[], depth=0, error=str(e))
+            return CrawlResult(
+                url=url, status_code=0, html="", text="", links=[], depth=0, error=str(e)
+            )
 
-    async def _crawl_url(
-        self, url: str, depth: int, session: aiohttp.ClientSession
-    ) -> CrawlResult:
+    async def _crawl_url(self, url: str, depth: int, session: aiohttp.ClientSession) -> CrawlResult:
         async with self._semaphore:
             delay = random.uniform(self.config.delay_min, self.config.delay_max)
             await asyncio.sleep(delay)
@@ -156,10 +160,7 @@ class Crawler:
             while queue and len(batch) < self.config.max_concurrent:
                 batch.append(queue.popleft())
 
-            tasks = [
-                self._crawl_url(url, depth, session)
-                for url, depth, _ in batch
-            ]
+            tasks = [self._crawl_url(url, depth, session) for url, depth, _ in batch]
             results = await asyncio.gather(*tasks, return_exceptions=True)
 
             for i, result in enumerate(results):

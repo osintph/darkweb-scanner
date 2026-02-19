@@ -11,8 +11,7 @@ from darkweb_scanner.tor_client import create_tor_client
 
 
 @pytest.mark.skipif(
-    os.getenv("TOR_INTEGRATION") != "1",
-    reason="Skipped unless TOR_INTEGRATION=1 env var is set"
+    os.getenv("TOR_INTEGRATION") != "1", reason="Skipped unless TOR_INTEGRATION=1 env var is set"
 )
 @pytest.mark.asyncio
 async def test_tor_connectivity():
@@ -24,8 +23,7 @@ async def test_tor_connectivity():
 
 
 @pytest.mark.skipif(
-    os.getenv("TOR_INTEGRATION") != "1",
-    reason="Skipped unless TOR_INTEGRATION=1 env var is set"
+    os.getenv("TOR_INTEGRATION") != "1", reason="Skipped unless TOR_INTEGRATION=1 env var is set"
 )
 @pytest.mark.asyncio
 async def test_onion_fetch():
@@ -34,7 +32,9 @@ async def test_onion_fetch():
     session = await tor.get_session()
     # DuckDuckGo's .onion site — a stable, legitimate test target
     try:
-        async with session.get("https://duckduckgogg42xjoc72x3sjasowoarfbgcmvfimaftt6twagswzczad.onion", ssl=False) as resp:
+        async with session.get(
+            "https://duckduckgogg42xjoc72x3sjasowoarfbgcmvfimaftt6twagswzczad.onion", ssl=False
+        ) as resp:
             assert resp.status == 200
     finally:
         await tor.close()
