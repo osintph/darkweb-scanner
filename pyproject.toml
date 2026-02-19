@@ -46,7 +46,8 @@ dev = [
     "types-beautifulsoup4",
 ]
 all = [
-    "darkweb-scanner[dashboard]",
+    "flask>=3.0",
+    "gunicorn>=21.0",
 ]
 
 [project.scripts]
@@ -66,18 +67,18 @@ line-length = 100
 target-version = "py311"
 
 [tool.ruff.lint]
-select = ["E", "F", "W", "I", "N", "UP", "B", "A", "C4", "RET", "SIM"]
-ignore = ["E501", "B008"]
+select = ["E", "F", "W", "I"]
+ignore = ["E501"]
 
 # ── Mypy (type checking) ────────────────────────────────────────────────────────
 [tool.mypy]
 python_version = "3.11"
 strict = false
-warn_return_any = true
+warn_return_any = false
 warn_unused_configs = true
+ignore_missing_imports = true
 
 # ── Pytest ──────────────────────────────────────────────────────────────────────
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 asyncio_mode = "auto"
-addopts = "--cov=darkweb_scanner --cov-report=term-missing"

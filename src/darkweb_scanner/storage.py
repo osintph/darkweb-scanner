@@ -8,10 +8,7 @@ import os
 from datetime import datetime
 from typing import Optional
 
-from sqlalchemy import (
-    Boolean, Column, DateTime, Integer, String, Text,
-    create_engine, func, Index
-)
+from sqlalchemy import Boolean, Column, DateTime, Index, Integer, String, Text, create_engine, func
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
 logger = logging.getLogger(__name__)

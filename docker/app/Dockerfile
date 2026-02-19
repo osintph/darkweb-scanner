@@ -1,6 +1,5 @@
 FROM python:3.11-slim
 
-# System deps
 RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
     libxml2-dev \
@@ -10,15 +9,15 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 WORKDIR /app
 
-# Install Python deps first (layer caching)
+# Copy everything first, then install
 COPY pyproject.toml ./
-RUN pip install --no-cache-dir -e ".[all]"
-
-# Copy source
 COPY src/ ./src/
 COPY config/ ./config/
 
-# Create data directory
+# Install the package
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir ".[all]"
+
 RUN mkdir -p /app/data
 
 ENV PYTHONUNBUFFERED=1

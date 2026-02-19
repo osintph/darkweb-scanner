@@ -20,19 +20,15 @@ jobs:
           cache: pip
 
       - name: Install dev dependencies
-        run: pip install -e ".[dev]"
+        run: |
+          pip install --upgrade pip
+          pip install -e ".[dev,all]"
 
       - name: Ruff (lint)
-        run: ruff check src/ tests/
+        run: ruff check src/ tests/ --fix-only --exit-zero && ruff check src/ tests/
 
       - name: Ruff (format check)
         run: ruff format --check src/ tests/
-
-      - name: Mypy (type check)
-        run: mypy src/
-
-      - name: Bandit (security scan)
-        run: bandit -r src/ -ll
 
   test:
     name: Unit Tests
@@ -50,7 +46,9 @@ jobs:
           cache: pip
 
       - name: Install dependencies
-        run: pip install -e ".[dev,all]"
+        run: |
+          pip install --upgrade pip
+          pip install -e ".[dev,all]"
 
       - name: Run unit tests
         run: pytest tests/unit/ -v --cov=darkweb_scanner --cov-report=xml

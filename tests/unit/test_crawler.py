@@ -1,8 +1,10 @@
 """Unit tests for the crawler — link extraction and URL filtering."""
 
+from unittest.mock import MagicMock
+
 import pytest
-from unittest.mock import MagicMock, AsyncMock
-from darkweb_scanner.crawler import Crawler, CrawlConfig
+
+from darkweb_scanner.crawler import CrawlConfig, Crawler
 
 
 @pytest.fixture
@@ -35,9 +37,8 @@ def test_extract_links(crawler):
     assert "http://other.onion/page1" in links
     assert "http://base.onion/relative" in links
     assert "http://valid.onion/page2" in links
-    # clearnet and mailto should be excluded
-    assert not any("clearnet.com" in l for l in links)
-    assert not any("mailto" in l for l in links)
+    assert not any("clearnet.com" in link for link in links)
+    assert not any("mailto" in link for link in links)
 
 
 def test_should_crawl_already_visited(crawler):

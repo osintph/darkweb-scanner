@@ -1,6 +1,7 @@
 """Unit tests for the keyword scanner."""
 
 import pytest
+
 from darkweb_scanner.scanner import KeywordConfig, Scanner
 
 
@@ -56,7 +57,6 @@ def test_context_window(scanner):
     text = "before " * 20 + "acme corp" + " after " * 20
     hits = scanner.scan("http://test.onion", text)
     assert len(hits) == 1
-    # context should be shorter than full text
     assert len(hits[0].context) < len(text)
     assert "acme corp" in hits[0].context.lower()
 
