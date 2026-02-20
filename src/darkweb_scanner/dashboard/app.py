@@ -8,17 +8,6 @@ from datetime import timedelta
 from flask import Flask, redirect, url_for
 from werkzeug.middleware.proxy_fix import ProxyFix
 
-from ..storage import Storage
-
-_storage = None
-
-
-def get_storage() -> Storage:
-    global _storage
-    if _storage is None:
-        _storage = Storage()
-    return _storage
-
 
 def create_app() -> Flask:
     app = Flask(__name__)
@@ -29,7 +18,6 @@ def create_app() -> Flask:
     # Trust X-Forwarded-Proto from nginx so url_for generates https:// URLs
     app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
 
-    # ── Blueprints ────────────────────────────────────────────────────────────
     from .auth_routes import auth_bp
     from .dashboard_routes import dashboard_bp
 
@@ -42,8 +30,6 @@ def create_app() -> Flask:
 
     return app
 
-
-# ── Entrypoint ────────────────────────────────────────────────────────────────
 
 app = create_app()
 

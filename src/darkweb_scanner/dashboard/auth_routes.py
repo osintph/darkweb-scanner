@@ -2,39 +2,37 @@
 Auth blueprint — login, register, TOTP setup/verify, OAuth, logout.
 """
 
+import logging
 import os
 import secrets
-import logging
-import requests as http_requests
-
-from flask import (
-    Blueprint, flash, redirect, render_template,
-    request, session, url_for
-)
 from urllib.parse import urlencode
 
+import requests as http_requests
+from flask import Blueprint, flash, redirect, render_template, request, session, url_for
+
 from ..auth import (
-    check_password, generate_totp_qr_base64, generate_totp_secret,
-    get_oauth_providers, hash_password, login_user, logout_user,
-    validate_password_strength, verify_totp
+    check_password,
+    generate_totp_qr_base64,
+    generate_totp_secret,
+    get_oauth_providers,
+    hash_password,
+    login_user,
+    logout_user,
+    validate_password_strength,
+    verify_totp,
 )
-from ..storage import Storage
+from .storage_helper import get_storage
 
 logger = logging.getLogger(__name__)
 auth_bp = Blueprint("auth", __name__)
 
-def get_storage() -> Storage:
-    from .app import get_storage as _gs
-    return _gs()
-
 
 # ── Registration ──────────────────────────────────────────────────────────────
+
 
 @auth_bp.route("/register", methods=["GET", "POST"])
 def register():
     storage = get_storage()
-    # Only allow registration if no users exist yet (first-run setup)
-    # After that, admin must create accounts
     if storage.count_users() > 0:
         flash("Registration is closed. Contact your administrator.", "error")
         return redirect(url_for("auth.login"))
@@ -66,7 +64,7 @@ def register():
             username=username,
             email=email or None,
             password_hash=hash_password(password),
-            is_admin=True  # first user is always admin
+            is_admin=True,
         )
         login_user(user_id, username)
         flash("Account created! Set up 2FA to secure your account.", "success")
@@ -77,6 +75,7 @@ def register():
 
 # ── Login ─────────────────────────────────────────────────────────────────────
 
+
 @auth_bp.route("/login", methods=["GET", "POST"])
 def login():
     if session.get("logged_in"):
@@ -84,7 +83,6 @@ def login():
 
     storage = get_storage()
 
-    # First-run: no users exist yet
     if storage.count_users() == 0:
         return redirect(url_for("auth.register"))
 
@@ -103,13 +101,11 @@ def login():
             flash("Invalid username or password.", "error")
             return render_template("login.html", oauth_providers=oauth_providers)
 
-        # Check if TOTP is enabled
         if user.totp_enabled and user.totp_secret:
             session["totp_pending_user_id"] = user.id
             session["totp_pending_username"] = user.username
             return redirect(url_for("auth.totp_verify"))
 
-        # No 2FA — log in directly
         login_user(user.id, user.username)
         storage.update_user_login(user.id)
         next_url = request.args.get("next") or url_for("dashboard.index")
@@ -119,6 +115,7 @@ def login():
 
 
 # ── TOTP Setup ────────────────────────────────────────────────────────────────
+
 
 @auth_bp.route("/totp/setup", methods=["GET", "POST"])
 def totp_setup():
@@ -147,7 +144,6 @@ def totp_setup():
         flash("Two-factor authentication enabled!", "success")
         return redirect(url_for("dashboard.index"))
 
-    # Generate new secret for setup
     secret = generate_totp_secret()
     session["totp_setup_secret"] = secret
     qr = generate_totp_qr_base64(secret, username)
@@ -155,6 +151,7 @@ def totp_setup():
 
 
 # ── TOTP Verify ───────────────────────────────────────────────────────────────
+
 
 @auth_bp.route("/totp/verify", methods=["GET", "POST"])
 def totp_verify():
@@ -186,6 +183,7 @@ def totp_verify():
 
 # ── OAuth ─────────────────────────────────────────────────────────────────────
 
+
 @auth_bp.route("/oauth/<provider>")
 def oauth_redirect(provider):
     providers = get_oauth_providers()
@@ -216,7 +214,6 @@ def oauth_callback(provider):
         flash("Unknown OAuth provider.", "error")
         return redirect(url_for("auth.login"))
 
-    # Validate state
     if request.args.get("state") != session.pop("oauth_state", None):
         flash("OAuth state mismatch. Please try again.", "error")
         return redirect(url_for("auth.login"))
@@ -229,17 +226,20 @@ def oauth_callback(provider):
     p = providers[provider]
     callback_url = url_for("auth.oauth_callback", provider=provider, _external=True)
 
-    # Exchange code for token
     try:
-        token_resp = http_requests.post(p["token_url"], data={
-            "client_id": p["client_id"],
-            "client_secret": p["client_secret"],
-            "code": code,
-            "redirect_uri": callback_url,
-            "grant_type": "authorization_code",
-        }, headers={"Accept": "application/json"}, timeout=10)
-        token_data = token_resp.json()
-        access_token = token_data.get("access_token")
+        token_resp = http_requests.post(
+            p["token_url"],
+            data={
+                "client_id": p["client_id"],
+                "client_secret": p["client_secret"],
+                "code": code,
+                "redirect_uri": callback_url,
+                "grant_type": "authorization_code",
+            },
+            headers={"Accept": "application/json"},
+            timeout=10,
+        )
+        access_token = token_resp.json().get("access_token")
     except Exception as e:
         logger.error(f"OAuth token exchange failed: {e}")
         flash("OAuth login failed. Please try again.", "error")
@@ -249,23 +249,21 @@ def oauth_callback(provider):
         flash("OAuth login failed — no access token.", "error")
         return redirect(url_for("auth.login"))
 
-    # Fetch user info
     try:
-        userinfo_resp = http_requests.get(p["userinfo_url"], headers={
-            "Authorization": f"Bearer {access_token}",
-            "Accept": "application/json",
-        }, timeout=10)
-        userinfo = userinfo_resp.json()
+        userinfo = http_requests.get(
+            p["userinfo_url"],
+            headers={"Authorization": f"Bearer {access_token}", "Accept": "application/json"},
+            timeout=10,
+        ).json()
     except Exception as e:
         logger.error(f"OAuth userinfo failed: {e}")
         flash("OAuth login failed — could not fetch user info.", "error")
         return redirect(url_for("auth.login"))
 
-    # Extract identity
     if provider == "google":
         oauth_id = userinfo.get("sub")
         email = userinfo.get("email")
-        username = email.split("@")[0] if email else f"google_{oauth_id[:8]}"
+        username = email.split("@")[0] if email else f"google_{str(oauth_id)[:8]}"
     elif provider == "github":
         oauth_id = str(userinfo.get("id"))
         email = userinfo.get("email")
@@ -280,19 +278,15 @@ def oauth_callback(provider):
 
     storage = get_storage()
 
-    # Block OAuth login if no users exist yet — must register locally first
     if storage.count_users() == 0:
         flash("Please create a local admin account first.", "error")
         return redirect(url_for("auth.register"))
 
-    # Find or create user
     user = storage.get_user_by_oauth(provider, oauth_id)
     if not user and email:
         user = storage.get_user_by_email(email)
 
     if not user:
-        # New OAuth user — create account
-        # Make username unique if taken
         base_username = username
         counter = 1
         while storage.get_user_by_username(username):
@@ -314,6 +308,7 @@ def oauth_callback(provider):
 
 
 # ── Logout ────────────────────────────────────────────────────────────────────
+
 
 @auth_bp.route("/logout")
 def logout():
