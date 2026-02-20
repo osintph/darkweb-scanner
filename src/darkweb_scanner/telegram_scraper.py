@@ -97,12 +97,13 @@ async def scrape_channels(
                 async for message in client.iter_messages(
                     entity, limit=config.limit_per_channel
                 ):
-                    if not message.text:
+                    # Capture text messages and media captions
+                    text = message.text or message.message or ""
+                    if not text:
                         continue
 
                     pages_scraped += 1
                     url = f"https://t.me/{channel}/{message.id}"
-                    text = message.text
 
                     hits = scanner.scan(url=url, text=text, depth=0)
                     for hit in hits:
