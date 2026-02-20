@@ -1,16 +1,13 @@
 """
-Web dashboard — Flask app for viewing scan results.
+Flask application factory — wires up auth + dashboard blueprints.
 """
 
 import os
-from datetime import datetime
+from datetime import timedelta
 
-from flask import Flask, jsonify, render_template, request
+from flask import Flask, redirect, url_for
 
 from ..storage import Storage
-
-app = Flask(__name__)
-app.secret_key = os.getenv("DASHBOARD_SECRET_KEY", "change-me-in-production")
 
 _storage = None
 
@@ -22,51 +19,34 @@ def get_storage() -> Storage:
     return _storage
 
 
-@app.route("/")
-def index():
-    return render_template("index.html")
+def create_app() -> Flask:
+    app = Flask(__name__)
 
+    app.secret_key = os.getenv("DASHBOARD_SECRET_KEY", "change-me-in-production")
+    app.permanent_session_lifetime = timedelta(hours=12)
 
-@app.route("/api/stats")
-def api_stats():
-    return jsonify(get_storage().get_stats())
+    # Trust X-Forwarded-Proto from nginx so url_for generates https:// URLs
+    from werkzeug.middleware.proxy_fix import ProxyFix
+    app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
 
+    # ── Blueprints ────────────────────────────────────────────────────────────
+    from .auth_routes import auth_bp
+    from .dashboard_routes import dashboard_bp
 
-@app.route("/api/hits")
-def api_hits():
-    limit = int(request.args.get("limit", 50))
-    keyword = request.args.get("keyword")
-    storage = get_storage()
-    if keyword:
-        records = storage.get_hits_by_keyword(keyword, limit=limit)
-    else:
-        records = storage.get_recent_hits(limit=limit)
+    app.register_blueprint(auth_bp)
+    app.register_blueprint(dashboard_bp)
 
-    return jsonify(
-        [
-            {
-                "id": r.id,
-                "url": r.url,
-                "keyword": r.keyword,
-                "category": r.category,
-                "context": r.context,
-                "depth": r.depth,
-                "found_at": r.found_at.isoformat() if r.found_at else None,
-                "alerted": r.alerted,
-            }
-            for r in records
-        ]
-    )
+    # Root redirect
+    @app.route("/")
+    def root():
+        return redirect(url_for("dashboard.index"))
 
-
-@app.route("/api/health")
-def health():
-    return jsonify({"status": "ok", "timestamp": datetime.utcnow().isoformat()})
-
-
-def create_app():
     return app
 
+
+# ── Entrypoint ────────────────────────────────────────────────────────────────
+
+app = create_app()
 
 if __name__ == "__main__":
     port = int(os.getenv("DASHBOARD_PORT", "8080"))
