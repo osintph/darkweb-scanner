@@ -93,7 +93,7 @@ def generate_totp_qr_base64(secret: str, username: str) -> str:
 
 def get_oauth_providers() -> dict:
     providers = {}
-    
+
     if os.getenv("GOOGLE_CLIENT_ID") and os.getenv("GOOGLE_CLIENT_SECRET"):
         providers["google"] = {
             "name": "Google",
@@ -105,7 +105,7 @@ def get_oauth_providers() -> dict:
             "userinfo_url": "https://www.googleapis.com/oauth2/v3/userinfo",
             "scope": "openid email profile",
         }
-    
+
     if os.getenv("GITHUB_CLIENT_ID") and os.getenv("GITHUB_CLIENT_SECRET"):
         providers["github"] = {
             "name": "GitHub",
@@ -117,5 +117,5 @@ def get_oauth_providers() -> dict:
             "userinfo_url": "https://api.github.com/user",
             "scope": "read:user user:email",
         }
-    
+
     return providers
