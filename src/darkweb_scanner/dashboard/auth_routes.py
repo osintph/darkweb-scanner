@@ -3,7 +3,6 @@ Auth blueprint — login, register, TOTP setup/verify, OAuth, logout.
 """
 
 import logging
-import os
 import secrets
 from urllib.parse import urlencode
 
@@ -27,7 +26,7 @@ logger = logging.getLogger(__name__)
 auth_bp = Blueprint("auth", __name__)
 
 
-# ── Registration ──────────────────────────────────────────────────────────────
+# ── Registration ───────────────────────────────────────────────────────────────
 
 
 @auth_bp.route("/register", methods=["GET", "POST"])
@@ -73,7 +72,7 @@ def register():
     return render_template("register.html")
 
 
-# ── Login ─────────────────────────────────────────────────────────────────────
+# ── Login ──────────────────────────────────────────────────────────────────────
 
 
 @auth_bp.route("/login", methods=["GET", "POST"])
@@ -114,7 +113,7 @@ def login():
     return render_template("login.html", oauth_providers=oauth_providers)
 
 
-# ── TOTP Setup ────────────────────────────────────────────────────────────────
+# ── TOTP Setup ─────────────────────────────────────────────────────────────────
 
 
 @auth_bp.route("/totp/setup", methods=["GET", "POST"])
@@ -150,7 +149,7 @@ def totp_setup():
     return render_template("totp_setup.html", qr_code=qr, secret=secret)
 
 
-# ── TOTP Verify ───────────────────────────────────────────────────────────────
+# ── TOTP Verify ────────────────────────────────────────────────────────────────
 
 
 @auth_bp.route("/totp/verify", methods=["GET", "POST"])
@@ -171,7 +170,9 @@ def totp_verify():
 
         if not verify_totp(user.totp_secret, code):
             flash("Invalid code. Please try again.", "error")
-            return render_template("totp_verify.html", username=session.get("totp_pending_username"))
+            return render_template(
+                "totp_verify.html", username=session.get("totp_pending_username")
+            )
 
         login_user(user.id, user.username)
         storage.update_user_login(user.id)
@@ -181,7 +182,7 @@ def totp_verify():
     return render_template("totp_verify.html", username=session.get("totp_pending_username"))
 
 
-# ── OAuth ─────────────────────────────────────────────────────────────────────
+# ── OAuth ──────────────────────────────────────────────────────────────────────
 
 
 @auth_bp.route("/oauth/<provider>")
@@ -307,7 +308,7 @@ def oauth_callback(provider):
     return redirect(url_for("dashboard.index"))
 
 
-# ── Logout ────────────────────────────────────────────────────────────────────
+# ── Logout ─────────────────────────────────────────────────────────────────────
 
 
 @auth_bp.route("/logout")
