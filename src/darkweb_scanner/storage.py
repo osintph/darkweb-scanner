@@ -306,3 +306,31 @@ class Storage:
         with self.get_session() as session:
             return session.query(KeywordHitRecord).filter(KeywordHitRecord.alerted.is_(False)).all()
 
+    def list_users(self):
+        with self.get_session() as session:
+            return session.query(User).order_by(User.created_at).all()
+
+    def delete_user(self, user_id: int):
+        with self.get_session() as session:
+            user = session.get(User, user_id)
+            if user:
+                session.delete(user)
+                session.commit()
+
+    def update_user_password(self, user_id: int, password_hash: str):
+        with self.get_session() as session:
+            user = session.get(User, user_id)
+            if user:
+                user.password_hash = password_hash
+                session.commit()
+
+    def get_active_session(self):
+        with self.get_session() as session:
+            return (
+                session.query(CrawlSession)
+                .filter(CrawlSession.status == "running")
+                .order_by(CrawlSession.started_at.desc())
+                .first()
+            )
+
+

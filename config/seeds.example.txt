@@ -1,13 +1,25 @@
 # ════════════════════════════════════════════════════════════
-#  Dark Web Scanner — Seed URLs
-#  Add .onion URLs to crawl, one per line.
-#  Lines starting with # are ignored.
-#  Copy this to seeds.txt and add your targets.
+#  Dark Web Scanner — Default Seed URLs
+#  These are well-known .onion directories and indexes.
+#  Copy this to seeds.txt — it will not be committed to git.
 # ════════════════════════════════════════════════════════════
 
-# Ahmia is a clearnet Tor search engine — use it to find .onion seeds
-# https://ahmia.fi
+# ── Search Engines & Indexes ──────────────────────────────
+http://juhanurmihxlp77nkq76byazcldy2hlmovfu2epvl5ankdibsot4csyd.onion
+http://haystak5njsmn2hqkewecpaxetahtwhsbsa64jom2k22z5afxhnpxfid.onion
+http://2fd6cemt4gmccflhm6imvdfvli3nf7zn6rfrwpsy7uhxrgbypvwf5fad.onion
 
-# Example (replace with real .onion URLs):
-# http://examplexxx.onion
-# http://anotherexample.onion/forum
+# ── Link Directories ──────────────────────────────────────
+http://zqktlwiuavvvqqt4ybvgvi7tyo4hjl5xgfuvpdf6otjiycgwqbym2qad.onion
+http://s4k4ceiapwwgcm3mkb6e4diqecpo7kvdnfr5gg7sph7jjppqkvwwqtyd.onion
+
+# ── Forums & Communities ──────────────────────────────────
+http://dreadytofatroptsdj6io7l3xptbet6onoyno2yv7jicoxknyazubrad.onion
+http://g66ol3eb5ujdckzqqfmwhwk4uzilnssnxitxtowpg3bwnpruo6p3yd.onion
+
+# ── News & Media ──────────────────────────────────────────
+http://p53lf57qovyuvwsc6xnrppyply3vtqm7l6pcobkmyqsiofyeznfu5uqd.onion
+http://darkfailenbsdla5mal2mxn2uz66od5vtzd5qozslagrfzachha3f3id.onion
+
+# ── Paste & Data Sites ────────────────────────────────────
+http://strongerw2ise74v3duebgsvug4mehyhlpa7f6kfwnas7zofs3kov7yd.onion
