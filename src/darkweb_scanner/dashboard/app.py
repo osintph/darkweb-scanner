@@ -6,6 +6,7 @@ import os
 from datetime import timedelta
 
 from flask import Flask, redirect, url_for
+from werkzeug.middleware.proxy_fix import ProxyFix
 
 from ..storage import Storage
 
@@ -26,7 +27,6 @@ def create_app() -> Flask:
     app.permanent_session_lifetime = timedelta(hours=12)
 
     # Trust X-Forwarded-Proto from nginx so url_for generates https:// URLs
-    from werkzeug.middleware.proxy_fix import ProxyFix
     app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
 
     # ── Blueprints ────────────────────────────────────────────────────────────
@@ -36,7 +36,6 @@ def create_app() -> Flask:
     app.register_blueprint(auth_bp)
     app.register_blueprint(dashboard_bp)
 
-    # Root redirect
     @app.route("/")
     def root():
         return redirect(url_for("dashboard.index"))
