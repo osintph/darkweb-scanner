@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Dark Web Scanner — Two-Factor Authentication</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #0d1117; --surface: #161b22; --border: #30363d;
+      --text: #e6edf3; --muted: #8b949e; --accent: #58a6ff; --red: #f85149;
+    }
+    body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, sans-serif;
+      min-height: 100vh; display: flex; align-items: center; justify-content: center; }
+    .card { background: var(--surface); border: 1px solid var(--border);
+      border-radius: 12px; padding: 40px; width: 100%; max-width: 380px; text-align: center; }
+    .icon { font-size: 3rem; margin-bottom: 16px; }
+    h1 { font-size: 1.2rem; margin-bottom: 8px; }
+    p { color: var(--muted); font-size: 0.875rem; margin-bottom: 28px; line-height: 1.5; }
+    .flash { padding: 10px 14px; border-radius: 6px; font-size: 0.85rem; margin-bottom: 20px; text-align: left; }
+    .flash.error { background: rgba(248,81,73,0.15); border: 1px solid rgba(248,81,73,0.4); color: #f85149; }
+    input[type="text"] {
+      width: 100%; background: var(--bg); border: 1px solid var(--border);
+      border-radius: 6px; color: var(--text); padding: 14px;
+      font-size: 1.8rem; letter-spacing: 0.5em; text-align: center;
+      margin-bottom: 16px; font-family: monospace;
+    }
+    input:focus { outline: none; border-color: var(--accent); }
+    .btn { width: 100%; padding: 11px; border: none; border-radius: 6px;
+      font-size: 0.9rem; font-weight: 600; cursor: pointer; margin-bottom: 14px; }
+    .btn-primary { background: var(--accent); color: #0d1117; }
+    .btn-primary:hover { opacity: 0.88; }
+    .back { color: var(--muted); font-size: 0.82rem; text-decoration: none; }
+    .back:hover { color: var(--text); }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="icon">🔐</div>
+    <h1>Two-Factor Authentication</h1>
+    <p>
+      {% if username %}Welcome back, <strong>{{ username }}</strong>. {% endif %}
+      Enter the 6-digit code from your authenticator app.
+    </p>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for category, message in messages %}
+        <div class="flash {{ category }}">{{ message }}</div>
+      {% endfor %}
+    {% endwith %}
+
+    <form method="POST">
+      <input type="text" name="code" maxlength="6" placeholder="000000"
+             autocomplete="one-time-code" inputmode="numeric"
+             autofocus required/>
+      <button type="submit" class="btn btn-primary">Verify</button>
+    </form>
+    <a href="{{ url_for('auth.login') }}" class="back">← Back to login</a>
+  </div>
+</body>
+</html>

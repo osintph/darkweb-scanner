@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Dark Web Scanner — Create Admin Account</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #0d1117; --surface: #161b22; --surface2: #21262d;
+      --border: #30363d; --text: #e6edf3; --muted: #8b949e;
+      --accent: #58a6ff; --red: #f85149; --green: #3fb950; --yellow: #d29922;
+    }
+    body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, sans-serif;
+      min-height: 100vh; display: flex; align-items: center; justify-content: center; }
+    .card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 12px; padding: 40px; width: 100%; max-width: 420px;
+    }
+    .logo { text-align: center; margin-bottom: 24px; }
+    .logo h1 { font-size: 1.3rem; font-weight: 700; }
+    .first-run {
+      background: rgba(210,153,34,0.12); border: 1px solid rgba(210,153,34,0.35);
+      border-radius: 6px; padding: 12px 14px; font-size: 0.83rem;
+      color: var(--yellow); margin-bottom: 24px;
+    }
+    .flash { padding: 10px 14px; border-radius: 6px; font-size: 0.85rem; margin-bottom: 20px; }
+    .flash.error { background: rgba(248,81,73,0.15); border: 1px solid rgba(248,81,73,0.4); color: #f85149; }
+    .form-group { margin-bottom: 16px; }
+    label { display: block; font-size: 0.85rem; color: var(--muted); margin-bottom: 6px; }
+    input[type="text"], input[type="email"], input[type="password"] {
+      width: 100%; background: var(--bg); border: 1px solid var(--border);
+      border-radius: 6px; color: var(--text); padding: 10px 14px; font-size: 0.9rem;
+    }
+    input:focus { outline: none; border-color: var(--accent); }
+    .hint { font-size: 0.75rem; color: var(--muted); margin-top: 4px; }
+    .btn { width: 100%; padding: 11px; border: none; border-radius: 6px;
+      font-size: 0.9rem; font-weight: 600; cursor: pointer; }
+    .btn-primary { background: var(--accent); color: #0d1117; }
+    .btn-primary:hover { opacity: 0.88; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="logo">
+      <h1>Create Admin Account</h1>
+    </div>
+
+    <div class="first-run">
+      ⚠️ First-time setup — create the administrator account. This page is only available once.
+    </div>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for category, message in messages %}
+        <div class="flash {{ category }}">{{ message }}</div>
+      {% endfor %}
+    {% endwith %}
+
+    <form method="POST">
+      <div class="form-group">
+        <label for="username">Username</label>
+        <input type="text" id="username" name="username" required autocomplete="username"/>
+      </div>
+      <div class="form-group">
+        <label for="email">Email <span style="color:var(--muted)">(optional)</span></label>
+        <input type="email" id="email" name="email" autocomplete="email"/>
+      </div>
+      <div class="form-group">
+        <label for="password">Password</label>
+        <input type="password" id="password" name="password" required autocomplete="new-password"/>
+        <div class="hint">Min 10 characters, one uppercase, one number.</div>
+      </div>
+      <div class="form-group">
+        <label for="confirm_password">Confirm Password</label>
+        <input type="password" id="confirm_password" name="confirm_password" required autocomplete="new-password"/>
+      </div>
+      <button type="submit" class="btn btn-primary">Create Account &amp; Continue</button>
+    </form>
+  </div>
+</body>
+</html>

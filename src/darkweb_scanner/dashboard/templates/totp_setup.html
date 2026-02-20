@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Dark Web Scanner — Set Up 2FA</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #0d1117; --surface: #161b22; --border: #30363d;
+      --text: #e6edf3; --muted: #8b949e; --accent: #58a6ff;
+      --red: #f85149; --green: #3fb950;
+    }
+    body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, sans-serif;
+      min-height: 100vh; display: flex; align-items: center; justify-content: center; }
+    .card { background: var(--surface); border: 1px solid var(--border);
+      border-radius: 12px; padding: 40px; width: 100%; max-width: 460px; }
+    h1 { font-size: 1.3rem; margin-bottom: 8px; }
+    p { color: var(--muted); font-size: 0.875rem; margin-bottom: 24px; line-height: 1.5; }
+    .steps { counter-reset: step; margin-bottom: 24px; }
+    .step { display: flex; gap: 14px; margin-bottom: 16px; align-items: flex-start; }
+    .step-num {
+      counter-increment: step; background: var(--accent); color: #0d1117;
+      width: 24px; height: 24px; border-radius: 50%; display: flex;
+      align-items: center; justify-content: center; font-size: 0.78rem;
+      font-weight: 700; flex-shrink: 0; margin-top: 1px;
+    }
+    .step-num::before { content: counter(step); }
+    .step-text { font-size: 0.875rem; line-height: 1.5; color: var(--text); }
+    .qr-wrap { text-align: center; margin: 20px 0; }
+    .qr-wrap img { border-radius: 8px; border: 4px solid white; }
+    .secret-box {
+      background: var(--bg); border: 1px solid var(--border); border-radius: 6px;
+      padding: 10px 14px; font-family: monospace; font-size: 0.85rem;
+      color: var(--accent); text-align: center; letter-spacing: 0.1em;
+      margin-bottom: 24px; word-break: break-all;
+    }
+    .flash { padding: 10px 14px; border-radius: 6px; font-size: 0.85rem; margin-bottom: 20px; }
+    .flash.error { background: rgba(248,81,73,0.15); border: 1px solid rgba(248,81,73,0.4); color: #f85149; }
+    .flash.success { background: rgba(63,185,80,0.15); border: 1px solid rgba(63,185,80,0.4); color: #3fb950; }
+    .form-group { margin-bottom: 16px; }
+    label { display: block; font-size: 0.85rem; color: var(--muted); margin-bottom: 6px; }
+    input[type="text"] {
+      width: 100%; background: var(--bg); border: 1px solid var(--border);
+      border-radius: 6px; color: var(--text); padding: 10px 14px;
+      font-size: 1.2rem; letter-spacing: 0.3em; text-align: center;
+    }
+    input:focus { outline: none; border-color: var(--accent); }
+    .btn { width: 100%; padding: 11px; border: none; border-radius: 6px;
+      font-size: 0.9rem; font-weight: 600; cursor: pointer; }
+    .btn-primary { background: var(--accent); color: #0d1117; }
+    .skip { text-align: center; margin-top: 14px; }
+    .skip a { color: var(--muted); font-size: 0.82rem; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>🔐 Set Up Two-Factor Authentication</h1>
+    <p>Add an extra layer of security to your account using an authenticator app like Google Authenticator, Authy, or 1Password.</p>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for category, message in messages %}
+        <div class="flash {{ category }}">{{ message }}</div>
+      {% endfor %}
+    {% endwith %}
+
+    <div class="steps">
+      <div class="step">
+        <div class="step-num"></div>
+        <div class="step-text">Install an authenticator app on your phone (Google Authenticator, Authy, 1Password, etc.)</div>
+      </div>
+      <div class="step">
+        <div class="step-num"></div>
+        <div class="step-text">Scan the QR code below with your authenticator app</div>
+      </div>
+      <div class="step">
+        <div class="step-num"></div>
+        <div class="step-text">Enter the 6-digit code shown in the app to verify and enable 2FA</div>
+      </div>
+    </div>
+
+    <div class="qr-wrap">
+      <img src="data:image/png;base64,{{ qr_code }}" alt="2FA QR Code" width="200" height="200"/>
+    </div>
+
+    <p style="font-size:0.78rem; color:var(--muted); text-align:center; margin-bottom:8px">
+      Can't scan? Enter this secret manually:
+    </p>
+    <div class="secret-box">{{ secret }}</div>
+
+    <form method="POST">
+      <div class="form-group">
+        <label for="code">Verification Code</label>
+        <input type="text" id="code" name="code" maxlength="6" placeholder="000000"
+               autocomplete="one-time-code" inputmode="numeric" required/>
+      </div>
+      <button type="submit" class="btn btn-primary">Enable 2FA</button>
+    </form>
+
+    <div class="skip">
+      <a href="{{ url_for('dashboard.index') }}">Skip for now (not recommended)</a>
+    </div>
+  </div>
+</body>
+</html>

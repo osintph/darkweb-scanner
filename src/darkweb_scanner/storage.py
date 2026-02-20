@@ -214,6 +214,96 @@ class Storage:
                 "top_keywords": [{"keyword": k, "count": c} for k, c in top_keywords],
             }
 
+
+    # --- Users ---
+
+    def get_user_by_id(self, user_id: int):
+        with self.get_session() as session:
+            return session.get(User, user_id)
+
+    def get_user_by_username(self, username: str):
+        with self.get_session() as session:
+            return session.query(User).filter(User.username == username).first()
+
+    def get_user_by_email(self, email: str):
+        with self.get_session() as session:
+            return session.query(User).filter(User.email == email).first()
+
+    def get_user_by_oauth(self, provider: str, oauth_id: str):
+        with self.get_session() as session:
+            return session.query(User).filter(
+                User.oauth_provider == provider,
+                User.oauth_id == oauth_id
+            ).first()
+
+    def create_user(self, username: str, password_hash: str = None,
+                    email: str = None, oauth_provider: str = None,
+                    oauth_id: str = None, is_admin: bool = False):
+        with self.get_session() as session:
+            user = User(
+                username=username,
+                email=email,
+                password_hash=password_hash,
+                oauth_provider=oauth_provider,
+                oauth_id=oauth_id,
+                is_admin=is_admin,
+            )
+            session.add(user)
+            session.commit()
+            session.refresh(user)
+            return user.id
+
+    def update_user_login(self, user_id: int):
+        with self.get_session() as session:
+            user = session.get(User, user_id)
+            if user:
+                user.last_login = datetime.utcnow()
+                session.commit()
+
+    def enable_totp(self, user_id: int, secret: str):
+        with self.get_session() as session:
+            user = session.get(User, user_id)
+            if user:
+                user.totp_secret = secret
+                user.totp_enabled = True
+                session.commit()
+
+    def disable_totp(self, user_id: int):
+        with self.get_session() as session:
+            user = session.get(User, user_id)
+            if user:
+                user.totp_secret = None
+                user.totp_enabled = False
+                session.commit()
+
+    def count_users(self) -> int:
+        with self.get_session() as session:
+            return session.query(func.count(User.id)).scalar() or 0
+
     def get_unalerted_hits(self) -> list[KeywordHitRecord]:
         with self.get_session() as session:
             return session.query(KeywordHitRecord).filter(KeywordHitRecord.alerted.is_(False)).all()
+
+
+# ── User model (added for authentication) ────────────────────────────────────
+
+class User(Base):
+    __tablename__ = "users"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    username = Column(String(100), unique=True, nullable=False)
+    email = Column(String(255), unique=True, nullable=True)
+    password_hash = Column(String(255), nullable=True)  # None for OAuth-only users
+    totp_secret = Column(String(64), nullable=True)
+    totp_enabled = Column(Boolean, default=False)
+    oauth_provider = Column(String(50), nullable=True)  # "google" | "github" | None
+    oauth_id = Column(String(255), nullable=True)
+    is_admin = Column(Boolean, default=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    last_login = Column(DateTime, nullable=True)
+
+    __table_args__ = (
+        Index("ix_users_username", "username"),
+        Index("ix_users_email", "email"),
+        Index("ix_users_oauth", "oauth_provider", "oauth_id"),
+    )
