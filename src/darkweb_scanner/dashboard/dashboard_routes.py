@@ -24,6 +24,7 @@ KEYWORDS_DEFAULT = CONFIG_DIR / "keywords.yaml"
 SEEDS_FILE = DATA_DIR / "seeds.txt"
 SEEDS_DEFAULT = CONFIG_DIR / "seeds.txt"
 CRAWL_FLAG = DATA_DIR / "crawl.start"
+STOP_FLAG  = DATA_DIR / "crawl.stop"
 
 
 def _ensure_data_dir():
@@ -230,6 +231,18 @@ def api_crawl_start():
         return jsonify({"error": str(e)}), 500
 
 
+
+
+@dashboard_bp.route("/api/crawl/stop", methods=["POST"])
+@require_login
+def api_crawl_stop():
+    try:
+        _ensure_data_dir()
+        STOP_FLAG.write_text(datetime.utcnow().isoformat())
+        return jsonify({"ok": True, "message": "Stop signal sent — crawl will halt after current page."})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 @dashboard_bp.route("/api/crawl/status", methods=["GET"])
 @require_login
 def api_crawl_status():
@@ -322,6 +335,7 @@ def api_users_create():
         email=email,
         password_hash=hash_password(password),
         is_admin=is_admin,
+        must_change_password=True,  # force password change + MFA on first login
     )
     return jsonify({"ok": True, "id": user_id})
 
@@ -819,14 +833,12 @@ def api_ip_investigations_list():
 @dashboard_bp.route("/api/ip-investigations", methods=["POST"])
 @require_login
 def api_ip_investigations_create():
-    import asyncio
     import re
     from ..ip_lookup import investigate_ip
 
     body = request.get_json()
     ip = (body.get("ip") or "").strip()
 
-    # Basic IP validation
     ipv4 = re.compile(r"^(\d{1,3}\.){3}\d{1,3}$")
     ipv6 = re.compile(r"^[0-9a-fA-F:]+$")
     if not ip or (not ipv4.match(ip) and not ipv6.match(ip)):
@@ -840,7 +852,7 @@ def api_ip_investigations_create():
 
     storage = get_storage()
     try:
-        result = asyncio.run(investigate_ip(ip, abuse_key, vt_key))
+        result = investigate_ip(ip, abuse_key, vt_key)
         inv_id = storage.save_ip_investigation(
             ip=ip,
             abuseipdb_data=result.get("abuseipdb") or {},

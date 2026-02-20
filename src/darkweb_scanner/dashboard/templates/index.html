@@ -634,10 +634,10 @@
         return;
       }
       el.innerHTML = Object.entries(cats).map(([cat, kws]) => `
-        <div style="margin-bottom:18px">
+        <div class="kw-category" data-cat="${esc(cat).toLowerCase()}" style="margin-bottom:18px">
           <div class="section-title">${esc(cat)}</div>
           <table><thead><tr><th>Keyword</th><th style="width:80px">Action</th></tr></thead>
-          <tbody>${(kws||[]).map(kw => `<tr>
+          <tbody>${(kws||[]).map(kw => `<tr class="kw-row" data-kw="${esc(kw).toLowerCase()}">
             <td><span class="keyword-tag">${esc(kw)}</span></td>
             <td><button class="btn btn-danger" onclick="deleteKeyword('${esc(kw).replace(/'/g,"\\'")}','${esc(cat).replace(/'/g,"\\'")}')">Remove</button></td>
           </tr>`).join('')}</tbody></table>
@@ -869,6 +869,44 @@
     div.querySelector('input').focus();
   }
 
+
+
+  let _allKeywords = [];
+
+  function filterKeywords() {
+    const q = (document.getElementById('keywordSearch')?.value || '').toLowerCase();
+    if (!q) {
+      document.querySelectorAll('#keywordsList .kw-row').forEach(r => r.style.display = '');
+      document.querySelectorAll('#keywordsList .kw-category').forEach(c => c.style.display = '');
+      return;
+    }
+    document.querySelectorAll('#keywordsList .kw-category').forEach(cat => {
+      let anyVisible = false;
+      cat.querySelectorAll('.kw-row').forEach(row => {
+        const match = (row.dataset.kw || '').includes(q) || (cat.dataset.cat || '').includes(q);
+        row.style.display = match ? '' : 'none';
+        if (match) anyVisible = true;
+      });
+      cat.style.display = anyVisible ? '' : 'none';
+    });
+  }
+  async function stopCrawl() {
+    if (!confirm('Send stop signal? The crawl will finish the current page then halt.')) return;
+    const btn = document.getElementById('crawlStopBtn');
+    btn.textContent = '⏳ Stopping…';
+    btn.disabled = true;
+    try {
+      const res = await fetch('/api/crawl/stop', { method: 'POST' });
+      const data = await res.json();
+      if (data.ok) toast('Stop signal sent — crawl will halt shortly.');
+      else toast(data.error || 'Error', 'error');
+    } catch(e) {
+      toast('Network error', 'error');
+    } finally {
+      btn.textContent = '■ Stop Crawl';
+      btn.disabled = false;
+    }
+  }
   async function runInvestigation() {
     const name = document.getElementById('invName').value.trim();
     if (!name) { toast('Enter an investigation name', 'error'); return; }

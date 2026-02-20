@@ -45,6 +45,14 @@ def require_login(f):
     def decorated(*args, **kwargs):
         if not is_authenticated():
             return redirect(url_for("auth.login", next=request.path))
+        # Block access until password change is done
+        if session.get("must_change_password"):
+            return redirect(url_for("auth.force_change_password"))
+        # Block access until MFA is set up (only enforce for non-setup routes)
+        if session.get("must_setup_mfa") and request.endpoint not in (
+            "auth.totp_setup", "auth.logout"
+        ):
+            return redirect(url_for("auth.totp_setup"))
         return f(*args, **kwargs)
 
     return decorated
@@ -131,6 +139,31 @@ def get_oauth_providers() -> dict:
             "token_url": "https://github.com/login/oauth/access_token",
             "userinfo_url": "https://api.github.com/user",
             "scope": "read:user user:email",
+        }
+
+    ms_tenant = os.getenv("MICROSOFT_TENANT_ID", "common")
+    if os.getenv("MICROSOFT_CLIENT_ID") and os.getenv("MICROSOFT_CLIENT_SECRET"):
+        providers["microsoft"] = {
+            "name": "Microsoft",
+            "icon": "M",
+            "client_id": os.getenv("MICROSOFT_CLIENT_ID"),
+            "client_secret": os.getenv("MICROSOFT_CLIENT_SECRET"),
+            "authorize_url": f"https://login.microsoftonline.com/{ms_tenant}/oauth2/v2.0/authorize",
+            "token_url": f"https://login.microsoftonline.com/{ms_tenant}/oauth2/v2.0/token",
+            "userinfo_url": "https://graph.microsoft.com/v1.0/me",
+            "scope": "openid email profile User.Read",
+        }
+
+    if os.getenv("APPLE_CLIENT_ID") and os.getenv("APPLE_CLIENT_SECRET"):
+        providers["apple"] = {
+            "name": "Apple",
+            "icon": "A",
+            "client_id": os.getenv("APPLE_CLIENT_ID"),
+            "client_secret": os.getenv("APPLE_CLIENT_SECRET"),
+            "authorize_url": "https://appleid.apple.com/auth/authorize",
+            "token_url": "https://appleid.apple.com/auth/token",
+            "userinfo_url": None,  # Apple sends user info in the token response
+            "scope": "name email",
         }
 
     return providers

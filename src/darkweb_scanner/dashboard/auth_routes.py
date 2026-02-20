@@ -107,6 +107,10 @@ def login():
 
         login_user(user.id, user.username)
         storage.update_user_login(user.id)
+        # Force password change if set by admin
+        if getattr(user, "must_change_password", False):
+            session["must_change_password"] = True
+            return redirect(url_for("auth.force_change_password"))
         next_url = request.args.get("next") or url_for("dashboard.index")
         return redirect(next_url)
 
@@ -140,7 +144,8 @@ def totp_setup():
 
         storage.enable_totp(user_id, secret)
         session.pop("totp_setup_secret", None)
-        flash("Two-factor authentication enabled!", "success")
+        session.pop("must_setup_mfa", None)
+        flash("Two-factor authentication enabled! Your account is now secure.", "success")
         return redirect(url_for("dashboard.index"))
 
     secret = generate_totp_secret()
@@ -250,16 +255,29 @@ def oauth_callback(provider):
         flash("OAuth login failed — no access token.", "error")
         return redirect(url_for("auth.login"))
 
-    try:
-        userinfo = http_requests.get(
-            p["userinfo_url"],
-            headers={"Authorization": f"Bearer {access_token}", "Accept": "application/json"},
-            timeout=10,
-        ).json()
-    except Exception as e:
-        logger.error(f"OAuth userinfo failed: {e}")
-        flash("OAuth login failed — could not fetch user info.", "error")
-        return redirect(url_for("auth.login"))
+    # Apple sends user info in the ID token, not a userinfo endpoint
+    if provider == "apple":
+        import base64, json as _json
+        id_token = token_resp.json().get("id_token", "")
+        try:
+            payload = id_token.split(".")[1]
+            payload += "=" * (4 - len(payload) % 4)
+            userinfo = _json.loads(base64.urlsafe_b64decode(payload))
+        except Exception:
+            userinfo = {}
+    elif p.get("userinfo_url"):
+        try:
+            userinfo = http_requests.get(
+                p["userinfo_url"],
+                headers={"Authorization": f"Bearer {access_token}", "Accept": "application/json"},
+                timeout=10,
+            ).json()
+        except Exception as e:
+            logger.error(f"OAuth userinfo failed: {e}")
+            flash("OAuth login failed — could not fetch user info.", "error")
+            return redirect(url_for("auth.login"))
+    else:
+        userinfo = {}
 
     if provider == "google":
         oauth_id = userinfo.get("sub")
@@ -269,6 +287,15 @@ def oauth_callback(provider):
         oauth_id = str(userinfo.get("id"))
         email = userinfo.get("email")
         username = userinfo.get("login") or f"github_{oauth_id[:8]}"
+    elif provider == "microsoft":
+        oauth_id = userinfo.get("id") or userinfo.get("sub")
+        email = userinfo.get("mail") or userinfo.get("userPrincipalName") or userinfo.get("email")
+        display = userinfo.get("displayName") or ""
+        username = (email.split("@")[0] if email else None) or f"ms_{str(oauth_id)[:8]}"
+    elif provider == "apple":
+        oauth_id = userinfo.get("sub")
+        email = userinfo.get("email")
+        username = email.split("@")[0] if email else f"apple_{str(oauth_id)[:8]}"
     else:
         flash("Unknown provider.", "error")
         return redirect(url_for("auth.login"))
@@ -306,6 +333,44 @@ def oauth_callback(provider):
     login_user(user.id, user.username)
     storage.update_user_login(user.id)
     return redirect(url_for("dashboard.index"))
+
+
+
+# ── Force Password Change ──────────────────────────────────────────────────────
+
+
+@auth_bp.route("/force-change-password", methods=["GET", "POST"])
+def force_change_password():
+    if not session.get("logged_in"):
+        return redirect(url_for("auth.login"))
+
+    if not session.get("must_change_password"):
+        return redirect(url_for("dashboard.index"))
+
+    storage = get_storage()
+    user_id = session["user_id"]
+
+    if request.method == "POST":
+        new_pw = request.form.get("new_password", "")
+        confirm = request.form.get("confirm_password", "")
+
+        if new_pw != confirm:
+            flash("Passwords do not match.", "error")
+            return render_template("force_change_password.html")
+
+        err = validate_password_strength(new_pw)
+        if err:
+            flash(err, "error")
+            return render_template("force_change_password.html")
+
+        storage.update_user_password(user_id, hash_password(new_pw))
+        storage.set_must_change_password(user_id, False)
+        session.pop("must_change_password", None)
+        session["must_setup_mfa"] = True  # force MFA setup next
+        flash("Password updated. Now set up two-factor authentication to continue.", "success")
+        return redirect(url_for("auth.totp_setup"))
+
+    return render_template("force_change_password.html")
 
 
 # ── Logout ─────────────────────────────────────────────────────────────────────

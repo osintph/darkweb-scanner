@@ -7,6 +7,7 @@ and yields page content for downstream processing.
 import asyncio
 import logging
 import os
+import pathlib
 import random
 import re
 from collections import deque
@@ -155,7 +156,18 @@ class Crawler:
 
         session = await self.tor.get_session()
 
+        stop_flag = pathlib.Path(os.environ.get("DATA_DIR", "/app/data")) / "crawl.stop"
+
         while queue:
+            # Check for stop signal from dashboard
+            if stop_flag.exists():
+                logger.info("Stop flag detected — halting crawl gracefully.")
+                try:
+                    stop_flag.unlink()
+                except Exception:
+                    pass
+                break
+
             batch = []
             while queue and len(batch) < self.config.max_concurrent:
                 batch.append(queue.popleft())
