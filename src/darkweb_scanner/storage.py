@@ -3,6 +3,7 @@ Storage layer — SQLite (default) or PostgreSQL via SQLAlchemy.
 Stores crawl results, keyword hits, and crawl session metadata.
 """
 
+import json
 import logging
 import os
 from datetime import datetime
