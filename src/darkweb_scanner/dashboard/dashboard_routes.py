@@ -4,7 +4,6 @@ Dashboard blueprint — all protected routes.
 
 import json
 import os
-import subprocess
 from datetime import datetime
 from pathlib import Path
 
@@ -15,9 +14,43 @@ from .storage_helper import get_storage
 
 dashboard_bp = Blueprint("dashboard", __name__)
 
+# Config is read-only at /app/config — write user edits to /app/data instead
 CONFIG_DIR = Path(os.getenv("CONFIG_DIR", "/app/config"))
-KEYWORDS_FILE = CONFIG_DIR / "keywords.yaml"
-SEEDS_FILE = CONFIG_DIR / "seeds.txt"
+DATA_DIR = Path(os.getenv("DATA_DIR", "/app/data"))
+
+# Read from config (bundled defaults), write to data (persistent, writable)
+KEYWORDS_FILE = DATA_DIR / "keywords.yaml"
+KEYWORDS_DEFAULT = CONFIG_DIR / "keywords.yaml"
+SEEDS_FILE = DATA_DIR / "seeds.txt"
+SEEDS_DEFAULT = CONFIG_DIR / "seeds.txt"
+CRAWL_FLAG = DATA_DIR / "crawl.start"
+
+
+def _ensure_data_dir():
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
+
+
+def _load_seeds() -> list[str]:
+    """Load seeds from data dir (user edits), falling back to config default."""
+    src = SEEDS_FILE if SEEDS_FILE.exists() else SEEDS_DEFAULT
+    if not src.exists():
+        return []
+    return [
+        line.strip()
+        for line in src.read_text().splitlines()
+        if line.strip() and not line.strip().startswith("#")
+    ]
+
+
+def _load_keywords() -> dict:
+    """Load keywords from data dir (user edits), falling back to config default."""
+    import yaml
+
+    src = KEYWORDS_FILE if KEYWORDS_FILE.exists() else KEYWORDS_DEFAULT
+    if not src.exists():
+        return {}
+    data = yaml.safe_load(src.read_text()) or {}
+    return data.get("keywords", {})
 
 
 # ── Pages ──────────────────────────────────────────────────────────────────────
@@ -75,12 +108,7 @@ def api_hits():
 @require_login
 def api_keywords_get():
     try:
-        import yaml
-
-        if not KEYWORDS_FILE.exists():
-            return jsonify({"categories": {}})
-        data = yaml.safe_load(KEYWORDS_FILE.read_text()) or {}
-        return jsonify({"categories": data.get("keywords", {})})
+        return jsonify({"categories": _load_keywords()})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -97,13 +125,14 @@ def api_keywords_add():
         if not keyword:
             return jsonify({"error": "keyword required"}), 400
 
-        data = {}
-        if KEYWORDS_FILE.exists():
-            data = yaml.safe_load(KEYWORDS_FILE.read_text()) or {}
-        data.setdefault("keywords", {}).setdefault(category, [])
-        if keyword not in data["keywords"][category]:
-            data["keywords"][category].append(keyword)
-            KEYWORDS_FILE.write_text(yaml.dump(data, default_flow_style=False, allow_unicode=True))
+        _ensure_data_dir()
+        cats = _load_keywords()
+        cats.setdefault(category, [])
+        if keyword not in cats[category]:
+            cats[category].append(keyword)
+            KEYWORDS_FILE.write_text(
+                yaml.dump({"keywords": cats}, default_flow_style=False, allow_unicode=True)
+            )
         return jsonify({"ok": True})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -121,14 +150,13 @@ def api_keywords_delete():
         if not keyword or not category:
             return jsonify({"error": "keyword and category required"}), 400
 
-        if not KEYWORDS_FILE.exists():
-            return jsonify({"ok": True})
-        data = yaml.safe_load(KEYWORDS_FILE.read_text()) or {}
-        kws = data.get("keywords", {}).get(category, [])
-        if keyword in kws:
-            kws.remove(keyword)
-            data["keywords"][category] = kws
-            KEYWORDS_FILE.write_text(yaml.dump(data, default_flow_style=False, allow_unicode=True))
+        _ensure_data_dir()
+        cats = _load_keywords()
+        if keyword in cats.get(category, []):
+            cats[category].remove(keyword)
+            KEYWORDS_FILE.write_text(
+                yaml.dump({"keywords": cats}, default_flow_style=False, allow_unicode=True)
+            )
         return jsonify({"ok": True})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -141,14 +169,7 @@ def api_keywords_delete():
 @require_login
 def api_seeds_get():
     try:
-        if not SEEDS_FILE.exists():
-            return jsonify({"seeds": []})
-        seeds = [
-            line.strip()
-            for line in SEEDS_FILE.read_text().splitlines()
-            if line.strip() and not line.strip().startswith("#")
-        ]
-        return jsonify({"seeds": seeds})
+        return jsonify({"seeds": _load_seeds()})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -164,9 +185,8 @@ def api_seeds_add():
         if not url.startswith("http"):
             return jsonify({"error": "URL must start with http"}), 400
 
-        existing = []
-        if SEEDS_FILE.exists():
-            existing = SEEDS_FILE.read_text().splitlines()
+        _ensure_data_dir()
+        existing = _load_seeds()
         if url not in existing:
             existing.append(url)
             SEEDS_FILE.write_text("\n".join(existing) + "\n")
@@ -184,38 +204,28 @@ def api_seeds_delete():
         if not url:
             return jsonify({"error": "url required"}), 400
 
-        if not SEEDS_FILE.exists():
-            return jsonify({"ok": True})
-        lines = [l for l in SEEDS_FILE.read_text().splitlines() if l.strip() != url]
-        SEEDS_FILE.write_text("\n".join(lines) + "\n")
+        _ensure_data_dir()
+        seeds = [s for s in _load_seeds() if s != url]
+        SEEDS_FILE.write_text("\n".join(seeds) + "\n")
         return jsonify({"ok": True})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
 
 # ── Crawl control API ──────────────────────────────────────────────────────────
+# The dashboard can't exec docker — instead it writes a flag file that the
+# scanner container watches. Run the scanner with: make scan
 
 
 @dashboard_bp.route("/api/crawl/start", methods=["POST"])
 @require_login
 def api_crawl_start():
     try:
-        # Check if already running
-        result = subprocess.run(
-            ["docker", "ps", "--filter", "name=scanner", "--format", "{{.Names}}"],
-            capture_output=True,
-            text=True,
-        )
-        if "scanner" in result.stdout:
-            return jsonify({"error": "Crawl already running"}), 409
-
-        subprocess.Popen(
-            ["docker", "compose", "--profile", "scan", "run", "--rm", "scanner"],
-            cwd="/app",
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-        )
-        return jsonify({"ok": True, "message": "Crawl started"})
+        _ensure_data_dir()
+        if CRAWL_FLAG.exists():
+            return jsonify({"error": "Crawl flag already set"}), 409
+        CRAWL_FLAG.write_text(datetime.utcnow().isoformat())
+        return jsonify({"ok": True, "message": "Crawl flag set. Run: make scan on the server."})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -364,7 +374,6 @@ def api_disable_totp():
     storage = get_storage()
     user = storage.get_user_by_id(session["user_id"])
 
-    # Require either password or valid TOTP code to disable 2FA
     code = body.get("totp_code", "").strip()
     password = body.get("password", "")
 
