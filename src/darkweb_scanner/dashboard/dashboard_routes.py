@@ -237,22 +237,22 @@ def api_crawl_status():
         storage = get_storage()
         stats = storage.get_stats()
         active = storage.get_active_session()
-        return jsonify(
-            {
-                "active": active is not None,
-                "session": (
-                    {
-                        "id": active.id,
-                        "started_at": active.started_at.isoformat() if active else None,
-                        "pages_crawled": active.pages_crawled if active else 0,
-                        "hits_found": active.hits_found if active else 0,
-                    }
-                    if active
-                    else None
-                ),
-                "stats": stats,
+        session_data = None
+        if active:
+            # Count actual hits in DB for this session (updated in real time)
+            live_hits = storage.count_session_hits(active.id)
+            live_pages = storage.count_session_pages(active.id)
+            session_data = {
+                "id": active.id,
+                "started_at": active.started_at.isoformat() if active.started_at else None,
+                "pages_crawled": live_pages,
+                "hits_found": live_hits,
             }
-        )
+        return jsonify({
+            "active": active is not None,
+            "session": session_data,
+            "stats": stats,
+        })
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -474,20 +474,22 @@ def api_telegram_channels_delete():
 def api_sessions():
     storage = get_storage()
     sessions = storage.get_sessions(limit=20)
-    return jsonify(
-        [
-            {
-                "id": s.id,
-                "started_at": s.started_at.isoformat() if s.started_at else None,
-                "completed_at": s.completed_at.isoformat() if s.completed_at else None,
-                "pages_crawled": s.pages_crawled or 0,
-                "hits_found": s.hits_found or 0,
-                "status": s.status,
-                "seed_urls": s.seed_urls if hasattr(s, "seed_urls") else [],
-            }
-            for s in sessions
-        ]
-    )
+    result = []
+    for s in sessions:
+        try:
+            seed_urls = json.loads(s.seed_urls) if s.seed_urls else []
+        except Exception:
+            seed_urls = []
+        result.append({
+            "id": s.id,
+            "started_at": s.started_at.isoformat() if s.started_at else None,
+            "ended_at": s.ended_at.isoformat() if s.ended_at else None,
+            "pages_crawled": s.pages_crawled or 0,
+            "hits_found": s.hits_found or 0,
+            "status": s.status or "completed",
+            "seed_urls": seed_urls,
+        })
+    return jsonify(result)
 
 
 @dashboard_bp.route("/api/sessions/<int:session_id>/hits", methods=["GET"])
@@ -520,6 +522,7 @@ def api_report_pdf():
     try:
         from io import BytesIO
         from datetime import datetime as dt
+        session_id_filter = request.args.get("session_id", type=int)
 
         from reportlab.lib import colors
         from reportlab.lib.pagesizes import A4
@@ -536,8 +539,14 @@ def api_report_pdf():
 
         storage = get_storage()
         stats = storage.get_stats()
-        sessions = storage.get_sessions(limit=50)
-        hits = storage.get_hits_for_report(limit=200)
+        if session_id_filter:
+            sessions = [s for s in storage.get_sessions(limit=50) if s.id == session_id_filter]
+            hits = storage.get_hits_by_session(session_id_filter, limit=500)
+            report_title = f"Session #{session_id_filter} — Threat Intelligence Report"
+        else:
+            sessions = storage.get_sessions(limit=50)
+            hits = storage.get_hits_for_report(limit=200)
+            report_title = "Threat Intelligence Executive Report"
 
         buf = BytesIO()
         doc = SimpleDocTemplate(
@@ -607,7 +616,7 @@ def api_report_pdf():
 
         # ── Cover header ──
         story.append(Paragraph("Dark Web Scanner", s_title))
-        story.append(Paragraph("Threat Intelligence Executive Report", s_subtitle))
+        story.append(Paragraph(report_title, s_subtitle))
         story.append(Paragraph(f"Generated: {generated_at}", s_subtitle))
         story.append(HRFlowable(width=W, thickness=2, color=colors.HexColor("#f85149"), spaceAfter=14))
 

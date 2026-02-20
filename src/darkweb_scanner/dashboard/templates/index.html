@@ -304,15 +304,20 @@
     <div class="report-hero">
       <div class="icon">📄</div>
       <h2>Executive Report</h2>
-      <p>Generate a professional PDF threat intelligence report with scan history, keyword hits, session statistics, and findings summary.</p>
+      <p>Generate a professional PDF threat intelligence report. Choose a specific scan session or generate an all-time summary.</p>
 
-      <div class="report-preview" id="reportPreview">
-        <h3>Report will include</h3>
+      <div class="report-preview" style="max-width:560px;margin:0 auto 20px">
+        <h3>Scope</h3>
+        <div class="report-item">
+          <span class="label">Coverage</span>
+          <select id="reportScope" style="background:var(--bg);border:1px solid var(--border);color:var(--text);padding:5px 10px;border-radius:5px;font-size:.83rem" onchange="updateReportPreview()">
+            <option value="all">All sessions (full history)</option>
+          </select>
+        </div>
         <div class="report-item"><span class="label">Executive Summary</span><span>Stats overview</span></div>
         <div class="report-item"><span class="label">Top Keywords</span><span>By hit count</span></div>
-        <div class="report-item"><span class="label">Session History</span><span>All crawl sessions</span></div>
-        <div class="report-item"><span class="label">Keyword Hits Detail</span><span>Latest 200 hits with context</span></div>
-        <div class="report-item"><span class="label">Sources</span><span>.onion URLs + Telegram</span></div>
+        <div class="report-item"><span class="label">Keyword Hits</span><span id="reportHitsLabel">Latest 200 hits</span></div>
+        <div class="report-item"><span class="label">Session History</span><span id="reportSessionsLabel">All sessions</span></div>
       </div>
 
       <div id="reportStats" style="color:var(--muted);font-size:.84rem;margin-bottom:20px">Loading stats…</div>
@@ -369,8 +374,10 @@
   }
   function fmtTime(iso) {
     if (!iso) return '—';
-    const d = new Date(iso.endsWith('Z') ? iso : iso + 'Z');
-    return d.toLocaleDateString() + ' ' + d.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
+    try {
+      const d = new Date(iso.includes('T') ? (iso.endsWith('Z') ? iso : iso + 'Z') : iso);
+      return d.toLocaleDateString() + ' ' + d.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
+    } catch(e) { return iso; }
   }
   function toast(msg, type = 'success') {
     const t = document.getElementById('toast');
@@ -476,8 +483,8 @@
     const started = fmtTime(s.started_at);
     const statusClass = `status-${s.status || 'completed'}`;
     let duration = '—';
-    if (s.started_at && s.completed_at) {
-      const secs = Math.round((new Date(s.completed_at+'Z') - new Date(s.started_at+'Z')) / 1000);
+    if (s.started_at && s.ended_at) {
+      const secs = Math.round((new Date(s.ended_at.endsWith('Z')?s.ended_at:s.ended_at+'Z') - new Date(s.started_at.endsWith('Z')?s.started_at:s.started_at+'Z')) / 1000);
       duration = secs < 60 ? `${secs}s` : `${Math.floor(secs/60)}m ${secs%60}s`;
     } else if (s.status === 'running') {
       duration = 'Running…';
@@ -667,19 +674,51 @@
   }
 
   // ── Reports ────────────────────────────────────────────────────────────────
+  let reportSessions = [];
+
   async function loadReportPreview() {
     try {
-      const stats = await (await fetch('/api/stats')).json();
+      const [stats, sessions] = await Promise.all([
+        (await fetch('/api/stats')).json(),
+        (await fetch('/api/sessions')).json(),
+      ]);
+      reportSessions = sessions;
       document.getElementById('reportStats').innerHTML =
-        `<strong>${stats.total_hits}</strong> keyword hits across <strong>${stats.total_sessions}</strong> sessions from <strong>${stats.total_pages}</strong> pages crawled`;
+        `<strong>${stats.total_hits}</strong> keyword hits across <strong>${stats.total_sessions}</strong> sessions · <strong>${stats.total_pages}</strong> pages crawled`;
+      // Populate session dropdown
+      const sel = document.getElementById('reportScope');
+      sel.innerHTML = '<option value="all">All sessions (full history)</option>';
+      sessions.forEach(s => {
+        const started = fmtTime(s.started_at);
+        const opt = document.createElement('option');
+        opt.value = s.id;
+        opt.textContent = `Session #${s.id} — ${started} (${s.hits_found} hits, ${s.pages_crawled} pages)`;
+        sel.appendChild(opt);
+      });
     } catch(e) {}
+  }
+
+  function updateReportPreview() {
+    const val = document.getElementById('reportScope').value;
+    if (val === 'all') {
+      document.getElementById('reportHitsLabel').textContent = 'Latest 200 hits';
+      document.getElementById('reportSessionsLabel').textContent = 'All sessions';
+    } else {
+      const s = reportSessions.find(x => x.id == val);
+      if (s) {
+        document.getElementById('reportHitsLabel').textContent = `${s.hits_found} hits from this session`;
+        document.getElementById('reportSessionsLabel').textContent = `Session #${s.id} only`;
+      }
+    }
   }
 
   function downloadReport() {
     const btn = document.querySelector('.btn-report');
     btn.textContent = '⏳ Generating…';
     btn.disabled = true;
-    window.location.href = '/api/report/pdf';
+    const scope = document.getElementById('reportScope').value;
+    const url = scope === 'all' ? '/api/report/pdf' : `/api/report/pdf?session_id=${scope}`;
+    window.location.href = url;
     setTimeout(() => { btn.textContent = '⬇ Download PDF Report'; btn.disabled = false; }, 3000);
   }
 

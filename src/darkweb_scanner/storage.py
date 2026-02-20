@@ -325,6 +325,23 @@ class Storage:
                 session.commit()
 
 
+
+    def count_session_hits(self, session_id: int) -> int:
+        with self.get_session() as session:
+            return (
+                session.query(func.count(KeywordHitRecord.id))
+                .filter(KeywordHitRecord.session_id == session_id)
+                .scalar() or 0
+            )
+
+    def count_session_pages(self, session_id: int) -> int:
+        with self.get_session() as session:
+            return (
+                session.query(func.count(CrawledPage.id))
+                .filter(CrawledPage.session_id == session_id)
+                .scalar() or 0
+            )
+
     def get_sessions(self, limit: int = 20):
         with self.get_session() as session:
             return (
