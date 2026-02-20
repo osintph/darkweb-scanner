@@ -1,11 +1,75 @@
 # Deployment Guide
 
+## Quick Deploy (Recommended)
+
+The fastest way to get running on any fresh Linux server:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/osintph/darkweb-scanner/main/deploy.sh | sudo bash
+```
+
+This installs Docker, clones the repo, configures Tor, and starts all services automatically.
+
+---
+
+## SSL / HTTPS
+
+The dashboard runs behind an Nginx reverse proxy with SSL enabled by default.
+
+### Self-Signed Certificate (default)
+
+If you do not set a domain, a self-signed certificate is generated automatically. The dashboard will be accessible at `https://YOUR_SERVER_IP` but browsers will show a "Not secure" warning. Traffic is still encrypted.
+
+### Trusted SSL with Let's Encrypt (recommended for production)
+
+You need a domain name pointed at your server's public IP.
+
+**Option A — Set domain at deploy time:**
+```bash
+DOMAIN=scanner.yourdomain.com SSL_EMAIL=you@example.com sudo bash deploy.sh
+```
+
+**Option B — Set domain after deployment (without redeploying):**
+```bash
+sudo bash ~/darkweb-scanner/scripts/configure-ssl.sh
+```
+
+The helper prompts you interactively — your domain and email are stored only in `.env` on the server, never in git.
+
+### DNS Setup (Cloudflare or any provider)
+
+1. Log into your DNS provider
+2. Add an **A record**:
+   - Name: `scanner` (or any subdomain you want)
+   - Value: your server's public IP
+   - TTL: Auto
+3. Wait 1-5 minutes for DNS to propagate
+4. Run `sudo bash ~/darkweb-scanner/scripts/configure-ssl.sh`
+
+**Cloudflare users:** Set the proxy status to **DNS only** (grey cloud, not orange) for the A record. Let's Encrypt needs to reach your server directly for certificate validation. You can re-enable the Cloudflare proxy after the cert is issued if desired.
+
+### Free Domain Options
+
+If you do not have a domain yet:
+
+| Option | Cost | Notes |
+|--------|------|-------|
+| Namecheap / Cloudflare Registrar | ~$10/year | Most reliable |
+| DuckDNS | Free | `yourname.duckdns.org` subdomains |
+| Freenom | Free | `.tk`, `.ml` domains — less reliable |
+
+**DuckDNS quick setup:**
+1. Go to [duckdns.org](https://www.duckdns.org) and sign in
+2. Create a subdomain and point it to your server IP
+3. Use `yourname.duckdns.org` as your `DOMAIN`
+
+---
+
 ## Production Setup on Ubuntu 22.04 VPS
 
 ### 1. Initial Server Hardening
 
 ```bash
-# Update system
 apt update && apt upgrade -y
 
 # Create a non-root user
@@ -21,116 +85,78 @@ systemctl restart sshd
 ufw default deny incoming
 ufw default allow outgoing
 ufw allow ssh
-ufw allow 8080/tcp   # dashboard — consider restricting to your IP
+ufw allow 80/tcp
+ufw allow 443/tcp
 ufw enable
 ```
 
-### 2. Install Docker
-
-```bash
-curl -fsSL https://get.docker.com | sh
-usermod -aG docker scanner
-```
-
-### 3. Deploy the Application
+### 2. Deploy
 
 ```bash
 su - scanner
-git clone https://github.com/osintph/darkweb-scanner
-cd darkweb-scanner
-make setup
-
-# Generate a hashed Tor control password
-docker run --rm debian:bookworm-slim bash -c \
-  "apt-get install -y tor -qq && tor --hash-password yourpassword 2>/dev/null | tail -1"
-# Copy the output hash into docker/tor/torrc and set TOR_CONTROL_PASSWORD=yourpassword in .env
-
-# Edit configuration
-nano .env
-nano config/keywords.yaml
-nano config/seeds.txt
-
-# Start everything
-make run
+curl -fsSL https://raw.githubusercontent.com/osintph/darkweb-scanner/main/deploy.sh | sudo bash
 ```
 
-### 4. Run Scans on a Schedule (systemd timer)
+### 3. Configure SSL
 
 ```bash
-# Create a systemd service for scheduled scans
-sudo tee /etc/systemd/system/darkweb-scan.service > /dev/null <<EOF
-[Unit]
-Description=Dark Web Scanner — crawl job
-Requires=docker.service
-After=docker.service
-
-[Service]
-Type=oneshot
-User=scanner
-WorkingDirectory=/home/scanner/darkweb-scanner
-ExecStart=/usr/bin/docker compose --profile scan run --rm scanner
-EOF
-
-sudo tee /etc/systemd/system/darkweb-scan.timer > /dev/null <<EOF
-[Unit]
-Description=Run Dark Web Scanner every 6 hours
-
-[Timer]
-OnBootSec=5min
-OnUnitActiveSec=6h
-
-[Install]
-WantedBy=timers.target
-EOF
-
-sudo systemctl daemon-reload
-sudo systemctl enable --now darkweb-scan.timer
+sudo bash ~/darkweb-scanner/scripts/configure-ssl.sh
 ```
 
-### 5. Encrypted Storage (optional but recommended)
+### 4. Schedule Scans
 
 ```bash
-# Create an encrypted volume for scan data
-apt install cryptsetup -y
-dd if=/dev/urandom of=/data.img bs=1M count=10240   # 10GB
-cryptsetup luksFormat /data.img
-cryptsetup luksOpen /data.img scandata
-mkfs.ext4 /dev/mapper/scandata
-mkdir /mnt/scandata
-mount /dev/mapper/scandata /mnt/scandata
-
-# Update DATABASE_URL in .env to point to this volume
+INSTALL_TIMER=1 sudo bash ~/darkweb-scanner/deploy.sh
 ```
 
-### 6. Dashboard Security
+---
 
-The dashboard has no authentication by default. In production, put it behind a reverse proxy with auth:
+## Environment Variables Reference
+
+All configuration lives in `.env` in the repo root. Never commit this file.
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `DOMAIN` | (empty) | Public domain for Let's Encrypt SSL |
+| `SSL_EMAIL` | (empty) | Email for Let's Encrypt registration |
+| `DASHBOARD_SECRET_KEY` | (generated) | Flask session secret |
+| `TOR_CONTROL_PASSWORD` | (generated) | Tor control port password |
+| `DATABASE_URL` | SQLite | Database connection string |
+| `ALERT_WEBHOOK_URL` | (empty) | Slack/Discord webhook for alerts |
+| `LOG_LEVEL` | `INFO` | Logging verbosity |
+
+---
+
+## Updating
 
 ```bash
-apt install nginx -y
+cd ~/darkweb-scanner
+git pull
+docker compose build --no-cache
+docker compose up -d
+```
 
-# Basic auth
-apt install apache2-utils -y
-htpasswd -c /etc/nginx/.htpasswd osintph
+## Troubleshooting
 
-# Nginx config
-cat > /etc/nginx/sites-available/darkweb-scanner <<EOF
-server {
-    listen 443 ssl;
-    server_name osintph.github.io;
+**Tor not connecting:**
+```bash
+docker compose logs tor | grep Bootstrapped
+make check-tor
+```
 
-    ssl_certificate /path/to/cert.pem;
-    ssl_certificate_key /path/to/key.pem;
+**Dashboard not loading:**
+```bash
+docker compose logs dashboard
+docker compose logs nginx
+```
 
-    auth_basic "Restricted";
-    auth_basic_user_file /etc/nginx/.htpasswd;
+**Certificate issues:**
+```bash
+docker compose logs nginx
+sudo bash ~/darkweb-scanner/scripts/configure-ssl.sh
+```
 
-    location / {
-        proxy_pass http://localhost:8080;
-    }
-}
-EOF
-
-ln -s /etc/nginx/sites-available/darkweb-scanner /etc/nginx/sites-enabled/
-nginx -t && systemctl reload nginx
+**Full restart:**
+```bash
+docker compose down && docker compose up -d
 ```
