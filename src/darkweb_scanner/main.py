@@ -166,6 +166,14 @@ def scan(seeds: str, keywords: str, depth: int, no_tor_check: bool):
     )
 
 
+def _resolve_keywords_path(provided: str) -> str:
+    """Check writable data dir first, fall back to read-only config."""
+    data_kw = Path("/app/data/keywords.yaml")
+    if data_kw.exists():
+        return str(data_kw)
+    return provided
+
+
 @cli.command("telegram-scan")
 @click.option("--keywords", "-k", default="config/keywords.yaml", help="Path to keywords YAML file")
 @click.option(
@@ -196,6 +204,8 @@ def telegram_scan(keywords: str, channels: str):
             err=True,
         )
         sys.exit(1)
+
+    keywords = _resolve_keywords_path(keywords)
 
     keywords_path = Path(keywords)
     if not keywords_path.exists():

@@ -58,7 +58,6 @@ async def scrape_channels(
             UsernameInvalidError,
             UsernameNotOccupiedError,
         )
-        from telethon.tl.types import MessageMediaPhoto, MessageMediaDocument
     except ImportError:
         logger.error("telethon not installed. Run: pip install telethon")
         return {"pages_scraped": 0, "hits_found": 0}
@@ -91,17 +90,23 @@ async def scrape_channels(
             return {"pages_scraped": 0, "hits_found": 0}
 
         for channel in config.channels:
-            logger.info(f"Scraping Telegram channel: @{channel}")
+            logger.info(f"Scraping Telegram channel: @{channel} (limit={config.limit_per_channel})")
+            channel_total = 0
+            channel_text = 0
+            channel_hits = 0
+
             try:
                 entity = await client.get_entity(channel)
                 async for message in client.iter_messages(
                     entity, limit=config.limit_per_channel
                 ):
+                    channel_total += 1
                     # Capture text messages and media captions
                     text = message.text or message.message or ""
-                    if not text:
+                    if not text.strip():
                         continue
 
+                    channel_text += 1
                     pages_scraped += 1
                     url = f"https://t.me/{channel}/{message.id}"
 
@@ -117,14 +122,15 @@ async def scrape_channels(
                             session_id=session_id,
                         )
                         hits_found += 1
+                        channel_hits += 1
                         if alerter.alert(hit):
                             storage.mark_alerted(hit_id)
 
-                    # Polite delay to avoid flood limits
                     await asyncio.sleep(0.05)
 
                 logger.info(
-                    f"@{channel}: {pages_scraped} messages scanned, {hits_found} hits found"
+                    f"@{channel}: {channel_total} total messages, "
+                    f"{channel_text} with text, {channel_hits} keyword hits"
                 )
 
             except (UsernameNotOccupiedError, UsernameInvalidError):
@@ -135,12 +141,12 @@ async def scrape_channels(
                 logger.warning(f"Flood wait {e.seconds}s for @{channel} — skipping")
                 await asyncio.sleep(e.seconds)
             except Exception as e:
-                logger.error(f"Error scraping @{channel}: {e}")
+                logger.error(f"Error scraping @{channel}: {e}", exc_info=True)
 
     finally:
         await client.disconnect()
 
-    logger.info(f"Telegram scan complete. Messages: {pages_scraped} | Hits: {hits_found}")
+    logger.info(f"Telegram scan complete. Messages with text: {pages_scraped} | Hits: {hits_found}")
     return {"pages_scraped": pages_scraped, "hits_found": hits_found}
 
 
