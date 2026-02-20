@@ -234,6 +234,25 @@
         <div id="seedsList"><div class="empty"><div class="icon">🌱</div><p>Loading seeds…</p></div></div>
       </div>
     </div>
+
+    <div class="panel" style="margin-top:20px">
+      <div class="panel-header"><h2>📱 Telegram Channels</h2><span style="color:var(--muted);font-size:.8rem">Public channels to scrape for keywords</span></div>
+      <div class="panel-body">
+        <div class="form-row">
+          <div class="form-group">
+            <label>Channel Username (without @)</label>
+            <input type="text" id="newChannel" style="width:280px" placeholder="channelname"/>
+          </div>
+          <button class="btn btn-primary" onclick="addChannel()">+ Add Channel</button>
+        </div>
+        <div id="channelsList"><div class="empty"><div class="icon">📱</div><p>Loading channels…</p></div></div>
+        <div style="margin-top:16px;padding:12px 16px;background:rgba(88,166,255,.06);border:1px solid rgba(88,166,255,.2);border-radius:6px;font-size:.8rem;color:var(--muted)">
+          ℹ️ To scan channels, run <code style="color:var(--accent);background:var(--bg);padding:1px 6px;border-radius:3px">make telegram-scan</code> on the server.
+          First-time setup requires <code style="color:var(--accent);background:var(--bg);padding:1px 6px;border-radius:3px">make telegram-auth</code> and API credentials in <code style="color:var(--accent);background:var(--bg);padding:1px 6px;border-radius:3px">.env</code>.
+        </div>
+      </div>
+    </div>
+
   </div>
 
   <!-- ── Users Tab (admin only) ── -->
@@ -338,7 +357,7 @@
     document.getElementById('panel-' + tab).classList.add('active');
     btn.classList.add('active');
     if (tab === 'keywords') loadKeywords();
-    if (tab === 'seeds') loadSeeds();
+    if (tab === 'seeds') { loadSeeds(); loadChannels(); }
     if (tab === 'users' && isAdmin) loadUsers();
     if (tab === 'settings') loadSettings();
   }
@@ -630,6 +649,42 @@
     const data = await res.json();
     if (data.ok) { toast('2FA disabled'); loadSettings(); }
     else toast(data.error || 'Invalid code', 'error');
+  }
+
+  // ── Telegram Channels ──────────────────────────────────────────────────────
+  async function loadChannels() {
+    const el = document.getElementById('channelsList');
+    if (!el) return;
+    try {
+      const data = await (await fetch('/api/telegram/channels')).json();
+      if (!data.channels || !data.channels.length) {
+        el.innerHTML = '<div class="empty"><div class="icon">📱</div><p>No channels yet. Add channel usernames above.</p></div>';
+        return;
+      }
+      el.innerHTML = data.channels.map(ch => `
+        <div class="seed-item">
+          <span>@${esc(ch)}</span>
+          <button class="btn btn-danger" onclick="deleteChannel('${esc(ch)}')">Remove</button>
+        </div>`).join('');
+    } catch(e) {
+      el.innerHTML = '<div class="empty" style="color:var(--muted)">Configure TELEGRAM_API_ID in .env to enable.</div>';
+    }
+  }
+
+  async function addChannel() {
+    const ch = document.getElementById('newChannel').value.trim().replace(/^@/, '');
+    if (!ch) { toast('Enter a channel username first', 'error'); return; }
+    const res = await fetch('/api/telegram/channels', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({channel: ch}) });
+    const data = await res.json();
+    if (data.ok) { document.getElementById('newChannel').value = ''; toast('Channel added!'); loadChannels(); }
+    else toast(data.error || 'Error', 'error');
+  }
+
+  async function deleteChannel(ch) {
+    const res = await fetch('/api/telegram/channels', { method: 'DELETE', headers: {'Content-Type':'application/json'}, body: JSON.stringify({channel: ch}) });
+    const data = await res.json();
+    if (data.ok) { toast('Channel removed'); loadChannels(); }
+    else toast(data.error || 'Error', 'error');
   }
 </script>
 </body>

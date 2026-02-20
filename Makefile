@@ -73,6 +73,12 @@ hits:  ## Show recent keyword hits
 	docker compose exec dashboard python -m darkweb_scanner.main hits
 
 # ── Maintenance ───────────────────────────────────────────────────────────────
+telegram-auth:  ## Authenticate with Telegram (run once before telegram-scan)
+	docker compose exec dashboard python -m darkweb_scanner.main telegram-auth
+
+telegram-scan:  ## Scrape configured Telegram channels for keyword hits
+	docker compose exec dashboard python -m darkweb_scanner.main telegram-scan
+
 clean:  ## Remove build artifacts and cache
 	rm -rf dist/ build/ *.egg-info htmlcov/ .coverage .mypy_cache .ruff_cache
 	find . -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true

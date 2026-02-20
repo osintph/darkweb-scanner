@@ -90,8 +90,6 @@ async def run_scan(
                     session_id=session_id,
                 )
                 hits_found += 1
-
-                # alert and mark
                 if alerter.alert(hit):
                     storage.mark_alerted(hit_id)
 
@@ -117,7 +115,7 @@ async def run_scan(
 
 @click.group()
 def cli():
-    """Dark Web Scanner — keyword monitoring tool for .onion sites."""
+    """Dark Web Scanner — keyword monitoring tool for .onion sites and Telegram."""
     pass
 
 
@@ -127,7 +125,7 @@ def cli():
 @click.option("--depth", "-d", default=None, type=int, help="Max crawl depth (overrides env)")
 @click.option("--no-tor-check", is_flag=True, default=False, help="Skip Tor connectivity check")
 def scan(seeds: str, keywords: str, depth: int, no_tor_check: bool):
-    """Run a crawl and keyword scan."""
+    """Run a dark web crawl and keyword scan."""
     seeds_path = Path(seeds)
     keywords_path = Path(keywords)
 
@@ -168,6 +166,90 @@ def scan(seeds: str, keywords: str, depth: int, no_tor_check: bool):
     )
 
 
+@cli.command("telegram-scan")
+@click.option("--keywords", "-k", default="config/keywords.yaml", help="Path to keywords YAML file")
+@click.option(
+    "--channels",
+    "-c",
+    default=None,
+    help="Comma-separated channel usernames (overrides TELEGRAM_CHANNELS env var)",
+)
+def telegram_scan(keywords: str, channels: str):
+    """Scrape Telegram channels for keyword hits."""
+    from .telegram_scraper import TelegramConfig, scrape_channels
+
+    config = TelegramConfig.from_env()
+    if not config:
+        click.echo(
+            "ERROR: TELEGRAM_API_ID and TELEGRAM_API_HASH must be set in .env\n"
+            "Get them at: https://my.telegram.org",
+            err=True,
+        )
+        sys.exit(1)
+
+    if channels:
+        config.channels = [c.strip().lstrip("@") for c in channels.split(",") if c.strip()]
+
+    if not config.channels:
+        click.echo(
+            "ERROR: No channels specified. Set TELEGRAM_CHANNELS in .env or use --channels",
+            err=True,
+        )
+        sys.exit(1)
+
+    keywords_path = Path(keywords)
+    if not keywords_path.exists():
+        click.echo(f"Keywords file not found: {keywords_path}", err=True)
+        sys.exit(1)
+
+    keyword_config = KeywordConfig.from_yaml(str(keywords_path))
+    storage = Storage()
+    alerter = Alerter()
+    scanner_obj = __import__(
+        "darkweb_scanner.scanner", fromlist=["Scanner"]
+    ).Scanner(keyword_config)
+
+    session_id = storage.create_crawl_session(
+        [f"telegram:{c}" for c in config.channels]
+    )
+
+    click.echo(f"Scanning {len(config.channels)} Telegram channel(s)...")
+    result = asyncio.run(
+        scrape_channels(
+            config=config,
+            scanner=scanner_obj,
+            storage=storage,
+            alerter=alerter,
+            session_id=session_id,
+        )
+    )
+    storage.update_crawl_session(
+        session_id,
+        result["pages_scraped"],
+        result["hits_found"],
+        status="completed",
+    )
+    click.echo(
+        f"Done. Messages scanned: {result['pages_scraped']} | Hits: {result['hits_found']}"
+    )
+
+
+@cli.command("telegram-auth")
+def telegram_auth():
+    """Authenticate with Telegram (run once before telegram-scan)."""
+    from .telegram_scraper import TelegramConfig, interactive_auth
+
+    config = TelegramConfig.from_env()
+    if not config:
+        click.echo(
+            "ERROR: TELEGRAM_API_ID and TELEGRAM_API_HASH must be set in .env\n"
+            "Get them at: https://my.telegram.org",
+            err=True,
+        )
+        sys.exit(1)
+    asyncio.run(interactive_auth(config))
+
+
 @cli.command()
 def stats():
     """Print database statistics."""
@@ -176,7 +258,7 @@ def stats():
     click.echo(f"\n{'=' * 40}")
     click.echo("  Dark Web Scanner — Statistics")
     click.echo(f"{'=' * 40}")
-    click.echo(f"  Sessions:    {s['total_sessions']}")
+    click.echo(f"  Sessions:      {s['total_sessions']}")
     click.echo(f"  Pages crawled: {s['total_pages']}")
     click.echo(f"  Keyword hits:  {s['total_hits']}")
     if s["top_keywords"]:
@@ -201,7 +283,7 @@ def hits(limit: int):
         click.echo(f"  Context: {r.context[:200]}...")
 
 
-@cli.command()
+@cli.command("check-tor")
 def check_tor():
     """Verify Tor is reachable."""
 

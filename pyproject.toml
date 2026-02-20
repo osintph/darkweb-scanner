@@ -39,6 +39,7 @@ dashboard = [
     "qrcode>=7.4",
     "pillow>=10.0",
     "requests>=2.31",
+    "telethon>=1.36",
 ]
 dev = [
     "pytest>=7.4",
@@ -56,6 +57,7 @@ all = [
     "qrcode>=7.4",
     "pillow>=10.0",
     "requests>=2.31",
+    "telethon>=1.36",
     "flask>=3.0",
     "gunicorn>=21.0",
 ]

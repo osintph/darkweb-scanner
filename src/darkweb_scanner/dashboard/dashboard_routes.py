@@ -405,6 +405,66 @@ def api_profile():
     )
 
 
+
+# ── Telegram Channels API ──────────────────────────────────────────────────────
+
+TELEGRAM_CHANNELS_FILE = DATA_DIR / "telegram_channels.txt"
+
+
+def _load_channels() -> list[str]:
+    if not TELEGRAM_CHANNELS_FILE.exists():
+        # Fall back to env var
+        raw = os.getenv("TELEGRAM_CHANNELS", "")
+        return [c.strip().lstrip("@") for c in raw.split(",") if c.strip()]
+    return [
+        line.strip().lstrip("@")
+        for line in TELEGRAM_CHANNELS_FILE.read_text().splitlines()
+        if line.strip() and not line.strip().startswith("#")
+    ]
+
+
+@dashboard_bp.route("/api/telegram/channels", methods=["GET"])
+@require_login
+def api_telegram_channels_get():
+    try:
+        return jsonify({"channels": _load_channels()})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@dashboard_bp.route("/api/telegram/channels", methods=["POST"])
+@require_login
+def api_telegram_channels_add():
+    try:
+        body = request.get_json()
+        channel = (body.get("channel") or "").strip().lstrip("@")
+        if not channel:
+            return jsonify({"error": "channel required"}), 400
+        _ensure_data_dir()
+        existing = _load_channels()
+        if channel not in existing:
+            existing.append(channel)
+            TELEGRAM_CHANNELS_FILE.write_text("\n".join(existing) + "\n")
+        return jsonify({"ok": True})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@dashboard_bp.route("/api/telegram/channels", methods=["DELETE"])
+@require_login
+def api_telegram_channels_delete():
+    try:
+        body = request.get_json()
+        channel = (body.get("channel") or "").strip().lstrip("@")
+        if not channel:
+            return jsonify({"error": "channel required"}), 400
+        _ensure_data_dir()
+        channels = [c for c in _load_channels() if c != channel]
+        TELEGRAM_CHANNELS_FILE.write_text("\n".join(channels) + "\n")
+        return jsonify({"ok": True})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 # ── Health ─────────────────────────────────────────────────────────────────────
 
 
