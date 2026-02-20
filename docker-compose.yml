@@ -9,11 +9,11 @@ services:
     networks:
       - scanner_net
     healthcheck:
-      test: ["CMD", "curl", "--socks5", "localhost:9050", "-s", "https://check.torproject.org/api/ip"]
-      interval: 30s
-      timeout: 15s
-      retries: 5
-      start_period: 20s
+      test: ["CMD", "nc", "-z", "127.0.0.1", "9050"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
 
   # ── Scanner / crawler ───────────────────────────────────────────────────────
   scanner:
