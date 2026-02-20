@@ -342,14 +342,26 @@ class Storage:
                 .scalar() or 0
             )
 
-    def get_sessions(self, limit: int = 20):
+    def get_sessions(self, limit: int = 20) -> list[dict]:
         with self.get_session() as session:
-            return (
+            rows = (
                 session.query(CrawlSession)
                 .order_by(CrawlSession.started_at.desc())
                 .limit(limit)
                 .all()
             )
+            return [
+                {
+                    "id": r.id,
+                    "started_at": r.started_at.isoformat() if r.started_at else None,
+                    "ended_at": r.ended_at.isoformat() if r.ended_at else None,
+                    "seed_urls": r.seed_urls or "[]",
+                    "pages_crawled": r.pages_crawled or 0,
+                    "hits_found": r.hits_found or 0,
+                    "status": r.status or "completed",
+                }
+                for r in rows
+            ]
 
     def get_hits_by_session(self, session_id: int, limit: int = 200):
         with self.get_session() as session:
@@ -371,11 +383,20 @@ class Storage:
             )
     def get_active_session(self):
         with self.get_session() as session:
-            return (
+            r = (
                 session.query(CrawlSession)
                 .filter(CrawlSession.status == "running")
                 .order_by(CrawlSession.started_at.desc())
                 .first()
             )
+            if r is None:
+                return None
+            return {
+                "id": r.id,
+                "started_at": r.started_at.isoformat() if r.started_at else None,
+                "pages_crawled": r.pages_crawled or 0,
+                "hits_found": r.hits_found or 0,
+                "status": r.status,
+            }
 
 

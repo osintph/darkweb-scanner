@@ -7,7 +7,7 @@ import os
 from datetime import datetime
 from pathlib import Path
 
-from flask import Blueprint, jsonify, redirect, render_template, request, session, url_for
+from flask import Blueprint, Response, jsonify, render_template, request, session
 
 from ..auth import hash_password, require_login, validate_password_strength
 from .storage_helper import get_storage
@@ -239,12 +239,11 @@ def api_crawl_status():
         active = storage.get_active_session()
         session_data = None
         if active:
-            # Count actual hits in DB for this session (updated in real time)
-            live_hits = storage.count_session_hits(active.id)
-            live_pages = storage.count_session_pages(active.id)
+            live_hits = storage.count_session_hits(active["id"])
+            live_pages = storage.count_session_pages(active["id"])
             session_data = {
-                "id": active.id,
-                "started_at": active.started_at.isoformat() if active.started_at else None,
+                "id": active["id"],
+                "started_at": active["started_at"],
                 "pages_crawled": live_pages,
                 "hits_found": live_hits,
             }
@@ -474,22 +473,12 @@ def api_telegram_channels_delete():
 def api_sessions():
     storage = get_storage()
     sessions = storage.get_sessions(limit=20)
-    result = []
     for s in sessions:
         try:
-            seed_urls = json.loads(s.seed_urls) if s.seed_urls else []
+            s["seed_urls"] = json.loads(s["seed_urls"])
         except Exception:
-            seed_urls = []
-        result.append({
-            "id": s.id,
-            "started_at": s.started_at.isoformat() if s.started_at else None,
-            "ended_at": s.ended_at.isoformat() if s.ended_at else None,
-            "pages_crawled": s.pages_crawled or 0,
-            "hits_found": s.hits_found or 0,
-            "status": s.status or "completed",
-            "seed_urls": seed_urls,
-        })
-    return jsonify(result)
+            s["seed_urls"] = []
+    return jsonify(sessions)
 
 
 @dashboard_bp.route("/api/sessions/<int:session_id>/hits", methods=["GET"])
@@ -540,7 +529,7 @@ def api_report_pdf():
         storage = get_storage()
         stats = storage.get_stats()
         if session_id_filter:
-            sessions = [s for s in storage.get_sessions(limit=50) if s.id == session_id_filter]
+            sessions = [s for s in storage.get_sessions(limit=50) if s["id"] == session_id_filter]
             hits = storage.get_hits_by_session(session_id_filter, limit=500)
             report_title = f"Session #{session_id_filter} — Threat Intelligence Report"
         else:
@@ -674,8 +663,8 @@ def api_report_pdf():
         story.append(Paragraph("Scan Session History", s_h2))
         sess_data = [["Started", "Status", "Pages", "Hits"]]
         for s in sessions[:15]:
-            started = s.started_at.strftime("%Y-%m-%d %H:%M") if s.started_at else "—"
-            sess_data.append([started, s.status or "—", str(s.pages_crawled or 0), str(s.hits_found or 0)])
+            started = s["started_at"][:16].replace("T", " ") if s.get("started_at") else "—"
+            sess_data.append([started, s.get("status") or "—", str(s.get("pages_crawled") or 0), str(s.get("hits_found") or 0)])
         sess_table = Table(sess_data, colWidths=[W * 0.38, W * 0.22, W * 0.2, W * 0.2])
         sess_table.setStyle(
             TableStyle(
@@ -740,7 +729,6 @@ def api_report_pdf():
         doc.build(story)
         buf.seek(0)
 
-        from flask import Response
         filename = f"threat-intel-report-{dt.utcnow().strftime('%Y%m%d-%H%M')}.pdf"
         return Response(
             buf.read(),
