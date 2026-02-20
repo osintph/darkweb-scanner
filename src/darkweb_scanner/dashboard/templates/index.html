@@ -182,6 +182,7 @@
     <button class="nav-tab" onclick="switchTab('keywords', this)">🔑 Keywords</button>
     <button class="nav-tab" onclick="switchTab('seeds', this)">🌱 Seeds</button>
     <button class="nav-tab admin-only" id="tab-users" onclick="switchTab('users', this)">👥 Users</button>
+    <button class="nav-tab" onclick="switchTab('investigations', this)">🔍 Investigations</button>
     <button class="nav-tab" onclick="switchTab('reports', this)">📄 Reports</button>
     <button class="nav-tab" onclick="switchTab('settings', this)">⚙️ Settings</button>
   </nav>
@@ -299,6 +300,51 @@
     </div>
   </div>
 
+
+  <!-- ── Investigations Tab ── -->
+  <div class="tab-panel" id="panel-investigations">
+
+    <!-- Create new investigation -->
+    <div class="panel" style="margin-bottom:20px">
+      <div class="panel-header"><h2>🔍 New Investigation</h2><span style="color:var(--muted);font-size:.79rem">Ad hoc targeted lookup</span></div>
+      <div class="panel-body">
+        <div class="form-group" style="margin-bottom:14px">
+          <label>Investigation Name</label>
+          <input type="text" id="invName" style="width:360px" placeholder="e.g. Subject Name, Incident 2026-02"/>
+        </div>
+
+        <div style="margin-bottom:14px">
+          <div class="section-title">Targets</div>
+          <div id="invTargets" style="display:flex;flex-direction:column;gap:8px;margin-bottom:10px"></div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <button class="btn btn-secondary" onclick="addTarget('email')">+ Email</button>
+            <button class="btn btn-secondary" onclick="addTarget('name')">+ Name</button>
+            <button class="btn btn-secondary" onclick="addTarget('keyword')">+ Keyword</button>
+          </div>
+        </div>
+
+        <div class="info-banner" style="margin-bottom:14px">
+          📧 Emails will be checked against HIBP breach database (requires <code>HIBP_API_KEY</code> in .env) and searched in your dark web hits.<br/>
+          👤 Names and keywords will be searched across all captured dark web context.
+        </div>
+
+        <button class="btn btn-primary" onclick="runInvestigation()" id="invRunBtn" style="padding:8px 20px">
+          ▶ Run Investigation
+        </button>
+      </div>
+    </div>
+
+    <!-- Investigations list -->
+    <div class="panel">
+      <div class="panel-header">
+        <h2>Past Investigations</h2>
+        <button class="btn btn-secondary" onclick="loadInvestigations()">↻ Refresh</button>
+      </div>
+      <div id="investigationsList"><div class="empty"><div class="icon">🔍</div><p>No investigations yet.</p></div></div>
+    </div>
+
+  </div>
+
   <!-- ── Reports Tab ── -->
   <div class="tab-panel" id="panel-reports">
     <div class="report-hero">
@@ -395,6 +441,7 @@
     if (tab === 'keywords') loadKeywords();
     if (tab === 'seeds') { loadSeeds(); loadChannels(); }
     if (tab === 'users' && isAdmin) loadUsers();
+    if (tab === 'investigations') loadInvestigations();
     if (tab === 'reports') loadReportPreview();
     if (tab === 'settings') loadSettings();
   }
@@ -759,6 +806,173 @@
     if (data.ok) { toast('2FA disabled'); loadSettings(); }
     else toast(data.error||'Invalid code','error');
   }
+
+  // ── Investigations ─────────────────────────────────────────────────────────
+  let targetCount = 0;
+
+  function addTarget(type) {
+    targetCount++;
+    const id = `target-${targetCount}`;
+    const labels = { email: '📧 Email', name: '👤 Name', keyword: '🔑 Keyword' };
+    const placeholders = { email: 'user@example.com', name: 'John Doe', keyword: 'company name' };
+    const colors = { email: 'var(--accent)', name: 'var(--green)', keyword: 'var(--purple)' };
+    const div = document.createElement('div');
+    div.id = id;
+    div.style.cssText = 'display:flex;align-items:center;gap:8px';
+    div.innerHTML = `
+      <span style="font-size:.75rem;font-weight:600;color:${colors[type]};width:62px;flex-shrink:0">${labels[type]}</span>
+      <input type="text" data-type="${type}" style="flex:1;max-width:360px" placeholder="${placeholders[type]}"/>
+      <button class="btn btn-danger" onclick="document.getElementById('${id}').remove()" style="padding:4px 10px">✕</button>`;
+    document.getElementById('invTargets').appendChild(div);
+    div.querySelector('input').focus();
+  }
+
+  async function runInvestigation() {
+    const name = document.getElementById('invName').value.trim();
+    if (!name) { toast('Enter an investigation name', 'error'); return; }
+
+    const inputs = document.querySelectorAll('#invTargets input');
+    const targets = [];
+    inputs.forEach(inp => {
+      const val = inp.value.trim();
+      if (val) targets.push({ value: val, type: inp.dataset.type });
+    });
+
+    if (!targets.length) { toast('Add at least one target', 'error'); return; }
+
+    const btn = document.getElementById('invRunBtn');
+    btn.textContent = '⏳ Running…';
+    btn.disabled = true;
+
+    try {
+      const res = await fetch('/api/investigations', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, targets })
+      });
+      const data = await res.json();
+      if (data.ok) {
+        toast(`Investigation complete! ID #${data.id}`);
+        document.getElementById('invName').value = '';
+        document.getElementById('invTargets').innerHTML = '';
+        targetCount = 0;
+        loadInvestigations();
+      } else {
+        toast(data.error || 'Error running investigation', 'error');
+      }
+    } catch(e) {
+      toast('Network error', 'error');
+    } finally {
+      btn.textContent = '▶ Run Investigation';
+      btn.disabled = false;
+    }
+  }
+
+  async function loadInvestigations() {
+    const el = document.getElementById('investigationsList');
+    try {
+      const invs = await (await fetch('/api/investigations')).json();
+      if (!invs.length) {
+        el.innerHTML = '<div class="empty"><div class="icon">🔍</div><p>No investigations yet. Create one above.</p></div>';
+        return;
+      }
+      el.innerHTML = `<table>
+        <thead><tr><th>Name</th><th>Targets</th><th>Status</th><th>Created</th><th></th></tr></thead>
+        <tbody>${invs.map(inv => `
+          <tr class="session-row" onclick="expandInvestigation(${inv.id})" id="inv-${inv.id}">
+            <td><strong>${esc(inv.name)}</strong></td>
+            <td style="color:var(--muted)">${inv.target_count} target${inv.target_count !== 1 ? 's' : ''}</td>
+            <td><span class="status-badge status-${inv.status}">${inv.status}</span></td>
+            <td class="time-cell">${fmtTime(inv.created_at)}</td>
+            <td><button class="btn btn-danger" onclick="event.stopPropagation();deleteInvestigation(${inv.id})" style="padding:3px 10px">✕</button></td>
+          </tr>
+          <tr class="session-detail" id="inv-detail-${inv.id}">
+            <td colspan="5"><div class="session-detail-inner" id="inv-inner-${inv.id}"></div></td>
+          </tr>`).join('')}
+        </tbody></table>`;
+    } catch(e) {
+      el.innerHTML = '<div class="empty" style="color:var(--red)">Error loading investigations.</div>';
+    }
+  }
+
+  async function expandInvestigation(id) {
+    const detail = document.getElementById(`inv-detail-${id}`);
+    if (!detail) return;
+    const isOpen = detail.style.display === 'table-row';
+    if (isOpen) { detail.style.display = 'none'; return; }
+    detail.style.display = 'table-row';
+    const inner = document.getElementById(`inv-inner-${id}`);
+    inner.innerHTML = 'Loading…';
+    try {
+      const data = await (await fetch(`/api/investigations/${id}`)).json();
+      if (!data.targets?.length) { inner.innerHTML = '<p style="color:var(--muted);padding:10px">No targets found.</p>'; return; }
+      inner.innerHTML = data.targets.map(t => buildTargetCard(t)).join('');
+    } catch(e) {
+      inner.innerHTML = '<p style="color:var(--red)">Error loading results.</p>';
+    }
+  }
+
+  function buildTargetCard(t) {
+    const typeColors = { email: 'var(--accent)', name: 'var(--green)', keyword: 'var(--purple)' };
+    const typeIcons = { email: '📧', name: '👤', keyword: '🔑' };
+    let html = `<div style="border:1px solid var(--border);border-radius:8px;padding:14px;margin:10px 0;background:var(--bg)">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
+        <span style="font-size:1.1rem">${typeIcons[t.target_type] || '🎯'}</span>
+        <strong style="color:${typeColors[t.target_type] || 'var(--text)'}">${esc(t.value)}</strong>
+        <span style="font-size:.72rem;color:var(--muted)">${t.target_type}</span>
+        ${t.error ? `<span style="color:var(--yellow);font-size:.75rem">⚠ ${esc(t.error)}</span>` : ''}
+      </div>`;
+
+    // Breaches
+    if (t.target_type === 'email') {
+      if (t.breaches?.length) {
+        html += `<div style="margin-bottom:12px">
+          <div style="color:var(--red);font-weight:600;font-size:.82rem;margin-bottom:8px">⚠ Found in ${t.breaches.length} breach(es)</div>
+          ${t.breaches.map(b => `
+            <div style="background:rgba(248,81,73,.06);border:1px solid rgba(248,81,73,.2);border-radius:6px;padding:10px;margin-bottom:6px">
+              <div style="display:flex;justify-content:space-between;margin-bottom:5px">
+                <strong style="color:var(--red)">${esc(b.breach_name)}</strong>
+                <span style="color:var(--muted);font-size:.75rem">${esc(b.breach_date)}</span>
+              </div>
+              <div style="font-size:.75rem;color:var(--muted);margin-bottom:5px">${esc(b.description?.replace(/<[^>]+>/g,'').slice(0,200) || '')}</div>
+              <div style="display:flex;flex-wrap:wrap;gap:4px">
+                ${(b.data_classes||[]).map(dc => `<span style="background:rgba(248,81,73,.1);color:var(--red);border-radius:3px;padding:1px 6px;font-size:.7rem">${esc(dc)}</span>`).join('')}
+              </div>
+            </div>`).join('')}
+        </div>`;
+      } else if (!t.error) {
+        html += `<div style="color:var(--green);font-size:.82rem;margin-bottom:12px">✓ No breaches found in HIBP</div>`;
+      }
+    }
+
+    // Dark web hits
+    if (t.darkweb_hits?.length) {
+      html += `<div>
+        <div style="color:var(--orange);font-weight:600;font-size:.82rem;margin-bottom:8px">🕸 Found in ${t.darkweb_hits.length} dark web hit(s)</div>
+        ${t.darkweb_hits.slice(0,5).map(h => `
+          <div style="background:rgba(240,136,62,.06);border:1px solid rgba(240,136,62,.2);border-radius:6px;padding:10px;margin-bottom:6px">
+            <div style="font-family:var(--mono);font-size:.75rem;color:var(--accent);margin-bottom:4px">${esc(h.url)}</div>
+            <div style="font-size:.75rem;color:var(--muted);font-family:var(--mono)">${esc((h.context||'').slice(0,200))}</div>
+            <div style="font-size:.7rem;color:var(--muted);margin-top:4px">${esc(h.found_at||'')}</div>
+          </div>`).join('')}
+        ${t.darkweb_hits.length > 5 ? `<p style="color:var(--muted);font-size:.75rem">…and ${t.darkweb_hits.length - 5} more</p>` : ''}
+      </div>`;
+    } else {
+      html += `<div style="color:var(--muted);font-size:.82rem">No matches in dark web database</div>`;
+    }
+
+    html += '</div>';
+    return html;
+  }
+
+  async function deleteInvestigation(id) {
+    if (!confirm('Delete this investigation?')) return;
+    const res = await fetch(`/api/investigations/${id}`, { method: 'DELETE' });
+    const data = await res.json();
+    if (data.ok) { toast('Deleted'); loadInvestigations(); }
+    else toast(data.error || 'Error', 'error');
+  }
+
 </script>
 </body>
 </html>

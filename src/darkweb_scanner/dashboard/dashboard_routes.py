@@ -734,6 +734,77 @@ def api_report_pdf():
         import traceback
         return jsonify({"error": str(e), "trace": traceback.format_exc()}), 500
 
+
+# ── Investigations API ─────────────────────────────────────────────────────────
+
+
+@dashboard_bp.route("/api/investigations", methods=["GET"])
+@require_login
+def api_investigations_list():
+    storage = get_storage()
+    return jsonify(storage.get_investigations(limit=50))
+
+
+@dashboard_bp.route("/api/investigations", methods=["POST"])
+@require_login
+def api_investigations_create():
+    import asyncio
+    from ..investigations import run_investigation
+
+    body = request.get_json()
+    name = (body.get("name") or "").strip()
+    targets = body.get("targets") or []
+
+    if not name:
+        return jsonify({"error": "Investigation name required"}), 400
+    if not targets:
+        return jsonify({"error": "At least one target required"}), 400
+
+    # Validate targets
+    valid = []
+    for t in targets:
+        val = (t.get("value") or "").strip()
+        ttype = (t.get("type") or "keyword").strip()
+        if val and ttype in ("email", "name", "keyword"):
+            valid.append({"value": val, "type": ttype})
+
+    if not valid:
+        return jsonify({"error": "No valid targets provided"}), 400
+
+    storage = get_storage()
+    api_key = os.getenv("HIBP_API_KEY", "")
+
+    try:
+        inv_id = asyncio.run(run_investigation(
+            name=name,
+            targets=valid,
+            storage=storage,
+            api_key=api_key,
+        ))
+        return jsonify({"ok": True, "id": inv_id})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@dashboard_bp.route("/api/investigations/<int:inv_id>", methods=["GET"])
+@require_login
+def api_investigations_get(inv_id):
+    storage = get_storage()
+    targets = storage.get_investigation_targets(inv_id)
+    investigations = storage.get_investigations(limit=50)
+    inv = next((i for i in investigations if i["id"] == inv_id), None)
+    if not inv:
+        return jsonify({"error": "Not found"}), 404
+    return jsonify({**inv, "targets": targets})
+
+
+@dashboard_bp.route("/api/investigations/<int:inv_id>", methods=["DELETE"])
+@require_login
+def api_investigations_delete(inv_id):
+    storage = get_storage()
+    storage.delete_investigation(inv_id)
+    return jsonify({"ok": True})
+
 # ── Health ─────────────────────────────────────────────────────────────────────
 
 

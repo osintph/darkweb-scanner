@@ -92,6 +92,33 @@ class KeywordHitRecord(Base):
     )
 
 
+
+
+class Investigation(Base):
+    __tablename__ = "investigations"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    name = Column(String(255), nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    completed_at = Column(DateTime, nullable=True)
+    status = Column(String(50), default="running")  # running | completed
+    target_count = Column(Integer, default=0)
+
+
+class InvestigationTarget(Base):
+    __tablename__ = "investigation_targets"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    investigation_id = Column(Integer, nullable=False, index=True)
+    value = Column(String(512), nullable=False)
+    target_type = Column(String(50), nullable=False)  # email | name | keyword
+    breaches = Column(Text, default="[]")   # JSON list of breach dicts
+    darkweb_hits = Column(Text, default="[]")  # JSON list of hit dicts
+    breach_count = Column(Integer, default=0)
+    darkweb_count = Column(Integer, default=0)
+    error = Column(Text, nullable=True)
+    checked_at = Column(DateTime, default=datetime.utcnow)
+
 class Storage:
     def __init__(self, database_url: Optional[str] = None):
         self.database_url = database_url or os.getenv(
@@ -381,6 +408,133 @@ class Storage:
                 .limit(limit)
                 .all()
             )
+    # ── Investigations ──────────────────────────────────────────────────────────
+
+    def create_investigation(self, name: str, targets: list) -> int:
+        with self.get_session() as session:
+            record = Investigation(
+                name=name,
+                status="running",
+                target_count=len(targets),
+            )
+            session.add(record)
+            session.commit()
+            return record.id
+
+    def save_investigation_target(
+        self,
+        investigation_id: int,
+        value: str,
+        target_type: str,
+        breaches: list,
+        darkweb_hits: list,
+        error: Optional[str] = None,
+    ):
+        with self.get_session() as session:
+            record = InvestigationTarget(
+                investigation_id=investigation_id,
+                value=value,
+                target_type=target_type,
+                breaches=json.dumps(breaches),
+                darkweb_hits=json.dumps(darkweb_hits),
+                breach_count=len(breaches),
+                darkweb_count=len(darkweb_hits),
+                error=error,
+            )
+            session.add(record)
+            session.commit()
+
+    def complete_investigation(self, investigation_id: int):
+        with self.get_session() as session:
+            record = session.get(Investigation, investigation_id)
+            if record:
+                record.status = "completed"
+                record.completed_at = datetime.utcnow()
+                session.commit()
+
+    def get_investigations(self, limit: int = 50) -> list[dict]:
+        with self.get_session() as session:
+            rows = (
+                session.query(Investigation)
+                .order_by(Investigation.created_at.desc())
+                .limit(limit)
+                .all()
+            )
+            return [
+                {
+                    "id": r.id,
+                    "name": r.name,
+                    "status": r.status,
+                    "target_count": r.target_count,
+                    "created_at": r.created_at.isoformat() if r.created_at else None,
+                    "completed_at": r.completed_at.isoformat() if r.completed_at else None,
+                }
+                for r in rows
+            ]
+
+    def get_investigation_targets(self, investigation_id: int) -> list[dict]:
+        with self.get_session() as session:
+            rows = (
+                session.query(InvestigationTarget)
+                .filter(InvestigationTarget.investigation_id == investigation_id)
+                .order_by(InvestigationTarget.id.asc())
+                .all()
+            )
+            results = []
+            for r in rows:
+                try:
+                    breaches = json.loads(r.breaches or "[]")
+                except Exception:
+                    breaches = []
+                try:
+                    darkweb_hits = json.loads(r.darkweb_hits or "[]")
+                except Exception:
+                    darkweb_hits = []
+                results.append({
+                    "id": r.id,
+                    "value": r.value,
+                    "target_type": r.target_type,
+                    "breaches": breaches,
+                    "darkweb_hits": darkweb_hits,
+                    "breach_count": r.breach_count or 0,
+                    "darkweb_count": r.darkweb_count or 0,
+                    "error": r.error,
+                    "checked_at": r.checked_at.isoformat() if r.checked_at else None,
+                })
+            return results
+
+    def delete_investigation(self, investigation_id: int):
+        with self.get_session() as session:
+            session.query(InvestigationTarget).filter(
+                InvestigationTarget.investigation_id == investigation_id
+            ).delete()
+            record = session.get(Investigation, investigation_id)
+            if record:
+                session.delete(record)
+            session.commit()
+
+    def search_hits(self, query: str, limit: int = 50) -> list[dict]:
+        """Search existing dark web keyword hits for a given string."""
+        with self.get_session() as session:
+            rows = (
+                session.query(KeywordHitRecord)
+                .filter(KeywordHitRecord.context.ilike(f"%{query}%"))
+                .order_by(KeywordHitRecord.found_at.desc())
+                .limit(limit)
+                .all()
+            )
+            return [
+                {
+                    "url": r.url,
+                    "keyword": r.keyword,
+                    "category": r.category,
+                    "context": r.context,
+                    "found_at": r.found_at.isoformat() if r.found_at else None,
+                }
+                for r in rows
+            ]
+
+
     def get_active_session(self):
         with self.get_session() as session:
             r = (
