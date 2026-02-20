@@ -10,7 +10,7 @@
       --bg: #0d1117; --surface: #161b22; --surface2: #21262d;
       --border: #30363d; --text: #e6edf3; --muted: #8b949e;
       --accent: #58a6ff; --red: #f85149; --green: #3fb950;
-      --yellow: #d29922; --purple: #bc8cff;
+      --yellow: #d29922; --purple: #bc8cff; --orange: #f0883e;
       --font: 'Segoe UI', system-ui, sans-serif;
       --mono: 'Cascadia Code', 'Fira Code', monospace;
     }
@@ -19,118 +19,154 @@
     /* ── Nav ── */
     header {
       background: var(--surface); border-bottom: 1px solid var(--border);
-      padding: 0 32px; display: flex; align-items: center; gap: 0; position: sticky; top: 0; z-index: 100;
+      padding: 0 28px; display: flex; align-items: center; position: sticky; top: 0; z-index: 100;
     }
-    .logo { display: flex; align-items: center; gap: 10px; padding: 16px 0; margin-right: 24px; }
+    .logo { display: flex; align-items: center; gap: 10px; padding: 14px 0; margin-right: 20px; }
     .logo h1 { font-size: 1rem; font-weight: 700; white-space: nowrap; }
-    .logo .badge { background: var(--red); color: white; font-size: 0.65rem; padding: 2px 7px; border-radius: 20px; font-weight: 700; letter-spacing: 0.05em; }
-    .status-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--green); animation: pulse 2s infinite; flex-shrink: 0; }
-    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.35} }
+    .logo .badge { background: var(--red); color: white; font-size: 0.65rem; padding: 2px 7px; border-radius: 20px; font-weight: 700; }
+    .status-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--green); flex-shrink: 0; }
+    .status-dot.pulse { animation: pulse 1.5s infinite; }
+    @keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.5;transform:scale(1.3)} }
     nav { display: flex; gap: 2px; flex: 1; }
     .nav-tab {
-      padding: 18px 16px; font-size: 0.85rem; font-weight: 500; color: var(--muted);
+      padding: 16px 14px; font-size: 0.84rem; font-weight: 500; color: var(--muted);
       cursor: pointer; border-bottom: 2px solid transparent; transition: all 0.15s;
       white-space: nowrap; background: none; border-top: none; border-left: none; border-right: none;
       font-family: var(--font);
     }
     .nav-tab:hover { color: var(--text); }
     .nav-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
-    .nav-tab.admin-only { display: none; }
-    .nav-tab.admin-only.visible { display: block; }
-    .header-right { margin-left: auto; display: flex; align-items: center; gap: 12px; padding-left: 24px; }
-    .crawl-btn {
-      background: var(--green); color: #0d1117; border: none; border-radius: 6px;
-      padding: 7px 14px; font-size: 0.8rem; font-weight: 700; cursor: pointer; transition: opacity 0.15s;
-    }
-    .crawl-btn:hover { opacity: 0.85; }
-    .crawl-btn.running { background: var(--red); }
+    .admin-only { display: none; }
+    .admin-only.visible { display: block; }
+    .header-right { margin-left: auto; display: flex; align-items: center; gap: 10px; padding-left: 20px; }
+    .btn-crawl { background: var(--green); color: #0d1117; border: none; border-radius: 6px; padding: 7px 14px; font-size: 0.8rem; font-weight: 700; cursor: pointer; white-space: nowrap; font-family: var(--font); }
+    .btn-crawl:hover { opacity: .85; }
+    .btn-crawl.running { background: var(--red); color: white; }
     .user-pill { color: var(--muted); font-size: 0.82rem; }
-    .logout-link { color: var(--muted); font-size: 0.8rem; text-decoration: none; }
-    .logout-link:hover { color: var(--red); }
+    .sign-out { color: var(--muted); font-size: 0.8rem; text-decoration: none; }
+    .sign-out:hover { color: var(--red); }
 
     /* ── Layout ── */
-    main { padding: 32px; max-width: 1400px; margin: 0 auto; }
+    main { padding: 28px; max-width: 1400px; margin: 0 auto; }
     .tab-panel { display: none; }
     .tab-panel.active { display: block; }
 
-    /* ── Cards / Panels ── */
-    .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px; margin-bottom: 28px; }
-    .stat-card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 20px; }
-    .stat-card .label { color: var(--muted); font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 8px; }
-    .stat-card .value { font-size: 2rem; font-weight: 700; color: var(--accent); }
-    .stat-card .sub { font-size: 0.75rem; color: var(--muted); margin-top: 4px; }
-    .panel { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; margin-bottom: 24px; overflow: hidden; }
-    .panel-header { padding: 14px 20px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
-    .panel-header h2 { font-size: 0.9rem; font-weight: 600; }
-    .panel-body { padding: 20px; }
+    /* ── Live crawl card ── */
+    .crawl-card {
+      border-radius: 10px; padding: 18px 24px; margin-bottom: 24px;
+      display: flex; align-items: center; gap: 20px;
+      border: 1px solid var(--border); background: var(--surface);
+      transition: all .3s;
+    }
+    .crawl-card.active { border-color: rgba(63,185,80,.4); background: rgba(63,185,80,.06); }
+    .crawl-card.active .crawl-dot { background: var(--green); animation: pulse 1.2s infinite; }
+    .crawl-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--muted); flex-shrink: 0; }
+    .crawl-info { flex: 1; }
+    .crawl-title { font-weight: 600; font-size: 0.9rem; margin-bottom: 3px; }
+    .crawl-sub { color: var(--muted); font-size: 0.8rem; }
+    .crawl-stats { display: flex; gap: 24px; }
+    .crawl-stat { text-align: center; }
+    .crawl-stat .val { font-size: 1.4rem; font-weight: 700; color: var(--accent); }
+    .crawl-stat .lbl { font-size: 0.7rem; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
+
+    /* ── Stats grid ── */
+    .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 14px; margin-bottom: 24px; }
+    .stat-card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 18px 20px; }
+    .stat-card .lbl { color: var(--muted); font-size: 0.72rem; text-transform: uppercase; letter-spacing: .08em; margin-bottom: 6px; }
+    .stat-card .val { font-size: 1.9rem; font-weight: 700; color: var(--accent); }
+
+    /* ── Panel ── */
+    .panel { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; margin-bottom: 20px; overflow: hidden; }
+    .panel-header { padding: 13px 18px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+    .panel-header h2 { font-size: 0.88rem; font-weight: 600; }
+    .panel-body { padding: 18px; }
 
     /* ── Tables ── */
-    table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
-    th { text-align: left; padding: 10px 14px; color: var(--muted); font-weight: 500; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; border-bottom: 1px solid var(--border); }
-    td { padding: 12px 14px; border-bottom: 1px solid var(--border); vertical-align: top; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.83rem; }
+    th { text-align: left; padding: 9px 12px; color: var(--muted); font-weight: 500; font-size: 0.72rem; text-transform: uppercase; letter-spacing: .05em; border-bottom: 1px solid var(--border); }
+    td { padding: 11px 12px; border-bottom: 1px solid var(--border); vertical-align: top; }
     tr:last-child td { border-bottom: none; }
     tr:hover td { background: var(--surface2); }
-    .keyword-tag { display: inline-block; background: rgba(88,166,255,.15); color: var(--accent); border: 1px solid rgba(88,166,255,.3); border-radius: 4px; padding: 2px 8px; font-size: 0.78rem; font-weight: 600; font-family: var(--mono); }
-    .cat-tag { display: inline-block; background: rgba(188,140,255,.12); color: var(--purple); border: 1px solid rgba(188,140,255,.25); border-radius: 4px; padding: 2px 8px; font-size: 0.75rem; }
-    .url-cell { font-family: var(--mono); font-size: 0.78rem; color: var(--accent); word-break: break-all; max-width: 260px; }
-    .ctx-cell { color: var(--muted); font-size: 0.78rem; font-family: var(--mono); max-width: 380px; white-space: pre-wrap; word-break: break-word; }
-    .time-cell { color: var(--muted); font-size: 0.75rem; white-space: nowrap; }
+    .keyword-tag { display: inline-block; background: rgba(88,166,255,.12); color: var(--accent); border: 1px solid rgba(88,166,255,.25); border-radius: 4px; padding: 2px 7px; font-size: 0.75rem; font-weight: 600; font-family: var(--mono); }
+    .cat-tag { display: inline-block; background: rgba(188,140,255,.1); color: var(--purple); border: 1px solid rgba(188,140,255,.2); border-radius: 4px; padding: 2px 7px; font-size: 0.73rem; }
+    .url-cell { font-family: var(--mono); font-size: 0.75rem; color: var(--accent); word-break: break-all; max-width: 240px; }
+    .ctx-cell { color: var(--muted); font-size: 0.76rem; font-family: var(--mono); max-width: 340px; white-space: pre-wrap; word-break: break-word; }
+    .time-cell { color: var(--muted); font-size: 0.73rem; white-space: nowrap; }
+    .status-badge { border-radius: 4px; padding: 2px 8px; font-size: 0.72rem; font-weight: 600; }
+    .status-completed { background: rgba(63,185,80,.12); color: var(--green); border: 1px solid rgba(63,185,80,.25); }
+    .status-running { background: rgba(88,166,255,.12); color: var(--accent); border: 1px solid rgba(88,166,255,.25); }
+    .status-failed { background: rgba(248,81,73,.12); color: var(--red); border: 1px solid rgba(248,81,73,.25); }
 
-    /* ── Forms / Inputs ── */
-    .form-row { display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap; margin-bottom: 20px; }
-    .form-group { display: flex; flex-direction: column; gap: 6px; }
-    .form-group label { font-size: 0.8rem; color: var(--muted); }
+    /* ── Session expand ── */
+    .session-row { cursor: pointer; }
+    .session-row:hover td { background: rgba(88,166,255,.05); }
+    .session-detail { display: none; }
+    .session-detail td { padding: 0; background: var(--bg) !important; }
+    .session-detail-inner { padding: 12px 20px; border-top: 1px solid var(--border); }
+
+    /* ── Top keywords pills ── */
+    .kw-pills { display: flex; flex-wrap: wrap; gap: 8px; padding: 14px 18px; }
+    .kw-pill { background: var(--surface2); border: 1px solid var(--border); border-radius: 20px; padding: 4px 12px; font-size: 0.79rem; display: flex; align-items: center; gap: 7px; cursor: pointer; transition: border-color .15s; }
+    .kw-pill:hover { border-color: var(--accent); color: var(--accent); }
+    .kw-pill .count { background: var(--accent); color: #0d1117; border-radius: 10px; padding: 1px 7px; font-size: 0.68rem; font-weight: 700; }
+
+    /* ── Forms ── */
+    .form-row { display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap; margin-bottom: 18px; }
+    .form-group { display: flex; flex-direction: column; gap: 5px; }
+    .form-group label { font-size: 0.78rem; color: var(--muted); }
     input[type="text"], input[type="email"], input[type="password"], select {
       background: var(--bg); border: 1px solid var(--border); border-radius: 6px;
-      color: var(--text); padding: 8px 12px; font-size: 0.85rem; font-family: var(--font);
+      color: var(--text); padding: 7px 11px; font-size: 0.83rem; font-family: var(--font);
     }
     input:focus, select:focus { outline: none; border-color: var(--accent); }
-    input[type="text"].wide { width: 280px; }
-    .btn { border: none; border-radius: 6px; padding: 8px 16px; font-size: 0.85rem; font-weight: 600; cursor: pointer; transition: opacity .15s; font-family: var(--font); }
+    .btn { border: none; border-radius: 6px; padding: 7px 14px; font-size: 0.83rem; font-weight: 600; cursor: pointer; font-family: var(--font); transition: opacity .15s; }
     .btn-primary { background: var(--accent); color: #0d1117; }
     .btn-primary:hover { opacity: .85; }
-    .btn-danger { background: rgba(248,81,73,.15); color: var(--red); border: 1px solid rgba(248,81,73,.3); }
-    .btn-danger:hover { background: rgba(248,81,73,.25); }
+    .btn-danger { background: rgba(248,81,73,.12); color: var(--red); border: 1px solid rgba(248,81,73,.25); }
+    .btn-danger:hover { background: rgba(248,81,73,.22); }
     .btn-secondary { background: var(--surface2); color: var(--text); border: 1px solid var(--border); }
     .btn-secondary:hover { border-color: var(--accent); }
+    .btn-report { background: var(--purple); color: #0d1117; font-weight: 700; }
+    .btn-report:hover { opacity: .85; }
 
-    /* ── Crawl status bar ── */
-    .crawl-status {
-      background: rgba(63,185,80,.08); border: 1px solid rgba(63,185,80,.25);
-      border-radius: 8px; padding: 12px 20px; margin-bottom: 24px;
-      display: flex; align-items: center; gap: 16px; font-size: 0.85rem;
-    }
-    .crawl-status.idle { background: var(--surface); border-color: var(--border); }
-    .crawl-status .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green); animation: pulse 1s infinite; }
-    .crawl-status.idle .dot { background: var(--muted); animation: none; }
-
-    /* ── Empty state ── */
-    .empty { padding: 60px; text-align: center; color: var(--muted); }
-    .empty .icon { font-size: 2.5rem; margin-bottom: 12px; }
-    .empty p { font-size: 0.875rem; }
+    /* ── Seeds / channels ── */
+    .seed-item { display: flex; align-items: center; justify-content: space-between; padding: 9px 0; border-bottom: 1px solid var(--border); font-family: var(--mono); font-size: 0.79rem; color: var(--accent); }
+    .seed-item:last-child { border-bottom: none; }
 
     /* ── User badges ── */
-    .badge-admin { background: rgba(248,81,73,.15); color: var(--red); border: 1px solid rgba(248,81,73,.3); border-radius: 4px; padding: 2px 7px; font-size: 0.72rem; font-weight: 600; }
-    .badge-user { background: var(--surface2); color: var(--muted); border: 1px solid var(--border); border-radius: 4px; padding: 2px 7px; font-size: 0.72rem; }
-    .badge-2fa { background: rgba(63,185,80,.12); color: var(--green); border: 1px solid rgba(63,185,80,.3); border-radius: 4px; padding: 2px 7px; font-size: 0.72rem; }
+    .badge-admin { background: rgba(248,81,73,.12); color: var(--red); border: 1px solid rgba(248,81,73,.25); border-radius: 4px; padding: 2px 7px; font-size: 0.7rem; font-weight: 600; }
+    .badge-user { background: var(--surface2); color: var(--muted); border: 1px solid var(--border); border-radius: 4px; padding: 2px 7px; font-size: 0.7rem; }
+    .badge-2fa { background: rgba(63,185,80,.1); color: var(--green); border: 1px solid rgba(63,185,80,.25); border-radius: 4px; padding: 2px 7px; font-size: 0.7rem; }
+
+    /* ── Report tab ── */
+    .report-hero { text-align: center; padding: 60px 20px; }
+    .report-hero .icon { font-size: 3rem; margin-bottom: 16px; }
+    .report-hero h2 { font-size: 1.4rem; font-weight: 700; margin-bottom: 8px; }
+    .report-hero p { color: var(--muted); font-size: 0.88rem; margin-bottom: 28px; max-width: 480px; margin-left: auto; margin-right: auto; }
+    .report-preview { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 24px; max-width: 560px; margin: 0 auto 28px; text-align: left; }
+    .report-preview h3 { font-size: 0.85rem; font-weight: 600; margin-bottom: 14px; color: var(--muted); text-transform: uppercase; letter-spacing: .07em; }
+    .report-item { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 0.84rem; }
+    .report-item:last-child { border-bottom: none; }
+    .report-item .label { color: var(--muted); }
+
+    /* ── Empty ── */
+    .empty { padding: 50px; text-align: center; color: var(--muted); }
+    .empty .icon { font-size: 2.2rem; margin-bottom: 10px; }
+    .empty p { font-size: 0.84rem; }
 
     /* ── Toast ── */
-    #toast { position: fixed; bottom: 24px; right: 24px; background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; padding: 12px 20px; font-size: 0.85rem; opacity: 0; transform: translateY(8px); transition: all .25s; pointer-events: none; z-index: 999; }
+    #toast { position: fixed; bottom: 24px; right: 24px; background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; padding: 11px 18px; font-size: 0.84rem; opacity: 0; transform: translateY(8px); transition: all .25s; pointer-events: none; z-index: 999; }
     #toast.show { opacity: 1; transform: translateY(0); }
     #toast.success { border-color: var(--green); color: var(--green); }
     #toast.error { border-color: var(--red); color: var(--red); }
 
-    /* ── Settings sections ── */
-    .settings-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 20px; }
-    .section-title { font-size: 0.8rem; font-weight: 600; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin-bottom: 16px; }
-    .kw-pills { display: flex; flex-wrap: wrap; gap: 8px; }
-    .kw-pill { background: var(--surface2); border: 1px solid var(--border); border-radius: 20px; padding: 4px 12px; font-size: 0.8rem; display: flex; align-items: center; gap: 8px; }
-    .kw-pill .count { background: var(--accent); color: #0d1117; border-radius: 10px; padding: 1px 7px; font-size: 0.7rem; font-weight: 700; }
-    .kw-pill:hover { border-color: var(--accent); color: var(--accent); cursor: pointer; }
-    .seed-item { display: flex; align-items: center; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid var(--border); font-family: var(--mono); font-size: 0.8rem; color: var(--accent); }
-    .seed-item:last-child { border-bottom: none; }
-    .tag-green { color: var(--green); }
-    .tag-red { color: var(--red); }
+    /* ── Settings ── */
+    .settings-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 18px; }
+    .section-title { font-size: 0.77rem; font-weight: 600; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin-bottom: 14px; }
+
+    /* ── Info banner ── */
+    .info-banner { background: rgba(88,166,255,.06); border: 1px solid rgba(88,166,255,.2); border-radius: 6px; padding: 10px 14px; font-size: 0.8rem; color: var(--muted); margin-top: 14px; }
+    code { color: var(--accent); background: var(--bg); padding: 1px 5px; border-radius: 3px; font-family: var(--mono); font-size: .85em; }
   </style>
 </head>
 <body>
@@ -142,55 +178,60 @@
     <span class="badge">THREAT INTEL</span>
   </div>
   <nav>
-    <button class="nav-tab active" onclick="switchTab('hits', this)">📊 Dashboard</button>
+    <button class="nav-tab active" onclick="switchTab('dashboard', this)">📊 Dashboard</button>
     <button class="nav-tab" onclick="switchTab('keywords', this)">🔑 Keywords</button>
     <button class="nav-tab" onclick="switchTab('seeds', this)">🌱 Seeds</button>
     <button class="nav-tab admin-only" id="tab-users" onclick="switchTab('users', this)">👥 Users</button>
+    <button class="nav-tab" onclick="switchTab('reports', this)">📄 Reports</button>
     <button class="nav-tab" onclick="switchTab('settings', this)">⚙️ Settings</button>
   </nav>
   <div class="header-right">
-    <button class="crawl-btn" id="crawlBtn" onclick="toggleCrawl()">▶ Start Crawl</button>
+    <button class="btn-crawl" id="crawlBtn" onclick="toggleCrawl()">▶ Start Crawl</button>
     <span class="user-pill">{{ username }}</span>
-    <a href="/logout" class="logout-link">Sign out</a>
+    <a href="/logout" class="sign-out">Sign out</a>
   </div>
 </header>
 
 <main>
 
   <!-- ── Dashboard Tab ── -->
-  <div class="tab-panel active" id="panel-hits">
-    <div id="crawlStatusBar" class="crawl-status idle">
-      <div class="dot"></div>
-      <span id="crawlStatusText">No active crawl</span>
+  <div class="tab-panel active" id="panel-dashboard">
+
+    <!-- Live crawl card -->
+    <div class="crawl-card" id="crawlCard">
+      <div class="crawl-dot" id="crawlDot"></div>
+      <div class="crawl-info">
+        <div class="crawl-title" id="crawlTitle">No active crawl</div>
+        <div class="crawl-sub" id="crawlSub">Run <code>make scan</code> on the server to start a dark web crawl</div>
+      </div>
+      <div class="crawl-stats" id="crawlLiveStats" style="display:none">
+        <div class="crawl-stat"><div class="val" id="livePagesVal">0</div><div class="lbl">Pages</div></div>
+        <div class="crawl-stat"><div class="val" id="liveHitsVal">0</div><div class="lbl">Hits</div></div>
+      </div>
     </div>
 
+    <!-- Stats -->
     <div class="stats-grid">
-      <div class="stat-card"><div class="label">Crawl Sessions</div><div class="value" id="statSessions">—</div></div>
-      <div class="stat-card"><div class="label">Pages Crawled</div><div class="value" id="statPages">—</div></div>
-      <div class="stat-card"><div class="label">Keyword Hits</div><div class="value" id="statHits">—</div></div>
+      <div class="stat-card"><div class="lbl">Crawl Sessions</div><div class="val" id="statSessions">—</div></div>
+      <div class="stat-card"><div class="lbl">Pages Crawled</div><div class="val" id="statPages">—</div></div>
+      <div class="stat-card"><div class="lbl">Keyword Hits</div><div class="val" id="statHits">—</div></div>
     </div>
 
+    <!-- Top keywords -->
     <div class="panel">
-      <div class="panel-header">
-        <h2>Top Keywords</h2>
-      </div>
-      <div class="kw-pills" style="padding:16px 20px" id="topKeywords">
-        <span style="color:var(--muted);font-size:.85rem">Loading...</span>
-      </div>
+      <div class="panel-header"><h2>Top Keywords</h2></div>
+      <div class="kw-pills" id="topKeywords"><span style="color:var(--muted);font-size:.84rem">Loading…</span></div>
     </div>
 
+    <!-- Session history with expandable hits -->
     <div class="panel">
       <div class="panel-header">
-        <h2>Keyword Hits</h2>
-        <button class="btn btn-secondary" onclick="loadHits()">↻ Refresh</button>
+        <h2>Scan Sessions</h2>
+        <button class="btn btn-secondary" onclick="loadSessions()">↻ Refresh</button>
       </div>
-      <div style="padding:14px 20px;border-bottom:1px solid var(--border);display:flex;gap:10px;flex-wrap:wrap">
-        <input type="text" id="keywordFilter" class="wide" placeholder="Filter by keyword…"/>
-        <button class="btn btn-primary" onclick="applyFilter()">Search</button>
-        <button class="btn btn-secondary" onclick="clearFilter()">Clear</button>
-      </div>
-      <div id="hitsContainer"><div class="empty"><div class="icon">🔍</div><p>Loading…</p></div></div>
+      <div id="sessionsContainer"><div class="empty"><div class="icon">🔍</div><p>Loading…</p></div></div>
     </div>
+
   </div>
 
   <!-- ── Keywords Tab ── -->
@@ -199,22 +240,19 @@
       <div class="panel-header"><h2>Manage Keywords</h2></div>
       <div class="panel-body">
         <div class="form-row">
-          <div class="form-group">
-            <label>Keyword</label>
-            <input type="text" id="newKeyword" class="wide" placeholder="e.g. credential dump"/>
-          </div>
+          <div class="form-group"><label>Keyword</label><input type="text" id="newKeyword" style="width:260px" placeholder="e.g. credential dump"/></div>
           <div class="form-group">
             <label>Category</label>
-            <select id="newCategory" style="width:180px">
+            <select id="newCategory" style="width:170px">
               <option value="custom">custom</option>
               <option value="threat_intel">threat_intel</option>
               <option value="brand_monitoring">brand_monitoring</option>
               <option value="infrastructure">infrastructure</option>
             </select>
           </div>
-          <button class="btn btn-primary" onclick="addKeyword()">+ Add Keyword</button>
+          <button class="btn btn-primary" onclick="addKeyword()">+ Add</button>
         </div>
-        <div id="keywordsList"><div class="empty"><div class="icon">🔑</div><p>Loading keywords…</p></div></div>
+        <div id="keywordsList"><div class="empty"><div class="icon">🔑</div><p>Loading…</p></div></div>
       </div>
     </div>
   </div>
@@ -222,109 +260,89 @@
   <!-- ── Seeds Tab ── -->
   <div class="tab-panel" id="panel-seeds">
     <div class="panel">
-      <div class="panel-header"><h2>Seed URLs</h2><span style="color:var(--muted);font-size:.8rem">.onion URLs to start crawling from</span></div>
+      <div class="panel-header"><h2>🧅 Dark Web Seeds</h2><span style="color:var(--muted);font-size:.79rem">.onion URLs to crawl</span></div>
       <div class="panel-body">
         <div class="form-row">
-          <div class="form-group">
-            <label>Add Seed URL</label>
-            <input type="text" id="newSeed" style="width:420px" placeholder="http://example.onion"/>
-          </div>
+          <div class="form-group"><label>Seed URL</label><input type="text" id="newSeed" style="width:400px" placeholder="http://example.onion"/></div>
           <button class="btn btn-primary" onclick="addSeed()">+ Add Seed</button>
         </div>
-        <div id="seedsList"><div class="empty"><div class="icon">🌱</div><p>Loading seeds…</p></div></div>
+        <div id="seedsList"><div class="empty"><div class="icon">🌱</div><p>Loading…</p></div></div>
       </div>
     </div>
-
-    <div class="panel" style="margin-top:20px">
-      <div class="panel-header"><h2>📱 Telegram Channels</h2><span style="color:var(--muted);font-size:.8rem">Public channels to scrape for keywords</span></div>
+    <div class="panel">
+      <div class="panel-header"><h2>📱 Telegram Channels</h2><span style="color:var(--muted);font-size:.79rem">Public channels to scrape</span></div>
       <div class="panel-body">
         <div class="form-row">
-          <div class="form-group">
-            <label>Channel Username (without @)</label>
-            <input type="text" id="newChannel" style="width:280px" placeholder="channelname"/>
-          </div>
+          <div class="form-group"><label>Channel (without @)</label><input type="text" id="newChannel" style="width:260px" placeholder="channelname"/></div>
           <button class="btn btn-primary" onclick="addChannel()">+ Add Channel</button>
         </div>
-        <div id="channelsList"><div class="empty"><div class="icon">📱</div><p>Loading channels…</p></div></div>
-        <div style="margin-top:16px;padding:12px 16px;background:rgba(88,166,255,.06);border:1px solid rgba(88,166,255,.2);border-radius:6px;font-size:.8rem;color:var(--muted)">
-          ℹ️ To scan channels, run <code style="color:var(--accent);background:var(--bg);padding:1px 6px;border-radius:3px">make telegram-scan</code> on the server.
-          First-time setup requires <code style="color:var(--accent);background:var(--bg);padding:1px 6px;border-radius:3px">make telegram-auth</code> and API credentials in <code style="color:var(--accent);background:var(--bg);padding:1px 6px;border-radius:3px">.env</code>.
-        </div>
+        <div id="channelsList"><div class="empty"><div class="icon">📱</div><p>Loading…</p></div></div>
+        <div class="info-banner">Run <code>make telegram-scan</code> on the server to scrape channels. First-time setup: <code>make telegram-auth</code></div>
       </div>
     </div>
-
   </div>
 
-  <!-- ── Users Tab (admin only) ── -->
+  <!-- ── Users Tab ── -->
   <div class="tab-panel" id="panel-users">
     <div class="panel">
       <div class="panel-header"><h2>User Management</h2></div>
       <div class="panel-body">
-        <p style="color:var(--muted);font-size:.83rem;margin-bottom:20px">New users can log in immediately. Encourage them to set up 2FA from their Settings page.</p>
-        <div class="form-row" style="background:var(--surface2);padding:16px;border-radius:8px;border:1px solid var(--border)">
-          <div class="form-group">
-            <label>Username</label>
-            <input type="text" id="newUsername" placeholder="username"/>
-          </div>
-          <div class="form-group">
-            <label>Email (optional)</label>
-            <input type="email" id="newEmail" placeholder="user@example.com"/>
-          </div>
-          <div class="form-group">
-            <label>Password</label>
-            <input type="password" id="newUserPassword" placeholder="Min 10 chars, 1 upper, 1 number"/>
-          </div>
-          <div class="form-group">
-            <label>Role</label>
-            <select id="newUserRole" style="width:120px">
-              <option value="0">User</option>
-              <option value="1">Admin</option>
-            </select>
-          </div>
-          <button class="btn btn-primary" onclick="createUser()">+ Create User</button>
+        <div class="form-row" style="background:var(--surface2);padding:14px;border-radius:8px;border:1px solid var(--border)">
+          <div class="form-group"><label>Username</label><input type="text" id="newUsername" placeholder="username"/></div>
+          <div class="form-group"><label>Email</label><input type="email" id="newEmail" placeholder="optional"/></div>
+          <div class="form-group"><label>Password</label><input type="password" id="newUserPassword" placeholder="Min 10 chars"/></div>
+          <div class="form-group"><label>Role</label><select id="newUserRole" style="width:110px"><option value="0">User</option><option value="1">Admin</option></select></div>
+          <button class="btn btn-primary" onclick="createUser()">+ Create</button>
         </div>
-        <div id="usersList" style="margin-top:20px"><div class="empty"><div class="icon">👥</div><p>Loading users…</p></div></div>
+        <div id="usersList" style="margin-top:18px"><div class="empty"><div class="icon">👥</div><p>Loading…</p></div></div>
       </div>
+    </div>
+  </div>
+
+  <!-- ── Reports Tab ── -->
+  <div class="tab-panel" id="panel-reports">
+    <div class="report-hero">
+      <div class="icon">📄</div>
+      <h2>Executive Report</h2>
+      <p>Generate a professional PDF threat intelligence report with scan history, keyword hits, session statistics, and findings summary.</p>
+
+      <div class="report-preview" id="reportPreview">
+        <h3>Report will include</h3>
+        <div class="report-item"><span class="label">Executive Summary</span><span>Stats overview</span></div>
+        <div class="report-item"><span class="label">Top Keywords</span><span>By hit count</span></div>
+        <div class="report-item"><span class="label">Session History</span><span>All crawl sessions</span></div>
+        <div class="report-item"><span class="label">Keyword Hits Detail</span><span>Latest 200 hits with context</span></div>
+        <div class="report-item"><span class="label">Sources</span><span>.onion URLs + Telegram</span></div>
+      </div>
+
+      <div id="reportStats" style="color:var(--muted);font-size:.84rem;margin-bottom:20px">Loading stats…</div>
+
+      <button class="btn btn-report" onclick="downloadReport()" style="padding:12px 32px;font-size:1rem">
+        ⬇ Download PDF Report
+      </button>
     </div>
   </div>
 
   <!-- ── Settings Tab ── -->
   <div class="tab-panel" id="panel-settings">
     <div class="settings-grid">
-
       <div class="panel">
         <div class="panel-header"><h2>Change Password</h2></div>
         <div class="panel-body">
-          <div class="form-group" style="margin-bottom:12px">
-            <label>Current Password</label>
-            <input type="password" id="currentPw" style="width:100%"/>
-          </div>
-          <div class="form-group" style="margin-bottom:12px">
-            <label>New Password</label>
-            <input type="password" id="newPw" style="width:100%"/>
-          </div>
-          <div class="form-group" style="margin-bottom:16px">
-            <label>Confirm New Password</label>
-            <input type="password" id="confirmPw" style="width:100%"/>
-          </div>
+          <div class="form-group" style="margin-bottom:10px"><label>Current Password</label><input type="password" id="currentPw" style="width:100%"/></div>
+          <div class="form-group" style="margin-bottom:10px"><label>New Password</label><input type="password" id="newPw" style="width:100%"/></div>
+          <div class="form-group" style="margin-bottom:14px"><label>Confirm New Password</label><input type="password" id="confirmPw" style="width:100%"/></div>
           <button class="btn btn-primary" onclick="changePassword()">Update Password</button>
         </div>
       </div>
-
       <div class="panel">
         <div class="panel-header"><h2>Two-Factor Authentication</h2></div>
-        <div class="panel-body">
-          <div id="totpStatus"><p style="color:var(--muted);font-size:.85rem">Loading…</p></div>
-        </div>
+        <div class="panel-body" id="totpStatus"><p style="color:var(--muted);font-size:.84rem">Loading…</p></div>
       </div>
-
       <div class="panel">
         <div class="panel-header"><h2>Account Info</h2></div>
-        <div class="panel-body" id="profileInfo">
-          <p style="color:var(--muted);font-size:.85rem">Loading…</p>
-        </div>
+        <div class="panel-body" id="profileInfo"><p style="color:var(--muted);font-size:.84rem">Loading…</p></div>
       </div>
-
     </div>
   </div>
 
@@ -333,22 +351,33 @@
 <div id="toast"></div>
 
 <script>
-  // ── State ──────────────────────────────────────────────────────────────────
-  let currentFilter = '';
   let isAdmin = {{ 'true' if is_admin else 'false' }};
   let crawlActive = false;
 
-  // ── Init ───────────────────────────────────────────────────────────────────
   document.addEventListener('DOMContentLoaded', () => {
-    if (isAdmin) {
-      document.getElementById('tab-users').classList.add('visible');
-    }
+    if (isAdmin) document.getElementById('tab-users').classList.add('visible');
     fetchStats();
-    loadHits();
+    loadSessions();
     pollCrawlStatus();
-    setInterval(() => { fetchStats(); loadHits(currentFilter); }, 30000);
+    setInterval(() => { fetchStats(); if (crawlActive) loadSessions(); }, 15000);
     setInterval(pollCrawlStatus, 5000);
   });
+
+  function esc(s) {
+    if (!s) return '';
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+  function fmtTime(iso) {
+    if (!iso) return '—';
+    const d = new Date(iso.endsWith('Z') ? iso : iso + 'Z');
+    return d.toLocaleDateString() + ' ' + d.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
+  }
+  function toast(msg, type = 'success') {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.className = 'show ' + type;
+    setTimeout(() => t.className = '', 3000);
+  }
 
   // ── Tab switching ──────────────────────────────────────────────────────────
   function switchTab(tab, btn) {
@@ -359,111 +388,144 @@
     if (tab === 'keywords') loadKeywords();
     if (tab === 'seeds') { loadSeeds(); loadChannels(); }
     if (tab === 'users' && isAdmin) loadUsers();
+    if (tab === 'reports') loadReportPreview();
     if (tab === 'settings') loadSettings();
-  }
-
-  // ── Toast ──────────────────────────────────────────────────────────────────
-  function toast(msg, type = 'success') {
-    const t = document.getElementById('toast');
-    t.textContent = msg;
-    t.className = 'show ' + type;
-    setTimeout(() => t.className = '', 3000);
-  }
-
-  // ── Escape HTML ────────────────────────────────────────────────────────────
-  function esc(s) {
-    if (!s) return '';
-    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-  }
-
-  function fmtTime(iso) {
-    if (!iso) return '—';
-    const d = new Date(iso + (iso.endsWith('Z') ? '' : 'Z'));
-    return d.toLocaleDateString() + ' ' + d.toLocaleTimeString();
   }
 
   // ── Stats ──────────────────────────────────────────────────────────────────
   async function fetchStats() {
     try {
-      const res = await fetch('/api/stats');
-      const data = await res.json();
-      document.getElementById('statSessions').textContent = (data.total_sessions || 0).toLocaleString();
-      document.getElementById('statPages').textContent = (data.total_pages || 0).toLocaleString();
-      document.getElementById('statHits').textContent = (data.total_hits || 0).toLocaleString();
+      const data = await (await fetch('/api/stats')).json();
+      document.getElementById('statSessions').textContent = (data.total_sessions||0).toLocaleString();
+      document.getElementById('statPages').textContent = (data.total_pages||0).toLocaleString();
+      document.getElementById('statHits').textContent = (data.total_hits||0).toLocaleString();
       const el = document.getElementById('topKeywords');
-      if (!data.top_keywords || !data.top_keywords.length) {
-        el.innerHTML = '<span style="color:var(--muted);font-size:.85rem">No hits yet.</span>';
+      if (!data.top_keywords?.length) {
+        el.innerHTML = '<span style="color:var(--muted);font-size:.84rem;padding:4px">No hits yet.</span>';
       } else {
         el.innerHTML = data.top_keywords.map(k =>
-          `<div class="kw-pill" onclick="filterByKeyword('${esc(k.keyword)}')">${esc(k.keyword)}<span class="count">${k.count}</span></div>`
+          `<div class="kw-pill" onclick="filterSession('${esc(k.keyword)}')">${esc(k.keyword)}<span class="count">${k.count}</span></div>`
         ).join('');
       }
-    } catch(e) {
-      document.getElementById('statusDot').style.background = 'var(--red)';
-    }
+    } catch(e) { document.getElementById('statusDot').style.background='var(--red)'; }
   }
 
-  // ── Hits ───────────────────────────────────────────────────────────────────
-  async function loadHits(keyword = '') {
-    const el = document.getElementById('hitsContainer');
-    el.innerHTML = '<div class="empty"><p>Loading…</p></div>';
-    try {
-      const url = '/api/hits?limit=100' + (keyword ? '&keyword=' + encodeURIComponent(keyword) : '');
-      const hits = await (await fetch(url)).json();
-      if (!hits.length) {
-        el.innerHTML = `<div class="empty"><div class="icon">🔍</div><p>No keyword hits found${keyword ? ` for "${esc(keyword)}"` : ''}.</p><p style="margin-top:8px">Start a crawl to begin monitoring.</p></div>`;
-        return;
-      }
-      el.innerHTML = `<table>
-        <thead><tr><th>Keyword</th><th>Category</th><th>URL</th><th>Context</th><th>Depth</th><th>Found At</th></tr></thead>
-        <tbody>${hits.map(h => `<tr>
-          <td><span class="keyword-tag">${esc(h.keyword)}</span></td>
-          <td><span class="cat-tag">${esc(h.category)}</span></td>
-          <td class="url-cell">${esc(h.url)}</td>
-          <td class="ctx-cell">${esc((h.context||'').slice(0,250))}</td>
-          <td style="color:var(--muted)">${h.depth}</td>
-          <td class="time-cell">${fmtTime(h.found_at)}</td>
-        </tr>`).join('')}</tbody></table>`;
-    } catch(e) {
-      el.innerHTML = '<div class="empty" style="color:var(--red)">Error loading hits.</div>';
-    }
-  }
-
-  function filterByKeyword(kw) { currentFilter = kw; document.getElementById('keywordFilter').value = kw; loadHits(kw); }
-  function applyFilter() { currentFilter = document.getElementById('keywordFilter').value.trim(); loadHits(currentFilter); }
-  function clearFilter() { currentFilter = ''; document.getElementById('keywordFilter').value = ''; loadHits(); }
-
-  // ── Crawl ──────────────────────────────────────────────────────────────────
+  // ── Crawl status ───────────────────────────────────────────────────────────
   async function pollCrawlStatus() {
     try {
       const data = await (await fetch('/api/crawl/status')).json();
       crawlActive = data.active;
-      const bar = document.getElementById('crawlStatusBar');
+      const card = document.getElementById('crawlCard');
+      const dot = document.getElementById('crawlDot');
+      const title = document.getElementById('crawlTitle');
+      const sub = document.getElementById('crawlSub');
+      const liveStats = document.getElementById('crawlLiveStats');
       const btn = document.getElementById('crawlBtn');
-      const txt = document.getElementById('crawlStatusText');
+
       if (data.active && data.session) {
-        bar.className = 'crawl-status';
-        btn.className = 'crawl-btn running';
-        btn.textContent = '⏹ Stop Crawl';
-        txt.textContent = `Crawl running — ${data.session.pages_crawled} pages crawled, ${data.session.hits_found} hits found`;
+        card.className = 'crawl-card active';
+        dot.className = 'crawl-dot pulse';
+        title.textContent = 'Crawl in progress';
+        sub.innerHTML = `Session #${data.session.id} — started ${fmtTime(data.session.started_at)}`;
+        liveStats.style.display = 'flex';
+        document.getElementById('livePagesVal').textContent = (data.session.pages_crawled||0).toLocaleString();
+        document.getElementById('liveHitsVal').textContent = (data.session.hits_found||0).toLocaleString();
+        btn.className = 'btn-crawl running';
+        btn.textContent = '⏹ Running…';
+        btn.disabled = true;
       } else {
-        bar.className = 'crawl-status idle';
-        btn.className = 'crawl-btn';
+        card.className = 'crawl-card';
+        dot.className = 'crawl-dot';
+        title.textContent = 'No active crawl';
+        sub.innerHTML = 'Run <code>make scan</code> on the server to start a dark web crawl';
+        liveStats.style.display = 'none';
+        btn.className = 'btn-crawl';
         btn.textContent = '▶ Start Crawl';
-        txt.textContent = 'No active crawl';
+        btn.disabled = false;
       }
     } catch(e) {}
   }
 
   async function toggleCrawl() {
-    if (crawlActive) { toast('Stop the crawl from the server terminal: make stop', 'error'); return; }
-    try {
-      const res = await fetch('/api/crawl/start', { method: 'POST' });
-      const data = await res.json();
-      if (data.ok) { toast('Crawl started!'); pollCrawlStatus(); }
-      else toast(data.error || 'Failed to start crawl', 'error');
-    } catch(e) { toast('Error starting crawl', 'error'); }
+    toast('Run "make scan" on the server to start a crawl', 'error');
   }
+
+  // ── Sessions ───────────────────────────────────────────────────────────────
+  let expandedSessions = new Set();
+
+  async function loadSessions() {
+    const el = document.getElementById('sessionsContainer');
+    try {
+      const sessions = await (await fetch('/api/sessions')).json();
+      if (!sessions.length) {
+        el.innerHTML = '<div class="empty"><div class="icon">📋</div><p>No crawl sessions yet. Run <code>make scan</code> to start.</p></div>';
+        return;
+      }
+      el.innerHTML = `<table>
+        <thead><tr><th>Session</th><th>Started</th><th>Duration</th><th>Pages</th><th>Hits</th><th>Status</th></tr></thead>
+        <tbody id="sessionRows">${sessions.map(s => buildSessionRow(s)).join('')}</tbody>
+      </table>`;
+      // Re-expand previously expanded sessions
+      expandedSessions.forEach(id => expandSession(id, false));
+    } catch(e) {
+      el.innerHTML = '<div class="empty" style="color:var(--red)">Error loading sessions.</div>';
+    }
+  }
+
+  function buildSessionRow(s) {
+    const started = fmtTime(s.started_at);
+    const statusClass = `status-${s.status || 'completed'}`;
+    let duration = '—';
+    if (s.started_at && s.completed_at) {
+      const secs = Math.round((new Date(s.completed_at+'Z') - new Date(s.started_at+'Z')) / 1000);
+      duration = secs < 60 ? `${secs}s` : `${Math.floor(secs/60)}m ${secs%60}s`;
+    } else if (s.status === 'running') {
+      duration = 'Running…';
+    }
+    return `
+      <tr class="session-row" onclick="expandSession(${s.id}, true)" id="sess-${s.id}">
+        <td style="font-family:var(--mono);font-size:.8rem;color:var(--muted)">#${s.id}</td>
+        <td class="time-cell">${started}</td>
+        <td class="time-cell">${duration}</td>
+        <td><strong>${(s.pages_crawled||0).toLocaleString()}</strong></td>
+        <td><strong style="color:${s.hits_found>0?'var(--accent)':'var(--muted)'}">${(s.hits_found||0).toLocaleString()}</strong></td>
+        <td><span class="status-badge ${statusClass}">${s.status||'completed'}</span></td>
+      </tr>
+      <tr class="session-detail" id="sess-detail-${s.id}">
+        <td colspan="6"><div class="session-detail-inner" id="sess-inner-${s.id}">Loading…</div></td>
+      </tr>`;
+  }
+
+  async function expandSession(id, toggle) {
+    const detailRow = document.getElementById(`sess-detail-${id}`);
+    if (!detailRow) return;
+    const isOpen = detailRow.style.display === 'table-row';
+    if (toggle && isOpen) {
+      detailRow.style.display = 'none';
+      expandedSessions.delete(id);
+      return;
+    }
+    detailRow.style.display = 'table-row';
+    expandedSessions.add(id);
+    const inner = document.getElementById(`sess-inner-${id}`);
+    inner.innerHTML = 'Loading hits…';
+    try {
+      const hits = await (await fetch(`/api/sessions/${id}/hits`)).json();
+      if (!hits.length) { inner.innerHTML = '<p style="color:var(--muted);font-size:.83rem;padding:8px 0">No keyword hits in this session.</p>'; return; }
+      inner.innerHTML = `<table style="margin:8px 0">
+        <thead><tr><th>Keyword</th><th>Category</th><th>URL</th><th>Context</th><th>Found At</th></tr></thead>
+        <tbody>${hits.map(h => `<tr>
+          <td><span class="keyword-tag">${esc(h.keyword)}</span></td>
+          <td><span class="cat-tag">${esc(h.category)}</span></td>
+          <td class="url-cell">${esc(h.url)}</td>
+          <td class="ctx-cell">${esc((h.context||'').slice(0,200))}</td>
+          <td class="time-cell">${fmtTime(h.found_at)}</td>
+        </tr>`).join('')}</tbody>
+      </table>`;
+    } catch(e) { inner.innerHTML = '<p style="color:var(--red)">Error loading hits.</p>'; }
+  }
+
+  function filterSession(kw) { /* future: filter sessions by keyword */ }
 
   // ── Keywords ───────────────────────────────────────────────────────────────
   async function loadKeywords() {
@@ -472,11 +534,11 @@
       const data = await (await fetch('/api/keywords')).json();
       const cats = data.categories || {};
       if (!Object.keys(cats).length) {
-        el.innerHTML = '<div class="empty"><div class="icon">🔑</div><p>No keywords yet. Add some above.</p></div>';
+        el.innerHTML = '<div class="empty"><div class="icon">🔑</div><p>No keywords yet.</p></div>';
         return;
       }
       el.innerHTML = Object.entries(cats).map(([cat, kws]) => `
-        <div style="margin-bottom:20px">
+        <div style="margin-bottom:18px">
           <div class="section-title">${esc(cat)}</div>
           <table><thead><tr><th>Keyword</th><th style="width:80px">Action</th></tr></thead>
           <tbody>${(kws||[]).map(kw => `<tr>
@@ -484,24 +546,24 @@
             <td><button class="btn btn-danger" onclick="deleteKeyword('${esc(kw).replace(/'/g,"\\'")}','${esc(cat).replace(/'/g,"\\'")}')">Remove</button></td>
           </tr>`).join('')}</tbody></table>
         </div>`).join('');
-    } catch(e) { el.innerHTML = '<div class="empty" style="color:var(--red)">Error loading keywords.</div>'; }
+    } catch(e) { el.innerHTML = '<div class="empty" style="color:var(--red)">Error.</div>'; }
   }
 
   async function addKeyword() {
     const kw = document.getElementById('newKeyword').value.trim();
     const cat = document.getElementById('newCategory').value;
     if (!kw) { toast('Enter a keyword first', 'error'); return; }
-    const res = await fetch('/api/keywords', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({keyword:kw,category:cat}) });
+    const res = await fetch('/api/keywords', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({keyword:kw,category:cat}) });
     const data = await res.json();
-    if (data.ok) { document.getElementById('newKeyword').value = ''; toast('Keyword added!'); loadKeywords(); }
-    else toast(data.error || 'Error', 'error');
+    if (data.ok) { document.getElementById('newKeyword').value=''; toast('Keyword added!'); loadKeywords(); }
+    else toast(data.error||'Error', 'error');
   }
 
   async function deleteKeyword(kw, cat) {
-    const res = await fetch('/api/keywords', { method: 'DELETE', headers: {'Content-Type':'application/json'}, body: JSON.stringify({keyword:kw,category:cat}) });
+    const res = await fetch('/api/keywords', { method:'DELETE', headers:{'Content-Type':'application/json'}, body:JSON.stringify({keyword:kw,category:cat}) });
     const data = await res.json();
-    if (data.ok) { toast('Keyword removed'); loadKeywords(); }
-    else toast(data.error || 'Error', 'error');
+    if (data.ok) { toast('Removed'); loadKeywords(); }
+    else toast(data.error||'Error','error');
   }
 
   // ── Seeds ──────────────────────────────────────────────────────────────────
@@ -509,146 +571,29 @@
     const el = document.getElementById('seedsList');
     try {
       const data = await (await fetch('/api/seeds')).json();
-      if (!data.seeds || !data.seeds.length) {
-        el.innerHTML = '<div class="empty"><div class="icon">🌱</div><p>No seeds yet. Add .onion URLs above.</p></div>';
-        return;
-      }
+      if (!data.seeds?.length) { el.innerHTML = '<div class="empty"><div class="icon">🌱</div><p>No seeds yet.</p></div>'; return; }
       el.innerHTML = data.seeds.map(s => `
         <div class="seed-item">
           <span>${esc(s)}</span>
           <button class="btn btn-danger" onclick="deleteSeed('${esc(s).replace(/'/g,"\\'")}')">Remove</button>
         </div>`).join('');
-    } catch(e) { el.innerHTML = '<div class="empty" style="color:var(--red)">Error loading seeds.</div>'; }
+    } catch(e) { el.innerHTML = '<div class="empty" style="color:var(--red)">Error.</div>'; }
   }
 
   async function addSeed() {
     const url = document.getElementById('newSeed').value.trim();
-    if (!url) { toast('Enter a URL first', 'error'); return; }
-    const res = await fetch('/api/seeds', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({url}) });
+    if (!url) { toast('Enter a URL', 'error'); return; }
+    const res = await fetch('/api/seeds', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({url}) });
     const data = await res.json();
-    if (data.ok) { document.getElementById('newSeed').value = ''; toast('Seed added!'); loadSeeds(); }
-    else toast(data.error || 'Error', 'error');
+    if (data.ok) { document.getElementById('newSeed').value=''; toast('Seed added!'); loadSeeds(); }
+    else toast(data.error||'Error','error');
   }
 
   async function deleteSeed(url) {
-    const res = await fetch('/api/seeds', { method: 'DELETE', headers: {'Content-Type':'application/json'}, body: JSON.stringify({url}) });
+    const res = await fetch('/api/seeds', { method:'DELETE', headers:{'Content-Type':'application/json'}, body:JSON.stringify({url}) });
     const data = await res.json();
-    if (data.ok) { toast('Seed removed'); loadSeeds(); }
-    else toast(data.error || 'Error', 'error');
-  }
-
-  // ── Users ──────────────────────────────────────────────────────────────────
-  async function loadUsers() {
-    const el = document.getElementById('usersList');
-    try {
-      const users = await (await fetch('/api/users')).json();
-      if (!users.length) { el.innerHTML = '<div class="empty"><p>No users yet.</p></div>'; return; }
-      el.innerHTML = `<table>
-        <thead><tr><th>Username</th><th>Email</th><th>Role</th><th>2FA</th><th>OAuth</th><th>Last Login</th><th></th></tr></thead>
-        <tbody>${users.map(u => `<tr>
-          <td><strong>${esc(u.username)}</strong></td>
-          <td style="color:var(--muted)">${esc(u.email||'—')}</td>
-          <td>${u.is_admin ? '<span class="badge-admin">Admin</span>' : '<span class="badge-user">User</span>'}</td>
-          <td>${u.totp_enabled ? '<span class="badge-2fa">✓ On</span>' : '<span style="color:var(--muted);font-size:.8rem">Off</span>'}</td>
-          <td style="color:var(--muted);font-size:.8rem">${esc(u.oauth_provider||'—')}</td>
-          <td class="time-cell">${fmtTime(u.last_login)}</td>
-          <td><button class="btn btn-danger" onclick="deleteUser(${u.id},'${esc(u.username)}')">Remove</button></td>
-        </tr>`).join('')}</tbody></table>`;
-    } catch(e) { el.innerHTML = '<div class="empty" style="color:var(--red)">Error loading users.</div>'; }
-  }
-
-  async function createUser() {
-    const username = document.getElementById('newUsername').value.trim();
-    const email = document.getElementById('newEmail').value.trim();
-    const password = document.getElementById('newUserPassword').value;
-    const is_admin = document.getElementById('newUserRole').value === '1';
-    if (!username || !password) { toast('Username and password required', 'error'); return; }
-    const res = await fetch('/api/users', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({username,email,password,is_admin}) });
-    const data = await res.json();
-    if (data.ok) {
-      document.getElementById('newUsername').value = '';
-      document.getElementById('newEmail').value = '';
-      document.getElementById('newUserPassword').value = '';
-      toast('User created!'); loadUsers();
-    } else toast(data.error || 'Error', 'error');
-  }
-
-  async function deleteUser(id, username) {
-    if (!confirm(`Remove user "${username}"? This cannot be undone.`)) return;
-    const res = await fetch(`/api/users/${id}`, { method: 'DELETE' });
-    const data = await res.json();
-    if (data.ok) { toast('User removed'); loadUsers(); }
-    else toast(data.error || 'Error', 'error');
-  }
-
-  // ── Settings ───────────────────────────────────────────────────────────────
-  async function loadSettings() {
-    try {
-      const profile = await (await fetch('/api/settings/profile')).json();
-      document.getElementById('profileInfo').innerHTML = `
-        <div style="display:grid;gap:10px">
-          <div style="display:flex;justify-content:space-between;font-size:.85rem">
-            <span style="color:var(--muted)">Username</span><strong>${esc(profile.username)}</strong>
-          </div>
-          <div style="display:flex;justify-content:space-between;font-size:.85rem">
-            <span style="color:var(--muted)">Email</span><span>${esc(profile.email||'—')}</span>
-          </div>
-          <div style="display:flex;justify-content:space-between;font-size:.85rem">
-            <span style="color:var(--muted)">Role</span>
-            ${profile.is_admin ? '<span class="badge-admin">Admin</span>' : '<span class="badge-user">User</span>'}
-          </div>
-          <div style="display:flex;justify-content:space-between;font-size:.85rem">
-            <span style="color:var(--muted)">OAuth</span><span>${esc(profile.oauth_provider||'None')}</span>
-          </div>
-          <div style="display:flex;justify-content:space-between;font-size:.85rem">
-            <span style="color:var(--muted)">Last login</span><span class="time-cell">${fmtTime(profile.last_login)}</span>
-          </div>
-          <div style="display:flex;justify-content:space-between;font-size:.85rem">
-            <span style="color:var(--muted)">Member since</span><span class="time-cell">${fmtTime(profile.created_at)}</span>
-          </div>
-        </div>`;
-      const totpEl = document.getElementById('totpStatus');
-      if (profile.totp_enabled) {
-        totpEl.innerHTML = `
-          <p style="color:var(--green);font-size:.85rem;margin-bottom:16px">✓ Two-factor authentication is enabled.</p>
-          <div class="form-group" style="margin-bottom:12px">
-            <label>Enter your TOTP code or password to disable</label>
-            <input type="text" id="disableTotpCode" placeholder="6-digit code or password" style="width:100%"/>
-          </div>
-          <button class="btn btn-danger" onclick="disableTotp()">Disable 2FA</button>`;
-      } else {
-        totpEl.innerHTML = `
-          <p style="color:var(--muted);font-size:.85rem;margin-bottom:16px">2FA is not enabled. Set it up for extra security.</p>
-          <a href="/totp/setup" class="btn btn-primary">Set Up 2FA</a>`;
-      }
-    } catch(e) {}
-  }
-
-  async function changePassword() {
-    const body = {
-      current_password: document.getElementById('currentPw').value,
-      new_password: document.getElementById('newPw').value,
-      confirm_password: document.getElementById('confirmPw').value,
-    };
-    const res = await fetch('/api/settings/password', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(body) });
-    const data = await res.json();
-    if (data.ok) {
-      document.getElementById('currentPw').value = '';
-      document.getElementById('newPw').value = '';
-      document.getElementById('confirmPw').value = '';
-      toast('Password updated!');
-    } else toast(data.error || 'Error', 'error');
-  }
-
-  async function disableTotp() {
-    const val = document.getElementById('disableTotpCode').value.trim();
-    const body = val.length === 6 && /^\d+$/.test(val)
-      ? { totp_code: val }
-      : { password: val };
-    const res = await fetch('/api/settings/totp/disable', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(body) });
-    const data = await res.json();
-    if (data.ok) { toast('2FA disabled'); loadSettings(); }
-    else toast(data.error || 'Invalid code', 'error');
+    if (data.ok) { toast('Removed'); loadSeeds(); }
+    else toast(data.error||'Error','error');
   }
 
   // ── Telegram Channels ──────────────────────────────────────────────────────
@@ -657,34 +602,123 @@
     if (!el) return;
     try {
       const data = await (await fetch('/api/telegram/channels')).json();
-      if (!data.channels || !data.channels.length) {
-        el.innerHTML = '<div class="empty"><div class="icon">📱</div><p>No channels yet. Add channel usernames above.</p></div>';
-        return;
-      }
+      if (!data.channels?.length) { el.innerHTML = '<div class="empty"><div class="icon">📱</div><p>No channels yet.</p></div>'; return; }
       el.innerHTML = data.channels.map(ch => `
         <div class="seed-item">
           <span>@${esc(ch)}</span>
           <button class="btn btn-danger" onclick="deleteChannel('${esc(ch)}')">Remove</button>
         </div>`).join('');
-    } catch(e) {
-      el.innerHTML = '<div class="empty" style="color:var(--muted)">Configure TELEGRAM_API_ID in .env to enable.</div>';
-    }
+    } catch(e) { el.innerHTML = '<div class="empty" style="color:var(--muted)">Configure TELEGRAM_API_ID in .env</div>'; }
   }
 
   async function addChannel() {
-    const ch = document.getElementById('newChannel').value.trim().replace(/^@/, '');
-    if (!ch) { toast('Enter a channel username first', 'error'); return; }
-    const res = await fetch('/api/telegram/channels', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({channel: ch}) });
+    const ch = document.getElementById('newChannel').value.trim().replace(/^@/,'');
+    if (!ch) { toast('Enter a channel username', 'error'); return; }
+    const res = await fetch('/api/telegram/channels', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({channel:ch}) });
     const data = await res.json();
-    if (data.ok) { document.getElementById('newChannel').value = ''; toast('Channel added!'); loadChannels(); }
-    else toast(data.error || 'Error', 'error');
+    if (data.ok) { document.getElementById('newChannel').value=''; toast('Channel added!'); loadChannels(); }
+    else toast(data.error||'Error','error');
   }
 
   async function deleteChannel(ch) {
-    const res = await fetch('/api/telegram/channels', { method: 'DELETE', headers: {'Content-Type':'application/json'}, body: JSON.stringify({channel: ch}) });
+    const res = await fetch('/api/telegram/channels', { method:'DELETE', headers:{'Content-Type':'application/json'}, body:JSON.stringify({channel:ch}) });
     const data = await res.json();
-    if (data.ok) { toast('Channel removed'); loadChannels(); }
-    else toast(data.error || 'Error', 'error');
+    if (data.ok) { toast('Removed'); loadChannels(); }
+    else toast(data.error||'Error','error');
+  }
+
+  // ── Users ──────────────────────────────────────────────────────────────────
+  async function loadUsers() {
+    const el = document.getElementById('usersList');
+    try {
+      const users = await (await fetch('/api/users')).json();
+      if (!users.length) { el.innerHTML = '<div class="empty"><p>No users.</p></div>'; return; }
+      el.innerHTML = `<table>
+        <thead><tr><th>Username</th><th>Email</th><th>Role</th><th>2FA</th><th>Last Login</th><th></th></tr></thead>
+        <tbody>${users.map(u => `<tr>
+          <td><strong>${esc(u.username)}</strong></td>
+          <td style="color:var(--muted)">${esc(u.email||'—')}</td>
+          <td>${u.is_admin?'<span class="badge-admin">Admin</span>':'<span class="badge-user">User</span>'}</td>
+          <td>${u.totp_enabled?'<span class="badge-2fa">✓</span>':'<span style="color:var(--muted);font-size:.79rem">Off</span>'}</td>
+          <td class="time-cell">${fmtTime(u.last_login)}</td>
+          <td><button class="btn btn-danger" onclick="deleteUser(${u.id},'${esc(u.username)}')">Remove</button></td>
+        </tr>`).join('')}</tbody></table>`;
+    } catch(e) { el.innerHTML = '<div class="empty" style="color:var(--red)">Error.</div>'; }
+  }
+
+  async function createUser() {
+    const username = document.getElementById('newUsername').value.trim();
+    const email = document.getElementById('newEmail').value.trim();
+    const password = document.getElementById('newUserPassword').value;
+    const is_admin = document.getElementById('newUserRole').value === '1';
+    if (!username || !password) { toast('Username and password required', 'error'); return; }
+    const res = await fetch('/api/users', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({username,email,password,is_admin}) });
+    const data = await res.json();
+    if (data.ok) { document.getElementById('newUsername').value=''; document.getElementById('newEmail').value=''; document.getElementById('newUserPassword').value=''; toast('User created!'); loadUsers(); }
+    else toast(data.error||'Error','error');
+  }
+
+  async function deleteUser(id, username) {
+    if (!confirm(`Remove "${username}"?`)) return;
+    const res = await fetch(`/api/users/${id}`, { method:'DELETE' });
+    const data = await res.json();
+    if (data.ok) { toast('Removed'); loadUsers(); }
+    else toast(data.error||'Error','error');
+  }
+
+  // ── Reports ────────────────────────────────────────────────────────────────
+  async function loadReportPreview() {
+    try {
+      const stats = await (await fetch('/api/stats')).json();
+      document.getElementById('reportStats').innerHTML =
+        `<strong>${stats.total_hits}</strong> keyword hits across <strong>${stats.total_sessions}</strong> sessions from <strong>${stats.total_pages}</strong> pages crawled`;
+    } catch(e) {}
+  }
+
+  function downloadReport() {
+    const btn = document.querySelector('.btn-report');
+    btn.textContent = '⏳ Generating…';
+    btn.disabled = true;
+    window.location.href = '/api/report/pdf';
+    setTimeout(() => { btn.textContent = '⬇ Download PDF Report'; btn.disabled = false; }, 3000);
+  }
+
+  // ── Settings ───────────────────────────────────────────────────────────────
+  async function loadSettings() {
+    try {
+      const profile = await (await fetch('/api/settings/profile')).json();
+      document.getElementById('profileInfo').innerHTML = `
+        <div style="display:grid;gap:9px">
+          ${[['Username',profile.username],['Email',profile.email||'—'],['Role',profile.is_admin?'<span class="badge-admin">Admin</span>':'<span class="badge-user">User</span>'],['OAuth',profile.oauth_provider||'None'],['Last login',fmtTime(profile.last_login)],['Member since',fmtTime(profile.created_at)]].map(([l,v])=>`
+          <div style="display:flex;justify-content:space-between;font-size:.84rem"><span style="color:var(--muted)">${l}</span><span>${v}</span></div>`).join('')}
+        </div>`;
+      const totpEl = document.getElementById('totpStatus');
+      if (profile.totp_enabled) {
+        totpEl.innerHTML = `<p style="color:var(--green);font-size:.84rem;margin-bottom:14px">✓ 2FA is enabled.</p>
+          <div class="form-group" style="margin-bottom:10px"><label>TOTP code or password to disable</label><input type="text" id="disableTotpCode" style="width:100%"/></div>
+          <button class="btn btn-danger" onclick="disableTotp()">Disable 2FA</button>`;
+      } else {
+        totpEl.innerHTML = `<p style="color:var(--muted);font-size:.84rem;margin-bottom:14px">2FA is not enabled.</p>
+          <a href="/totp/setup" class="btn btn-primary">Set Up 2FA</a>`;
+      }
+    } catch(e) {}
+  }
+
+  async function changePassword() {
+    const body = { current_password: document.getElementById('currentPw').value, new_password: document.getElementById('newPw').value, confirm_password: document.getElementById('confirmPw').value };
+    const res = await fetch('/api/settings/password', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body) });
+    const data = await res.json();
+    if (data.ok) { document.getElementById('currentPw').value=''; document.getElementById('newPw').value=''; document.getElementById('confirmPw').value=''; toast('Password updated!'); }
+    else toast(data.error||'Error','error');
+  }
+
+  async function disableTotp() {
+    const val = document.getElementById('disableTotpCode').value.trim();
+    const body = val.length===6 && /^\d+$/.test(val) ? {totp_code:val} : {password:val};
+    const res = await fetch('/api/settings/totp/disable', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body) });
+    const data = await res.json();
+    if (data.ok) { toast('2FA disabled'); loadSettings(); }
+    else toast(data.error||'Invalid code','error');
   }
 </script>
 </body>

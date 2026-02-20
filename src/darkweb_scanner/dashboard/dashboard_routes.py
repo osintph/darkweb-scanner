@@ -465,6 +465,284 @@ def api_telegram_channels_delete():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+
+# ── Sessions API ───────────────────────────────────────────────────────────────
+
+
+@dashboard_bp.route("/api/sessions", methods=["GET"])
+@require_login
+def api_sessions():
+    storage = get_storage()
+    sessions = storage.get_sessions(limit=20)
+    return jsonify(
+        [
+            {
+                "id": s.id,
+                "started_at": s.started_at.isoformat() if s.started_at else None,
+                "completed_at": s.completed_at.isoformat() if s.completed_at else None,
+                "pages_crawled": s.pages_crawled or 0,
+                "hits_found": s.hits_found or 0,
+                "status": s.status,
+                "seed_urls": s.seed_urls if hasattr(s, "seed_urls") else [],
+            }
+            for s in sessions
+        ]
+    )
+
+
+@dashboard_bp.route("/api/sessions/<int:session_id>/hits", methods=["GET"])
+@require_login
+def api_session_hits(session_id):
+    storage = get_storage()
+    hits = storage.get_hits_by_session(session_id, limit=200)
+    return jsonify(
+        [
+            {
+                "id": r.id,
+                "url": r.url,
+                "keyword": r.keyword,
+                "category": r.category,
+                "context": r.context,
+                "depth": r.depth,
+                "found_at": r.found_at.isoformat() if r.found_at else None,
+            }
+            for r in hits
+        ]
+    )
+
+
+# ── PDF Report API ─────────────────────────────────────────────────────────────
+
+
+@dashboard_bp.route("/api/report/pdf", methods=["GET"])
+@require_login
+def api_report_pdf():
+    try:
+        from io import BytesIO
+        from datetime import datetime as dt
+
+        from reportlab.lib import colors
+        from reportlab.lib.pagesizes import A4
+        from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
+        from reportlab.lib.units import mm
+        from reportlab.platypus import (
+            HRFlowable,
+            Paragraph,
+            SimpleDocTemplate,
+            Spacer,
+            Table,
+            TableStyle,
+        )
+
+        storage = get_storage()
+        stats = storage.get_stats()
+        sessions = storage.get_sessions(limit=50)
+        hits = storage.get_hits_for_report(limit=200)
+
+        buf = BytesIO()
+        doc = SimpleDocTemplate(
+            buf,
+            pagesize=A4,
+            leftMargin=20 * mm,
+            rightMargin=20 * mm,
+            topMargin=20 * mm,
+            bottomMargin=20 * mm,
+        )
+
+        styles = getSampleStyleSheet()
+        W = A4[0] - 40 * mm
+
+        # Custom styles
+        s_title = ParagraphStyle(
+            "ReportTitle",
+            parent=styles["Normal"],
+            fontSize=22,
+            fontName="Helvetica-Bold",
+            textColor=colors.HexColor("#0d1117"),
+            spaceAfter=4,
+        )
+        s_subtitle = ParagraphStyle(
+            "Subtitle",
+            parent=styles["Normal"],
+            fontSize=10,
+            textColor=colors.HexColor("#8b949e"),
+            spaceAfter=2,
+        )
+        s_h2 = ParagraphStyle(
+            "H2",
+            parent=styles["Normal"],
+            fontSize=13,
+            fontName="Helvetica-Bold",
+            textColor=colors.HexColor("#0d1117"),
+            spaceBefore=14,
+            spaceAfter=6,
+        )
+        s_body = ParagraphStyle(
+            "Body",
+            parent=styles["Normal"],
+            fontSize=9,
+            textColor=colors.HexColor("#24292f"),
+            leading=13,
+        )
+        s_small = ParagraphStyle(
+            "Small",
+            parent=styles["Normal"],
+            fontSize=7.5,
+            textColor=colors.HexColor("#57606a"),
+            leading=11,
+            wordWrap="CJK",
+        )
+        s_mono = ParagraphStyle(
+            "Mono",
+            parent=styles["Normal"],
+            fontSize=7,
+            fontName="Courier",
+            textColor=colors.HexColor("#0550ae"),
+            leading=10,
+            wordWrap="CJK",
+        )
+
+        generated_at = dt.utcnow().strftime("%Y-%m-%d %H:%M UTC")
+        story = []
+
+        # ── Cover header ──
+        story.append(Paragraph("Dark Web Scanner", s_title))
+        story.append(Paragraph("Threat Intelligence Executive Report", s_subtitle))
+        story.append(Paragraph(f"Generated: {generated_at}", s_subtitle))
+        story.append(HRFlowable(width=W, thickness=2, color=colors.HexColor("#f85149"), spaceAfter=14))
+
+        # ── Executive summary stats ──
+        story.append(Paragraph("Executive Summary", s_h2))
+
+        stat_data = [
+            ["Metric", "Value"],
+            ["Total Crawl Sessions", str(stats["total_sessions"])],
+            ["Total Pages Crawled", str(stats["total_pages"])],
+            ["Total Keyword Hits", str(stats["total_hits"])],
+            ["Unique Keywords Triggered", str(len(stats["top_keywords"]))],
+        ]
+        stat_table = Table(stat_data, colWidths=[W * 0.6, W * 0.4])
+        stat_table.setStyle(
+            TableStyle(
+                [
+                    ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#161b22")),
+                    ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+                    ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+                    ("FONTSIZE", (0, 0), (-1, -1), 9),
+                    ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.HexColor("#f6f8fa"), colors.white]),
+                    ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#d0d7de")),
+                    ("PADDING", (0, 0), (-1, -1), 7),
+                    ("ALIGN", (1, 0), (1, -1), "CENTER"),
+                ]
+            )
+        )
+        story.append(stat_table)
+
+        # ── Top keywords ──
+        if stats["top_keywords"]:
+            story.append(Paragraph("Top Keywords by Hit Count", s_h2))
+            kw_data = [["Keyword", "Hits"]] + [
+                [k["keyword"], str(k["count"])] for k in stats["top_keywords"]
+            ]
+            kw_table = Table(kw_data, colWidths=[W * 0.75, W * 0.25])
+            kw_table.setStyle(
+                TableStyle(
+                    [
+                        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#161b22")),
+                        ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+                        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+                        ("FONTSIZE", (0, 0), (-1, -1), 9),
+                        ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.HexColor("#f6f8fa"), colors.white]),
+                        ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#d0d7de")),
+                        ("PADDING", (0, 0), (-1, -1), 7),
+                        ("ALIGN", (1, 0), (1, -1), "CENTER"),
+                    ]
+                )
+            )
+            story.append(kw_table)
+
+        # ── Session history ──
+        story.append(Paragraph("Scan Session History", s_h2))
+        sess_data = [["Started", "Status", "Pages", "Hits"]]
+        for s in sessions[:15]:
+            started = s.started_at.strftime("%Y-%m-%d %H:%M") if s.started_at else "—"
+            sess_data.append([started, s.status or "—", str(s.pages_crawled or 0), str(s.hits_found or 0)])
+        sess_table = Table(sess_data, colWidths=[W * 0.38, W * 0.22, W * 0.2, W * 0.2])
+        sess_table.setStyle(
+            TableStyle(
+                [
+                    ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#161b22")),
+                    ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+                    ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+                    ("FONTSIZE", (0, 0), (-1, -1), 8.5),
+                    ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.HexColor("#f6f8fa"), colors.white]),
+                    ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#d0d7de")),
+                    ("PADDING", (0, 0), (-1, -1), 6),
+                    ("ALIGN", (1, 0), (-1, -1), "CENTER"),
+                ]
+            )
+        )
+        story.append(sess_table)
+
+        # ── Keyword hits detail ──
+        if hits:
+            story.append(Paragraph(f"Keyword Hits Detail (latest {len(hits)})", s_h2))
+            hits_data = [["Keyword", "Category", "URL", "Context", "Found At"]]
+            for h in hits:
+                found = h.found_at.strftime("%m-%d %H:%M") if h.found_at else "—"
+                ctx = (h.context or "")[:120] + ("…" if len(h.context or "") > 120 else "")
+                hits_data.append([
+                    Paragraph(h.keyword or "", s_small),
+                    Paragraph(h.category or "", s_small),
+                    Paragraph(h.url or "", s_mono),
+                    Paragraph(ctx, s_small),
+                    Paragraph(found, s_small),
+                ])
+            hits_table = Table(
+                hits_data,
+                colWidths=[W * 0.12, W * 0.1, W * 0.25, W * 0.4, W * 0.13],
+                repeatRows=1,
+            )
+            hits_table.setStyle(
+                TableStyle(
+                    [
+                        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#161b22")),
+                        ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+                        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+                        ("FONTSIZE", (0, 0), (-1, 0), 8),
+                        ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.HexColor("#f6f8fa"), colors.white]),
+                        ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#d0d7de")),
+                        ("PADDING", (0, 0), (-1, -1), 5),
+                        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                    ]
+                )
+            )
+            story.append(hits_table)
+
+        # ── Footer ──
+        story.append(Spacer(1, 20))
+        story.append(HRFlowable(width=W, thickness=0.5, color=colors.HexColor("#d0d7de")))
+        story.append(Paragraph(
+            "CONFIDENTIAL — This report contains sensitive threat intelligence data. "
+            "Do not distribute without authorization.",
+            ParagraphStyle("Footer", parent=s_small, textColor=colors.HexColor("#8b949e"), fontSize=7),
+        ))
+
+        doc.build(story)
+        buf.seek(0)
+
+        from flask import Response
+        filename = f"threat-intel-report-{dt.utcnow().strftime('%Y%m%d-%H%M')}.pdf"
+        return Response(
+            buf.read(),
+            mimetype="application/pdf",
+            headers={"Content-Disposition": f"attachment; filename={filename}"},
+        )
+
+    except Exception as e:
+        import traceback
+        return jsonify({"error": str(e), "trace": traceback.format_exc()}), 500
+
 # ── Health ─────────────────────────────────────────────────────────────────────
 
 

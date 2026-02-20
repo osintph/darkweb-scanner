@@ -324,6 +324,34 @@ class Storage:
                 user.password_hash = password_hash
                 session.commit()
 
+
+    def get_sessions(self, limit: int = 20):
+        with self.get_session() as session:
+            return (
+                session.query(CrawlSession)
+                .order_by(CrawlSession.started_at.desc())
+                .limit(limit)
+                .all()
+            )
+
+    def get_hits_by_session(self, session_id: int, limit: int = 200):
+        with self.get_session() as session:
+            return (
+                session.query(KeywordHitRecord)
+                .filter(KeywordHitRecord.session_id == session_id)
+                .order_by(KeywordHitRecord.found_at.desc())
+                .limit(limit)
+                .all()
+            )
+
+    def get_hits_for_report(self, limit: int = 500):
+        with self.get_session() as session:
+            return (
+                session.query(KeywordHitRecord)
+                .order_by(KeywordHitRecord.found_at.desc())
+                .limit(limit)
+                .all()
+            )
     def get_active_session(self):
         with self.get_session() as session:
             return (
