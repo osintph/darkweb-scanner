@@ -48,7 +48,7 @@ run:  ## Start dashboard (and Tor) in background
 	@echo "✅ Dashboard running at http://localhost:$${DASHBOARD_PORT:-8080}"
 
 scan:  ## Run a crawl scan (foreground)
-	docker compose --profile scan run --rm scanner
+	docker compose --profile scan run --rm scanner python -m darkweb_scanner.main scan
 
 stop:  ## Stop all containers
 	docker compose down
@@ -73,6 +73,10 @@ hits:  ## Show recent keyword hits
 	docker compose exec dashboard python -m darkweb_scanner.main hits
 
 # ── Maintenance ───────────────────────────────────────────────────────────────
+check-seeds:  ## Show currently configured seed URLs
+	docker compose exec dashboard python -c "from pathlib import Path; f=Path('/app/data/seeds.txt'); print(f.read_text() if f.exists() else 'No seeds in /app/data/seeds.txt — add via dashboard Seeds tab')"
+
+
 telegram-auth:  ## Authenticate with Telegram (run once before telegram-scan)
 	docker compose exec dashboard python -m darkweb_scanner.main telegram-auth
 

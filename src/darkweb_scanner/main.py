@@ -126,11 +126,13 @@ def cli():
 @click.option("--no-tor-check", is_flag=True, default=False, help="Skip Tor connectivity check")
 def scan(seeds: str, keywords: str, depth: int, no_tor_check: bool):
     """Run a dark web crawl and keyword scan."""
-    seeds_path = Path(seeds)
-    keywords_path = Path(keywords)
+    # Prefer user-edited files in /app/data over read-only config defaults
+    seeds_path = Path(_resolve_data_path(seeds, "seeds.txt"))
+    keywords_path = Path(_resolve_keywords_path(keywords))
 
     if not seeds_path.exists():
         click.echo(f"Seeds file not found: {seeds_path}", err=True)
+        click.echo("Add seeds via the dashboard Seeds tab or copy config/seeds.example.txt to config/seeds.txt", err=True)
         sys.exit(1)
     if not keywords_path.exists():
         click.echo(f"Keywords file not found: {keywords_path}", err=True)
@@ -171,6 +173,14 @@ def _resolve_keywords_path(provided: str) -> str:
     data_kw = Path("/app/data/keywords.yaml")
     if data_kw.exists():
         return str(data_kw)
+    return provided
+
+
+def _resolve_data_path(provided: str, filename: str) -> str:
+    """Check writable data dir first, fall back to provided path."""
+    data_path = Path("/app/data") / filename
+    if data_path.exists():
+        return str(data_path)
     return provided
 
 

@@ -20,7 +20,7 @@ services:
     build:
       context: .
       dockerfile: docker/app/Dockerfile
-    restart: unless-stopped
+    restart: "no"
     depends_on:
       tor:
         condition: service_healthy
