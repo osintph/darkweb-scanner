@@ -119,6 +119,22 @@ class InvestigationTarget(Base):
     error = Column(Text, nullable=True)
     checked_at = Column(DateTime, default=datetime.utcnow)
 
+
+
+class IPInvestigation(Base):
+    __tablename__ = "ip_investigations"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    ip = Column(String(64), nullable=False, index=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    status = Column(String(50), default="running")
+    abuseipdb_data = Column(Text, nullable=True)   # JSON
+    virustotal_data = Column(Text, nullable=True)  # JSON
+    abuse_score = Column(Integer, nullable=True)
+    vt_malicious = Column(Integer, nullable=True)
+    country = Column(String(10), nullable=True)
+    isp = Column(String(255), nullable=True)
+
 class Storage:
     def __init__(self, database_url: Optional[str] = None):
         self.database_url = database_url or os.getenv(
@@ -533,6 +549,94 @@ class Storage:
                 }
                 for r in rows
             ]
+
+
+    # ── IP Investigations ───────────────────────────────────────────────────────
+
+    def save_ip_investigation(self, ip: str, abuseipdb_data: dict, virustotal_data: dict) -> int:
+        abuse_score = None
+        vt_malicious = None
+        country = None
+        isp = None
+        if abuseipdb_data and not abuseipdb_data.get("error"):
+            abuse_score = abuseipdb_data.get("abuse_confidence_score")
+            country = abuseipdb_data.get("country_code")
+            isp = abuseipdb_data.get("isp")
+        if virustotal_data and not virustotal_data.get("error"):
+            vt_malicious = virustotal_data.get("analysis_stats", {}).get("malicious", 0)
+            if not country:
+                country = virustotal_data.get("country")
+            if not isp:
+                isp = virustotal_data.get("as_owner")
+        with self.get_session() as session:
+            record = IPInvestigation(
+                ip=ip,
+                status="completed",
+                abuseipdb_data=json.dumps(abuseipdb_data),
+                virustotal_data=json.dumps(virustotal_data),
+                abuse_score=abuse_score,
+                vt_malicious=vt_malicious,
+                country=country,
+                isp=isp,
+            )
+            session.add(record)
+            session.commit()
+            return record.id
+
+    def get_ip_investigations(self, limit: int = 50) -> list[dict]:
+        with self.get_session() as session:
+            rows = (
+                session.query(IPInvestigation)
+                .order_by(IPInvestigation.created_at.desc())
+                .limit(limit)
+                .all()
+            )
+            return [
+                {
+                    "id": r.id,
+                    "ip": r.ip,
+                    "status": r.status,
+                    "abuse_score": r.abuse_score,
+                    "vt_malicious": r.vt_malicious,
+                    "country": r.country,
+                    "isp": r.isp,
+                    "created_at": r.created_at.isoformat() if r.created_at else None,
+                }
+                for r in rows
+            ]
+
+    def get_ip_investigation(self, inv_id: int) -> Optional[dict]:
+        with self.get_session() as session:
+            r = session.get(IPInvestigation, inv_id)
+            if not r:
+                return None
+            try:
+                abuse = json.loads(r.abuseipdb_data or "{}")
+            except Exception:
+                abuse = {}
+            try:
+                vt = json.loads(r.virustotal_data or "{}")
+            except Exception:
+                vt = {}
+            return {
+                "id": r.id,
+                "ip": r.ip,
+                "status": r.status,
+                "abuse_score": r.abuse_score,
+                "vt_malicious": r.vt_malicious,
+                "country": r.country,
+                "isp": r.isp,
+                "created_at": r.created_at.isoformat() if r.created_at else None,
+                "abuseipdb": abuse,
+                "virustotal": vt,
+            }
+
+    def delete_ip_investigation(self, inv_id: int):
+        with self.get_session() as session:
+            r = session.get(IPInvestigation, inv_id)
+            if r:
+                session.delete(r)
+                session.commit()
 
 
     def get_active_session(self):

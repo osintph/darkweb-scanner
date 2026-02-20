@@ -805,6 +805,69 @@ def api_investigations_delete(inv_id):
     storage.delete_investigation(inv_id)
     return jsonify({"ok": True})
 
+
+# ── IP Investigation API ───────────────────────────────────────────────────────
+
+
+@dashboard_bp.route("/api/ip-investigations", methods=["GET"])
+@require_login
+def api_ip_investigations_list():
+    storage = get_storage()
+    return jsonify(storage.get_ip_investigations(limit=50))
+
+
+@dashboard_bp.route("/api/ip-investigations", methods=["POST"])
+@require_login
+def api_ip_investigations_create():
+    import asyncio
+    import re
+    from ..ip_lookup import investigate_ip
+
+    body = request.get_json()
+    ip = (body.get("ip") or "").strip()
+
+    # Basic IP validation
+    ipv4 = re.compile(r"^(\d{1,3}\.){3}\d{1,3}$")
+    ipv6 = re.compile(r"^[0-9a-fA-F:]+$")
+    if not ip or (not ipv4.match(ip) and not ipv6.match(ip)):
+        return jsonify({"error": "Invalid IP address"}), 400
+
+    abuse_key = os.getenv("ABUSEIPDB_API_KEY", "")
+    vt_key = os.getenv("VIRUSTOTAL_API_KEY", "")
+
+    if not abuse_key and not vt_key:
+        return jsonify({"error": "No API keys configured. Add ABUSEIPDB_API_KEY and/or VIRUSTOTAL_API_KEY to .env"}), 400
+
+    storage = get_storage()
+    try:
+        result = asyncio.run(investigate_ip(ip, abuse_key, vt_key))
+        inv_id = storage.save_ip_investigation(
+            ip=ip,
+            abuseipdb_data=result.get("abuseipdb") or {},
+            virustotal_data=result.get("virustotal") or {},
+        )
+        return jsonify({"ok": True, "id": inv_id})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@dashboard_bp.route("/api/ip-investigations/<int:inv_id>", methods=["GET"])
+@require_login
+def api_ip_investigations_get(inv_id):
+    storage = get_storage()
+    data = storage.get_ip_investigation(inv_id)
+    if not data:
+        return jsonify({"error": "Not found"}), 404
+    return jsonify(data)
+
+
+@dashboard_bp.route("/api/ip-investigations/<int:inv_id>", methods=["DELETE"])
+@require_login
+def api_ip_investigations_delete(inv_id):
+    storage = get_storage()
+    storage.delete_ip_investigation(inv_id)
+    return jsonify({"ok": True})
+
 # ── Health ─────────────────────────────────────────────────────────────────────
 
 

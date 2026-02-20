@@ -183,6 +183,7 @@
     <button class="nav-tab" onclick="switchTab('seeds', this)">🌱 Seeds</button>
     <button class="nav-tab admin-only" id="tab-users" onclick="switchTab('users', this)">👥 Users</button>
     <button class="nav-tab" onclick="switchTab('investigations', this)">🔍 Investigations</button>
+    <button class="nav-tab" onclick="switchTab('iplookup', this)">🌐 IP Lookup</button>
     <button class="nav-tab" onclick="switchTab('reports', this)">📄 Reports</button>
     <button class="nav-tab" onclick="switchTab('settings', this)">⚙️ Settings</button>
   </nav>
@@ -345,6 +346,46 @@
 
   </div>
 
+
+  <!-- ── IP Lookup Tab ── -->
+  <div class="tab-panel" id="panel-iplookup">
+
+    <!-- Lookup form -->
+    <div class="panel" style="margin-bottom:20px">
+      <div class="panel-header">
+        <h2>🌐 IP Address Lookup</h2>
+        <span style="color:var(--muted);font-size:.79rem">AbuseIPDB + VirusTotal enrichment</span>
+      </div>
+      <div class="panel-body">
+        <div class="form-row" style="align-items:flex-end">
+          <div class="form-group">
+            <label>IP Address</label>
+            <input type="text" id="ipInput" style="width:220px;font-family:var(--mono)" placeholder="e.g. 185.220.101.5" onkeydown="if(event.key==='Enter')runIPLookup()"/>
+          </div>
+          <button class="btn btn-primary" onclick="runIPLookup()" id="ipLookupBtn" style="padding:8px 20px">🔍 Investigate</button>
+        </div>
+        <div class="info-banner" style="margin-top:12px">
+          Requires <code>ABUSEIPDB_API_KEY</code> and/or <code>VIRUSTOTAL_API_KEY</code> in .env — both free to get.<br/>
+          ⚠ VirusTotal free tier: 4 requests/min — lookup takes ~35s due to rate limiting.
+        </div>
+        <!-- Inline result -->
+        <div id="ipLookupResult" style="margin-top:18px;display:none"></div>
+      </div>
+    </div>
+
+    <!-- Past IP lookups -->
+    <div class="panel">
+      <div class="panel-header">
+        <h2>Past IP Lookups</h2>
+        <button class="btn btn-secondary" onclick="loadIPInvestigations()">↻ Refresh</button>
+      </div>
+      <div id="ipInvestigationsList">
+        <div class="empty"><div class="icon">🌐</div><p>No IP lookups yet.</p></div>
+      </div>
+    </div>
+
+  </div>
+
   <!-- ── Reports Tab ── -->
   <div class="tab-panel" id="panel-reports">
     <div class="report-hero">
@@ -442,6 +483,7 @@
     if (tab === 'seeds') { loadSeeds(); loadChannels(); }
     if (tab === 'users' && isAdmin) loadUsers();
     if (tab === 'investigations') loadInvestigations();
+    if (tab === 'iplookup') loadIPInvestigations();
     if (tab === 'reports') loadReportPreview();
     if (tab === 'settings') loadSettings();
   }
@@ -971,6 +1013,247 @@
     const data = await res.json();
     if (data.ok) { toast('Deleted'); loadInvestigations(); }
     else toast(data.error || 'Error', 'error');
+  }
+
+
+  // ── IP Lookup ──────────────────────────────────────────────────────────────
+
+  async function runIPLookup() {
+    const ip = document.getElementById('ipInput').value.trim();
+    if (!ip) { toast('Enter an IP address', 'error'); return; }
+    const btn = document.getElementById('ipLookupBtn');
+    const resultEl = document.getElementById('ipLookupResult');
+    btn.textContent = '⏳ Investigating…';
+    btn.disabled = true;
+    resultEl.style.display = 'none';
+
+    try {
+      const res = await fetch('/api/ip-investigations', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ip })
+      });
+      const data = await res.json();
+      if (!data.ok) { toast(data.error || 'Error', 'error'); return; }
+
+      // Fetch full results and show inline
+      const full = await (await fetch(`/api/ip-investigations/${data.id}`)).json();
+      resultEl.style.display = 'block';
+      resultEl.innerHTML = buildIPReport(full);
+      loadIPInvestigations();
+      toast(`Lookup complete for ${ip}`);
+    } catch(e) {
+      toast('Network error', 'error');
+    } finally {
+      btn.textContent = '🔍 Investigate';
+      btn.disabled = false;
+    }
+  }
+
+  async function loadIPInvestigations() {
+    const el = document.getElementById('ipInvestigationsList');
+    try {
+      const items = await (await fetch('/api/ip-investigations')).json();
+      if (!items.length) {
+        el.innerHTML = '<div class="empty"><div class="icon">🌐</div><p>No IP lookups yet.</p></div>';
+        return;
+      }
+      el.innerHTML = `<table>
+        <thead><tr><th>IP Address</th><th>Country</th><th>ISP/AS Owner</th><th>Abuse Score</th><th>VT Malicious</th><th>Looked Up</th><th></th></tr></thead>
+        <tbody>${items.map(i => {
+          const score = i.abuse_score ?? '—';
+          const scoreColor = i.abuse_score >= 80 ? 'var(--red)' : i.abuse_score >= 30 ? 'var(--yellow)' : 'var(--green)';
+          const vtColor = i.vt_malicious > 5 ? 'var(--red)' : i.vt_malicious > 0 ? 'var(--yellow)' : 'var(--green)';
+          return `<tr class="session-row" onclick="expandIPInvestigation(${i.id})" id="ipinv-${i.id}">
+            <td style="font-family:var(--mono);font-weight:600">${esc(i.ip)}</td>
+            <td>${esc(i.country || '—')}</td>
+            <td style="color:var(--muted);font-size:.8rem">${esc(i.isp || '—')}</td>
+            <td><strong style="color:${scoreColor}">${score}%</strong></td>
+            <td><strong style="color:${vtColor}">${i.vt_malicious ?? '—'}</strong></td>
+            <td class="time-cell">${fmtTime(i.created_at)}</td>
+            <td><button class="btn btn-danger" onclick="event.stopPropagation();deleteIPInv(${i.id})" style="padding:3px 10px">✕</button></td>
+          </tr>
+          <tr class="session-detail" id="ipinv-detail-${i.id}">
+            <td colspan="7"><div class="session-detail-inner" id="ipinv-inner-${i.id}"></div></td>
+          </tr>`;
+        }).join('')}</tbody></table>`;
+    } catch(e) {
+      el.innerHTML = '<div class="empty" style="color:var(--red)">Error loading.</div>';
+    }
+  }
+
+  async function expandIPInvestigation(id) {
+    const detail = document.getElementById(`ipinv-detail-${id}`);
+    if (!detail) return;
+    if (detail.style.display === 'table-row') { detail.style.display = 'none'; return; }
+    detail.style.display = 'table-row';
+    const inner = document.getElementById(`ipinv-inner-${id}`);
+    inner.innerHTML = 'Loading…';
+    try {
+      const data = await (await fetch(`/api/ip-investigations/${id}`)).json();
+      inner.innerHTML = buildIPReport(data);
+    } catch(e) { inner.innerHTML = '<p style="color:var(--red)">Error.</p>'; }
+  }
+
+  function buildIPReport(data) {
+    const a = data.abuseipdb || {};
+    const v = data.virustotal || {};
+    const aError = a.error;
+    const vError = v.error;
+
+    let html = `<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;padding:12px 0">`;
+
+    // ── AbuseIPDB Panel ──
+    html += `<div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:16px">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px">
+        <span style="font-size:1.1rem">🛡</span>
+        <strong style="font-size:.9rem">AbuseIPDB</strong>
+        ${aError ? `<span style="color:var(--red);font-size:.75rem">⚠ ${esc(aError)}</span>` : ''}
+      </div>`;
+
+    if (!aError && a.ip) {
+      const score = a.abuse_confidence_score ?? 0;
+      const scoreColor = score >= 80 ? 'var(--red)' : score >= 30 ? 'var(--yellow)' : 'var(--green)';
+      html += `
+        <div style="text-align:center;margin-bottom:16px">
+          <div style="font-size:2.8rem;font-weight:800;color:${scoreColor}">${score}%</div>
+          <div style="color:var(--muted);font-size:.75rem">Abuse Confidence Score</div>
+        </div>
+        ${ipRow('IP', a.ip)}
+        ${ipRow('Country', (a.country_name || '') + (a.country_code ? ` (${a.country_code})` : ''))}
+        ${ipRow('ISP', a.isp)}
+        ${ipRow('Domain', a.domain)}
+        ${ipRow('Usage Type', a.usage_type)}
+        ${ipRow('Tor Exit Node', a.is_tor ? '⚠ YES' : 'No', a.is_tor ? 'color:var(--red)' : '')}
+        ${ipRow('Total Reports', a.total_reports + (a.num_distinct_users ? ` (${a.num_distinct_users} reporters)` : ''))}
+        ${ipRow('Last Reported', a.last_reported_at ? fmtTime(a.last_reported_at) : 'Never')}
+        ${a.hostnames?.length ? ipRow('Hostnames', a.hostnames.slice(0,3).join(', ')) : ''}`;
+
+      if (a.reports?.length) {
+        html += `<div style="margin-top:12px">
+          <div style="font-size:.75rem;font-weight:600;color:var(--muted);text-transform:uppercase;margin-bottom:8px">Recent Reports</div>
+          ${a.reports.slice(0,5).map(r => `
+            <div style="background:var(--surface2);border-radius:5px;padding:8px;margin-bottom:5px;font-size:.76rem">
+              <div style="display:flex;justify-content:space-between;margin-bottom:3px">
+                <span style="color:var(--red)">${(r.categories||[]).join(', ') || 'Unknown'}</span>
+                <span style="color:var(--muted)">${r.reporter_country || ''}</span>
+              </div>
+              ${r.comment ? `<div style="color:var(--muted);font-family:var(--mono)">${esc(r.comment.slice(0,150))}</div>` : ''}
+            </div>`).join('')}
+        </div>`;
+      }
+    }
+    html += `</div>`;
+
+    // ── VirusTotal Panel ──
+    html += `<div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:16px">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px">
+        <span style="font-size:1.1rem">🦠</span>
+        <strong style="font-size:.9rem">VirusTotal</strong>
+        ${vError ? `<span style="color:var(--red);font-size:.75rem">⚠ ${esc(vError)}</span>` : ''}
+      </div>`;
+
+    if (!vError && v.ip) {
+      const stats = v.analysis_stats || {};
+      const mal = stats.malicious || 0;
+      const sus = stats.suspicious || 0;
+      const total = v.total_engines || 0;
+      const malColor = mal > 5 ? 'var(--red)' : mal > 0 ? 'var(--yellow)' : 'var(--green)';
+      html += `
+        <div style="text-align:center;margin-bottom:16px">
+          <div style="font-size:2.8rem;font-weight:800;color:${malColor}">${mal}/${total}</div>
+          <div style="color:var(--muted);font-size:.75rem">Malicious Detections</div>
+          <div style="font-size:.75rem;color:var(--muted);margin-top:2px">
+            ${sus} suspicious · ${stats.harmless||0} harmless · ${stats.undetected||0} undetected
+          </div>
+        </div>
+        ${ipRow('ASN', v.asn ? `AS${v.asn} — ${v.as_owner||''}` : '—')}
+        ${ipRow('Country', v.country || '—')}
+        ${ipRow('Continent', v.continent || '—')}
+        ${ipRow('Network', v.network || '—')}
+        ${ipRow('Registry', v.regional_internet_registry || '—')}
+        ${ipRow('Reputation', v.reputation !== undefined ? String(v.reputation) : '—')}
+        ${ipRow('JARM', v.jarm ? v.jarm.slice(0,24)+'…' : '—')}
+        ${v.tags?.length ? ipRow('Tags', v.tags.join(', ')) : ''}
+        ${ipRow('Last Analysis', v.last_analysis_date ? fmtTime(v.last_analysis_date) : '—')}`;
+
+      if (v.malicious_engines?.length) {
+        html += `<div style="margin-top:12px">
+          <div style="font-size:.75rem;font-weight:600;color:var(--red);text-transform:uppercase;margin-bottom:8px">Flagged by ${v.malicious_engines.length} engine(s)</div>
+          ${v.malicious_engines.slice(0,8).map(e => `
+            <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border);font-size:.76rem">
+              <span>${esc(e.engine)}</span>
+              <span style="color:${e.category==='malicious'?'var(--red)':'var(--yellow)'}">${esc(e.result||e.category)}</span>
+            </div>`).join('')}
+        </div>`;
+      }
+
+      if (v.ssl_certificate) {
+        const ssl = v.ssl_certificate;
+        html += `<div style="margin-top:12px">
+          <div style="font-size:.75rem;font-weight:600;color:var(--muted);text-transform:uppercase;margin-bottom:8px">SSL Certificate</div>
+          ${ssl.subject_cn ? ipRow('Subject CN', ssl.subject_cn) : ''}
+          ${ssl.issuer_org ? ipRow('Issuer', ssl.issuer_org) : ''}
+          ${ssl.valid_from ? ipRow('Valid', ssl.valid_from + ' → ' + (ssl.valid_to||'?')) : ''}
+        </div>`;
+      }
+    }
+    html += `</div></div>`;
+
+    // ── Resolutions ──
+    if (v.resolutions?.length) {
+      html += `<div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:14px;margin-top:4px">
+        <div style="font-size:.8rem;font-weight:600;margin-bottom:10px">📡 Historical DNS Resolutions (${v.resolutions.length})</div>
+        <table style="font-size:.78rem">
+          <thead><tr><th>Hostname</th><th>Date</th></tr></thead>
+          <tbody>${v.resolutions.slice(0,15).map(r => `<tr>
+            <td style="font-family:var(--mono);color:var(--accent)">${esc(r.hostname||'—')}</td>
+            <td class="time-cell">${r.date ? fmtTime(new Date(r.date*1000).toISOString()) : '—'}</td>
+          </tr>`).join('')}</tbody>
+        </table>
+      </div>`;
+    }
+
+    // ── Communicating files ──
+    if (v.communicating_files?.length) {
+      html += `<div style="background:var(--bg);border:1px solid rgba(248,81,73,.25);border-radius:8px;padding:14px;margin-top:8px">
+        <div style="font-size:.8rem;font-weight:600;color:var(--red);margin-bottom:10px">⚠ Malware communicating with this IP (${v.communicating_files.length} samples)</div>
+        <table style="font-size:.76rem">
+          <thead><tr><th>Name</th><th>Type</th><th>SHA256</th><th>Malicious</th></tr></thead>
+          <tbody>${v.communicating_files.map(f => `<tr>
+            <td style="color:var(--red)">${esc(f.name||'unknown')}</td>
+            <td style="color:var(--muted)">${esc(f.type||'—')}</td>
+            <td style="font-family:var(--mono);font-size:.7rem;color:var(--muted)">${(f.sha256||'').slice(0,16)}…</td>
+            <td style="color:${f.malicious>0?'var(--red)':'var(--muted)'}">${f.malicious||0}</td>
+          </tr>`).join('')}</tbody>
+        </table>
+      </div>`;
+    }
+
+    // ── WHOIS ──
+    if (v.whois) {
+      html += `<details style="margin-top:8px">
+        <summary style="cursor:pointer;font-size:.8rem;color:var(--muted);padding:8px;background:var(--surface);border:1px solid var(--border);border-radius:6px">📋 WHOIS Data</summary>
+        <pre style="background:var(--bg);border:1px solid var(--border);border-radius:0 0 6px 6px;padding:12px;font-size:.72rem;color:var(--muted);overflow-x:auto;max-height:300px;overflow-y:auto">${esc(v.whois)}</pre>
+      </details>`;
+    }
+
+    return html;
+  }
+
+  function ipRow(label, value, style = '') {
+    if (!value || value === '—' || value === 'undefined') return '';
+    return `<div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--border);font-size:.8rem">
+      <span style="color:var(--muted)">${label}</span>
+      <span style="text-align:right;max-width:60%;word-break:break-all;${style}">${esc(String(value))}</span>
+    </div>`;
+  }
+
+  async function deleteIPInv(id) {
+    if (!confirm('Delete this IP lookup?')) return;
+    await fetch(`/api/ip-investigations/${id}`, { method: 'DELETE' });
+    toast('Deleted');
+    loadIPInvestigations();
   }
 
 </script>
