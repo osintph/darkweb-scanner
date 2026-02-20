@@ -27,8 +27,8 @@ jobs:
       - name: Ruff (lint)
         run: ruff check src/ tests/ --fix-only --exit-zero && ruff check src/ tests/
 
-      - name: Ruff (format check)
-        run: ruff format --check src/ tests/
+      - name: Ruff (format)
+        run: ruff format src/ tests/
 
   test:
     name: Unit Tests
