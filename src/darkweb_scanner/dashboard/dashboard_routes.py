@@ -575,13 +575,7 @@ def api_report_pdf():
             spaceBefore=14,
             spaceAfter=6,
         )
-        s_body = ParagraphStyle(
-            "Body",
-            parent=styles["Normal"],
-            fontSize=9,
-            textColor=colors.HexColor("#24292f"),
-            leading=13,
-        )
+
         s_small = ParagraphStyle(
             "Small",
             parent=styles["Normal"],
