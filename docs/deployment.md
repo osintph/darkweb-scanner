@@ -5,10 +5,10 @@
 The fastest way to get running on any fresh Linux server:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/osintph/darkweb-scanner/main/deploy.sh | sudo bash
+sudo bash <(curl -fsSL https://raw.githubusercontent.com/osintph/darkweb-scanner/main/deploy.sh)
 ```
 
-This installs Docker, clones the repo, configures Tor, and starts all services automatically.
+This installs Docker, clones the repo, configures Tor, generates secrets, and starts all services automatically.
 
 ---
 
@@ -29,39 +29,15 @@ You need a domain name pointed at your server's public IP.
 DOMAIN=scanner.yourdomain.com SSL_EMAIL=you@example.com sudo bash deploy.sh
 ```
 
-**Option B — Set domain after deployment (without redeploying):**
+**Option B — Set domain after deployment:**
 ```bash
 sudo bash ~/darkweb-scanner/scripts/configure-ssl.sh
 ```
 
-The helper prompts you interactively — your domain and email are stored only in `.env` on the server, never in git.
+### DNS Setup
 
-### DNS Setup (Cloudflare or any provider)
-
-1. Log into your DNS provider
-2. Add an **A record**:
-   - Name: `scanner` (or any subdomain you want)
-   - Value: your server's public IP
-   - TTL: Auto
-3. Wait 1-5 minutes for DNS to propagate
-4. Run `sudo bash ~/darkweb-scanner/scripts/configure-ssl.sh`
-
-**Cloudflare users:** Set the proxy status to **DNS only** (grey cloud, not orange) for the A record. Let's Encrypt needs to reach your server directly for certificate validation. You can re-enable the Cloudflare proxy after the cert is issued if desired.
-
-### Free Domain Options
-
-If you do not have a domain yet:
-
-| Option | Cost | Notes |
-|--------|------|-------|
-| Namecheap / Cloudflare Registrar | ~$10/year | Most reliable |
-| DuckDNS | Free | `yourname.duckdns.org` subdomains |
-| Freenom | Free | `.tk`, `.ml` domains — less reliable |
-
-**DuckDNS quick setup:**
-1. Go to [duckdns.org](https://www.duckdns.org) and sign in
-2. Create a subdomain and point it to your server IP
-3. Use `yourname.duckdns.org` as your `DOMAIN`
+1. Add an **A record** at your DNS provider pointing to your server's public IP
+2. **Cloudflare users:** Set proxy status to **DNS only** (grey cloud) during cert issuance
 
 ---
 
@@ -71,17 +47,11 @@ If you do not have a domain yet:
 
 ```bash
 apt update && apt upgrade -y
-
-# Create a non-root user
 adduser scanner
 usermod -aG sudo,docker scanner
-
-# Harden SSH
 echo "PasswordAuthentication no" >> /etc/ssh/sshd_config
 echo "PermitRootLogin no" >> /etc/ssh/sshd_config
 systemctl restart sshd
-
-# Firewall
 ufw default deny incoming
 ufw default allow outgoing
 ufw allow ssh
@@ -94,36 +64,103 @@ ufw enable
 
 ```bash
 su - scanner
-curl -fsSL https://raw.githubusercontent.com/osintph/darkweb-scanner/main/deploy.sh | sudo bash
+DOMAIN=scanner.yourdomain.com SSL_EMAIL=you@example.com sudo bash \
+  <(curl -fsSL https://raw.githubusercontent.com/osintph/darkweb-scanner/main/deploy.sh)
 ```
 
-### 3. Configure SSL
+### 3. Configure API keys
 
 ```bash
-sudo bash ~/darkweb-scanner/scripts/configure-ssl.sh
-```
-
-### 4. Schedule Scans
-
-```bash
-INSTALL_TIMER=1 sudo bash ~/darkweb-scanner/deploy.sh
+nano ~/darkweb-scanner/.env
 ```
 
 ---
 
 ## Environment Variables Reference
 
-All configuration lives in `.env` in the repo root. Never commit this file.
+All configuration lives in `.env`. **Never commit this file.**
+
+### Core
 
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `DOMAIN` | (empty) | Public domain for Let's Encrypt SSL |
 | `SSL_EMAIL` | (empty) | Email for Let's Encrypt registration |
-| `DASHBOARD_SECRET_KEY` | (generated) | Flask session secret |
-| `TOR_CONTROL_PASSWORD` | (generated) | Tor control port password |
-| `DATABASE_URL` | SQLite | Database connection string |
-| `ALERT_WEBHOOK_URL` | (empty) | Slack/Discord webhook for alerts |
+| `DASHBOARD_SECRET_KEY` | (auto-generated) | Flask session secret |
+| `TOR_CONTROL_PASSWORD` | (auto-generated) | Tor control port password |
+| `DATABASE_URL` | SQLite | SQLite or PostgreSQL connection string |
 | `LOG_LEVEL` | `INFO` | Logging verbosity |
+
+### Alerting
+
+| Variable | Description |
+|----------|-------------|
+| `ALERT_WEBHOOK_URL` | Slack/Discord webhook for keyword hit alerts |
+| `SMTP_HOST` / `SMTP_PORT` | SMTP server for email alerts |
+| `SMTP_USER` / `SMTP_PASSWORD` | SMTP credentials |
+| `ALERT_EMAIL_FROM` / `ALERT_EMAIL_TO` | Alert email addresses |
+
+### Daily Digest (Mailgun)
+
+| Variable | Description |
+|----------|-------------|
+| `MAILGUN_API_KEY` | Mailgun API key — required for digest delivery |
+| `MAILGUN_DOMAIN` | Your Mailgun sending domain |
+| `MAILGUN_FROM` | Sender display name and address |
+
+### Threat Intelligence Feeds
+
+| Variable | Description |
+|----------|-------------|
+| `OTX_API_KEY` | AlienVault OTX API key — free at otx.alienvault.com |
+
+### IP Investigation
+
+| Variable | Description |
+|----------|-------------|
+| `ABUSEIPDB_API_KEY` | AbuseIPDB — free tier: 1,000 checks/day |
+| `VIRUSTOTAL_API_KEY` | VirusTotal — free tier: 4 req/min |
+
+### Telegram Scraper
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `TELEGRAM_API_ID` | (empty) | From my.telegram.org/apps |
+| `TELEGRAM_API_HASH` | (empty) | From my.telegram.org/apps |
+| `TELEGRAM_CHANNELS` | (empty) | Comma-separated channel usernames (no @) |
+| `TELEGRAM_SESSION_PATH` | `/app/data/telegram.session` | Session file path |
+| `TELEGRAM_LIMIT_PER_CHANNEL` | `200` | Max messages per channel |
+
+### OAuth (optional)
+
+| Variable | Description |
+|----------|-------------|
+| `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | Google OAuth credentials |
+| `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET` | GitHub OAuth credentials |
+
+---
+
+## Daily Digest Setup
+
+The digest sends curated threat intelligence every morning at 08:00 PHT.
+
+**1. Configure Mailgun** (free tier: 1,000 emails/month at mailgun.com)
+
+**2. Configure OTX** — free API key at otx.alienvault.com
+
+**3. Add subscribers** via dashboard (Settings → Digest → Subscribers)
+
+**4. Schedule with cron:**
+```bash
+0 0 * * * cd ~/darkweb-scanner && docker compose exec -T dashboard \
+  python -c "from darkweb_scanner.digest import send_digest; from darkweb_scanner.storage import Storage; send_digest(Storage())"
+```
+
+---
+
+## DNS Reconnaissance
+
+No additional setup required. Uses free public sources (crt.sh, HackerTarget, ip-api.com). The `dnspython` package is included in default dependencies.
 
 ---
 
@@ -136,27 +173,14 @@ docker compose build --no-cache
 docker compose up -d
 ```
 
+---
+
 ## Troubleshooting
 
-**Tor not connecting:**
-```bash
-docker compose logs tor | grep Bootstrapped
-make check-tor
-```
+**Tor not connecting:** `docker compose logs tor | grep Bootstrapped`
 
-**Dashboard not loading:**
-```bash
-docker compose logs dashboard
-docker compose logs nginx
-```
+**Dashboard not loading:** `docker compose logs dashboard`
 
-**Certificate issues:**
-```bash
-docker compose logs nginx
-sudo bash ~/darkweb-scanner/scripts/configure-ssl.sh
-```
+**Digest not sending:** Check `MAILGUN_API_KEY` is set in `.env`
 
-**Full restart:**
-```bash
-docker compose down && docker compose up -d
-```
+**Full restart:** `docker compose down && docker compose up -d`
