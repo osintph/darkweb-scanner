@@ -1034,9 +1034,19 @@ def api_digest_send():
 def api_digest_preview():
     """Download a preview of the digest PDF without sending."""
     from ..digest import build_digest_pdf
+    from ..feeds import fetch_all_feeds
     storage = get_storage()
     try:
-        pdf = build_digest_pdf(storage)
+        feed_data = fetch_all_feeds()
+        stats = storage.get_stats()
+        top_kw = stats.get("top_keywords", [{}])
+        scanner_summary = {
+            "total_hits": stats.get("total_hits", 0),
+            "total_pages": stats.get("total_pages", 0),
+            "total_sessions": stats.get("total_sessions", 0),
+            "top_keyword": top_kw[0].get("keyword", "—") if top_kw else "—",
+        }
+        pdf = build_digest_pdf(feed_data, scanner_summary=scanner_summary)
         from datetime import datetime as dt
         filename = f"digest-preview-{dt.utcnow().strftime('%Y%m%d')}.pdf"
         return Response(
@@ -1047,6 +1057,35 @@ def api_digest_preview():
     except Exception as e:
         import traceback
         return jsonify({"error": str(e), "trace": traceback.format_exc()}), 500
+
+
+@dashboard_bp.route("/api/digest/feeds", methods=["GET"])
+@require_login
+def api_digest_feeds():
+    """Preview feed data without building PDF."""
+    from ..feeds import fetch_all_feeds
+    try:
+        data = fetch_all_feeds()
+        return jsonify(data)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@dashboard_bp.route("/api/digest/subscribe", methods=["POST"])
+def api_public_subscribe():
+    """Public endpoint — no auth required. For static website subscribe form."""
+    from ..digest import add_subscriber
+    body = request.get_json() or {}
+    email = (body.get("email") or "").strip().lower()
+    name = (body.get("name") or "").strip()[:100]
+    org = (body.get("org") or "").strip()[:200]
+    # Honeypot
+    if body.get("website"):
+        return jsonify({"ok": True})  # silently drop bots
+    if not email or "@" not in email or "." not in email.split("@")[-1]:
+        return jsonify({"error": "Valid email required"}), 400
+    added = add_subscriber(email, name=name, org=org)
+    return jsonify({"ok": True, "new": added})
 
 
 # ── Health ─────────────────────────────────────────────────────────────────────
