@@ -270,16 +270,26 @@ def build_digest_pdf(feed_data: dict, scanner_summary: dict = None, date: dateti
     return buf.read()
 
 
-def build_email_html(feed_data: dict, date_str: str, stats: dict) -> str:
+def build_email_html(feed_data: dict, date_str: str, stats: dict) -> str:  # noqa: ARG001
     kev = feed_data.get("cisa_kev", [])
-    sea_items = ([p for p in feed_data.get("otx_pulses",[]) if p.get("sea_relevant")] +
-                 [r for r in feed_data.get("rss",[]) if r.get("sea_relevant")])[:6]
-    global_items = [r for r in feed_data.get("rss",[]) if not r.get("sea_relevant")][:5]
+    sea_items = ([p for p in feed_data.get("otx_pulses", []) if p.get("sea_relevant")] +
+                 [r for r in feed_data.get("rss", []) if r.get("sea_relevant")])[:6]
+    global_items = [r for r in feed_data.get("rss", []) if not r.get("sea_relevant")][:5]
 
-    kev_rows = "".join([
-        f'<tr style="background:{"#fff8f8" if i%2==0 else "#ffffff"}"><td style="padding:6px 10px;font-size:11px;font-family:monospace;color:#f85149;border-bottom:1px solid #d0d7de">{v["cve"]}</td><td style="padding:6px 10px;font-size:11px;border-bottom:1px solid #d0d7de">{v["title"][:60]}</td><td style="padding:6px 10px;font-size:11px;color:#57606a;border-bottom:1px solid #d0d7de">{v["vendor"]}</td></tr>'
-        for i,v in enumerate(kev[:8])
-    ])
+    # Build KEV rows — no nested f-strings (Python 3.11 compat)
+    kev_row_parts = []
+    for i, v in enumerate(kev[:8]):
+        row_bg = "#fff8f8" if i % 2 == 0 else "#ffffff"
+        cve_url = f"https://nvd.nist.gov/vuln/detail/{v['cve']}"
+        kev_row_parts.append(
+            f'<tr style="background:{row_bg}">'
+            f'<td style="padding:6px 10px;font-size:11px;font-family:monospace;border-bottom:1px solid #d0d7de">'
+            f'<a href="{cve_url}" style="color:#f85149;text-decoration:none">{v["cve"]}</a></td>'
+            f'<td style="padding:6px 10px;font-size:11px;border-bottom:1px solid #d0d7de">{v["title"][:60]}</td>'
+            f'<td style="padding:6px 10px;font-size:11px;color:#57606a;border-bottom:1px solid #d0d7de">{v["vendor"]}</td>'
+            f'</tr>'
+        )
+    kev_rows = "".join(kev_row_parts)
 
     def news_rows(items, highlight=False):
         rows = ""
@@ -290,13 +300,17 @@ def build_email_html(feed_data: dict, date_str: str, stats: dict) -> str:
             source = item.get("source", "")
             url = item.get("url", "")
             read_more = (
-                f' \u00b7 <a href="{url}" style="color:#58a6ff">Read more</a>'
+                f' \u00b7 <a href="{url}" style="color:#58a6ff;text-decoration:none">Read more \u2192</a>'
                 if url else ""
+            )
+            title_html = (
+                f'<a href="{url}" style="color:#0d1117;text-decoration:none;font-weight:600">{title}</a>'
+                if url else f'<span style="font-weight:600">{title}</span>'
             )
             rows += (
                 f'<tr style="background:{bg}">'
                 f'<td style="padding:10px 12px;border-bottom:1px solid #d0d7de">'
-                f'<div style="font-size:13px;font-weight:600;color:#0d1117;margin-bottom:3px">{title}</div>'
+                f'<div style="font-size:13px;margin-bottom:3px">{title_html}</div>'
                 f'<div style="font-size:11px;color:#57606a;margin-bottom:4px">{desc}</div>'
                 f'<div style="font-size:10px;color:#8b949e">'
                 f'<b style="color:#f85149">{source}</b>{read_more}'
@@ -304,43 +318,47 @@ def build_email_html(feed_data: dict, date_str: str, stats: dict) -> str:
             )
         return rows
 
-    kev_section = "" if not kev else f'''
-  <div style="background:#fff8f8;border-left:4px solid #f85149;padding:16px 20px">
-    <div style="font-size:13px;font-weight:700;color:#f85149;margin-bottom:8px">CISA: {len(kev)} Exploited Vulnerabilities This Week</div>
-    <table style="width:100%;border-collapse:collapse;background:white">
-      <tr style="background:#f85149"><th style="padding:6px 10px;font-size:11px;color:white;text-align:left">CVE</th><th style="padding:6px 10px;font-size:11px;color:white;text-align:left">Vulnerability</th><th style="padding:6px 10px;font-size:11px;color:white;text-align:left">Vendor</th></tr>
-      {kev_rows}
-    </table>
-  </div>'''
+    kev_section = "" if not kev else (
+        f'<div style="background:#fff8f8;border-left:4px solid #f85149;padding:16px 20px">'
+        f'<div style="font-size:13px;font-weight:700;color:#f85149;margin-bottom:8px">'
+        f'&#x1F6A8; CISA: {len(kev)} Exploited Vulnerabilities This Week</div>'
+        f'<table style="width:100%;border-collapse:collapse;background:white">'
+        f'<tr style="background:#f85149">'
+        f'<th style="padding:6px 10px;font-size:11px;color:white;text-align:left">CVE</th>'
+        f'<th style="padding:6px 10px;font-size:11px;color:white;text-align:left">Vulnerability</th>'
+        f'<th style="padding:6px 10px;font-size:11px;color:white;text-align:left">Vendor</th></tr>'
+        f'{kev_rows}</table></div>'
+    )
 
-    sea_section = "" if not sea_items else f'''
-  <div style="padding:16px 20px 0">
-    <div style="font-size:14px;font-weight:700;color:#0d1117;margin-bottom:8px">Philippines & SEA Focus</div>
-    <table style="width:100%;border-collapse:collapse;border:1px solid #d0d7de">{news_rows(sea_items, True)}</table>
-  </div>'''
+    sea_section = "" if not sea_items else (
+        f'<div style="padding:16px 20px 0">'
+        f'<div style="font-size:14px;font-weight:700;color:#0d1117;margin-bottom:8px">&#x1F1F5;&#x1F1ED; Philippines &amp; SEA Focus</div>'
+        f'<table style="width:100%;border-collapse:collapse;border:1px solid #d0d7de">'
+        f'{news_rows(sea_items, True)}</table></div>'
+    )
 
-    global_section = "" if not global_items else f'''
-  <div style="padding:16px 20px 0">
-    <div style="font-size:14px;font-weight:700;color:#0d1117;margin-bottom:8px">Global Cybersecurity News</div>
-    <table style="width:100%;border-collapse:collapse;border:1px solid #d0d7de">{news_rows(global_items)}</table>
-  </div>'''
+    global_section = "" if not global_items else (
+        f'<div style="padding:16px 20px 0">'
+        f'<div style="font-size:14px;font-weight:700;color:#0d1117;margin-bottom:8px">&#x1F310; Global Cybersecurity News</div>'
+        f'<table style="width:100%;border-collapse:collapse;border:1px solid #d0d7de">'
+        f'{news_rows(global_items)}</table></div>'
+    )
 
-    return f'''<div style="font-family:Arial,sans-serif;max-width:640px;margin:0 auto;background:#f6f8fa">
-  <div style="background:#0d1117;padding:24px 28px;border-bottom:4px solid #f85149">
-    <div style="font-size:22px;font-weight:800;color:white;margin-bottom:2px">Daily Threat Intelligence</div>
-    <div style="font-size:12px;color:#f85149;font-weight:700;margin-bottom:6px">powered by OSINT PH</div>
-    <div style="font-size:11px;color:#8b949e">{date_str} · Full report attached as PDF</div>
-  </div>
-  {kev_section}{sea_section}{global_section}
-  <div style="padding:16px 20px">
-    <div style="font-size:12px;color:#57606a;background:white;border:1px solid #d0d7de;padding:12px;border-radius:4px">
-      Scanner: {stats.get("total_hits",0):,} hits · {stats.get("total_pages",0):,} pages · Full report available on request.
-    </div>
-  </div>
-  <div style="padding:14px 20px;background:#0d1117">
-    <p style="color:#8b949e;font-size:11px;margin:0">CONFIDENTIAL · <a href="https://osintph.info" style="color:#f85149">osintph.info</a> · Reply UNSUBSCRIBE to opt out</p>
-  </div>
-</div>'''
+    return (
+        f'<div style="font-family:Arial,sans-serif;max-width:640px;margin:0 auto;background:#f6f8fa">'
+        f'<div style="background:#0d1117;padding:24px 28px;border-bottom:4px solid #f85149">'
+        f'<div style="font-size:22px;font-weight:800;color:white;margin-bottom:2px">Daily Threat Intelligence</div>'
+        f'<div style="font-size:12px;color:#f85149;font-weight:700;margin-bottom:6px">powered by OSINT PH</div>'
+        f'<div style="font-size:11px;color:#8b949e">{date_str} \u00b7 Full report attached as PDF</div>'
+        f'</div>'
+        f'{kev_section}{sea_section}{global_section}'
+        f'<div style="padding:14px 20px 16px;background:#0d1117;margin-top:10px">'
+        f'<p style="color:#8b949e;font-size:11px;margin:0">CONFIDENTIAL \u00b7 '
+        f'<a href="https://osintph.info" style="color:#f85149">osintph.info</a> \u00b7 '
+        f'Reply UNSUBSCRIBE to opt out</p>'
+        f'</div>'
+        f'</div>'
+    )
 
 
 def send_digest(storage, recipients: list = None, date: datetime = None) -> dict:
