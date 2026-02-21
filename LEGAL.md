@@ -29,6 +29,10 @@ Accessing the Tor network is legal in most jurisdictions. However:
 
 This tool does **not** download or store raw page content by default — only keyword hit context windows are stored. You should not modify the tool to store raw content unless you have legal authority to do so.
 
+## Network Access and Source Code
+
+In accordance with the **GNU Affero General Public License v3.0**, if you modify this software and run it on a server to provide services to users over a network, you must provide those users with a prominent way to download the source code of your modified version.
+
 ## No Warranty
 
-This software is provided "as is", without warranty of any kind, express or implied. See the [MIT License](LICENSE) for full terms.
+This software is provided "as is", without warranty of any kind, express or implied. See the [GNU Affero General Public License v3.0](LICENSE) for full terms.
