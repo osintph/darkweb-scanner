@@ -7,7 +7,7 @@ SocksPort 0.0.0.0:9050
 
 # Control port — used by stem for circuit rotation
 ControlPort 0.0.0.0:9051
-# HashedControlPassword is injected at deploy time by deploy.sh
+HashedControlPassword 16:BC7FF368BE6FE7E7602038EB21518DB86AE8AA088767AEDD3C26AB11C9
 # To regenerate: docker run --rm darkweb-scanner-tor tor --hash-password 'yourpassword'
 
 # Explicitly disable relay/exit functionality (client only)

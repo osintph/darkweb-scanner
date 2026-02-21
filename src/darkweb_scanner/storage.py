@@ -31,6 +31,7 @@ class User(Base):
     oauth_provider = Column(String(50), nullable=True)  # "google" | "github" | None
     oauth_id = Column(String(255), nullable=True)
     is_admin = Column(Boolean, default=False)
+    must_change_password = Column(Boolean, default=False)
     created_at = Column(DateTime, default=datetime.utcnow)
     last_login = Column(DateTime, nullable=True)
 
@@ -304,7 +305,7 @@ class Storage:
 
     def create_user(self, username: str, password_hash: str = None,
                     email: str = None, oauth_provider: str = None,
-                    oauth_id: str = None, is_admin: bool = False):
+                    oauth_id: str = None, is_admin: bool = False, must_change_password: bool = False):
         with self.get_session() as session:
             user = User(
                 username=username,
@@ -313,6 +314,7 @@ class Storage:
                 oauth_provider=oauth_provider,
                 oauth_id=oauth_id,
                 is_admin=is_admin,
+                must_change_password=must_change_password,
             )
             session.add(user)
             session.commit()
