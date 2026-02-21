@@ -3,13 +3,8 @@
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<<<<<<< Updated upstream
-  <title>Dark Web Scanner — Dashboard</title>
-=======
-  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23161b22'/%3E%3Ccircle cx='10' cy='16' r='3.5' fill='%23FF5C5C'/%3E%3Ccircle cx='19' cy='16' r='3.5' fill='%238b949e'/%3E%3Ccircle cx='28' cy='16' r='3.5' fill='%23d29922'/%3E%3C/svg%3E"/>
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23161b22'/%3E%3Ccircle cx='10' cy='16' r='3.5' fill='%23FF5C5C'/%3E%3Ccircle cx='19' cy='16' r='3.5' fill='%238b949e'/%3E%3Ccircle cx='28' cy='16' r='3.5' fill='%23d29922'/%3E%3C/svg%3E"/>
   <title>Threat Intelligence Platform — Dashboard</title>
->>>>>>> Stashed changes
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     :root {
@@ -45,6 +40,9 @@
     .admin-only { display: none; }
     .admin-only.visible { display: block; }
     .header-right { margin-left: auto; display: flex; align-items: center; gap: 10px; padding-left: 20px; }
+    .theme-btn { background: none; border: 1px solid var(--border); color: var(--muted); padding: 5px 9px; cursor: pointer; font-size: 13px; border-radius: 4px; transition: all .2s; line-height:1; }
+    .theme-btn:hover { border-color: var(--accent); color: var(--accent); }
+    body.light { --bg: #f6f8fa; --surface: #ffffff; --surface2: #f0f2f5; --border: #d0d7de; --text: #1f2328; --muted: #656d76; }
     .btn-crawl { background: var(--green); color: #0d1117; border: none; border-radius: 6px; padding: 7px 14px; font-size: 0.8rem; font-weight: 700; cursor: pointer; white-space: nowrap; font-family: var(--font); }
     .btn-crawl:hover { opacity: .85; }
     .btn-crawl.running { background: var(--red); color: white; }
@@ -180,7 +178,7 @@
 <header>
   <div class="logo">
     <div class="status-dot" id="statusDot"></div>
-    <h1>Dark Web Scanner</h1>
+    <h1>Threat Intelligence Platform</h1>
     <span class="badge">THREAT INTEL</span>
   </div>
   <nav>
@@ -194,6 +192,7 @@
     <button class="nav-tab" onclick="switchTab('settings', this)">⚙️ Settings</button>
   </nav>
   <div class="header-right">
+    <button class="theme-btn" onclick="toggleTheme()" id="themeBtn">🌙</button>
     <button class="btn-crawl" id="crawlBtn" onclick="toggleCrawl()">▶ Start Crawl</button>
     <span class="user-pill">{{ username }}</span>
     <a href="/logout" class="sign-out">Sign out</a>
@@ -213,9 +212,10 @@
         <div class="crawl-sub" id="crawlSub">Run <code>make scan</code> on the server to start a dark web crawl</div>
       </div>
       <div class="crawl-stats" id="crawlLiveStats" style="display:none">
-        <div class="crawl-stat"><div class="val" id="livePagesVal">0</div><div class="lbl">Pages</div></div>
-        <div class="crawl-stat"><div class="val" id="liveHitsVal">0</div><div class="lbl">Hits</div></div>
+        <div class="crawl-stat"><div class="val" id="livePagesVal">0</div><div class="lbl">PAGES</div></div>
+        <div class="crawl-stat"><div class="val" id="liveHitsVal">0</div><div class="lbl">HITS</div></div>
       </div>
+      <button id="crawlStopBtn" onclick="stopCrawl()" style="display:none;background:rgba(248,81,73,.12);border:1px solid var(--red);color:var(--red);padding:7px 18px;font-family:var(--mono);font-size:11px;letter-spacing:.08em;cursor:pointer;transition:background .2s;flex-shrink:0">■ STOP</button>
     </div>
 
     <!-- Stats -->
@@ -259,6 +259,11 @@
             </select>
           </div>
           <button class="btn btn-primary" onclick="addKeyword()">+ Add</button>
+        </div>
+        <div style="margin:14px 0 4px">
+          <input type="text" id="keywordSearch" placeholder="🔍 Search keywords…" oninput="filterKeywords()"
+            style="width:100%;max-width:340px;padding:7px 12px;background:var(--surface);border:1px solid var(--border);color:var(--text);font-family:var(--mono);font-size:12px;outline:none"
+            onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--border)'"/>
         </div>
         <div id="keywordsList"><div class="empty"><div class="icon">🔑</div><p>Loading…</p></div></div>
       </div>
@@ -461,6 +466,19 @@
     setInterval(pollCrawlStatus, 5000);
   });
 
+  function toggleTheme() {
+    const light = document.body.classList.toggle('light');
+    document.getElementById('themeBtn').textContent = light ? '🌑' : '🌙';
+    localStorage.setItem('theme', light ? 'light' : 'dark');
+  }
+  if (localStorage.getItem('theme') === 'light') {
+    document.body.classList.add('light');
+    document.addEventListener('DOMContentLoaded', () => {
+      const b = document.getElementById('themeBtn');
+      if (b) b.textContent = '🌑';
+    });
+  }
+
   function esc(s) {
     if (!s) return '';
     return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
@@ -535,6 +553,7 @@
         btn.className = 'btn-crawl running';
         btn.textContent = '⏹ Running…';
         btn.disabled = true;
+        document.getElementById('crawlStopBtn').style.display = 'inline-block';
       } else {
         card.className = 'crawl-card';
         dot.className = 'crawl-dot';
@@ -544,6 +563,7 @@
         btn.className = 'btn-crawl';
         btn.textContent = '▶ Start Crawl';
         btn.disabled = false;
+        document.getElementById('crawlStopBtn').style.display = 'none';
       }
     } catch(e) {}
   }
@@ -881,6 +901,7 @@
 
   function filterKeywords() {
     const q = (document.getElementById('keywordSearch')?.value || '').toLowerCase();
+    if (!document.querySelector('#keywordsList .kw-row')) { loadKeywords(); return; }
     if (!q) {
       document.querySelectorAll('#keywordsList .kw-row').forEach(r => r.style.display = '');
       document.querySelectorAll('#keywordsList .kw-category').forEach(c => c.style.display = '');

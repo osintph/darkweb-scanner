@@ -290,7 +290,6 @@ def oauth_callback(provider):
     elif provider == "microsoft":
         oauth_id = userinfo.get("id") or userinfo.get("sub")
         email = userinfo.get("mail") or userinfo.get("userPrincipalName") or userinfo.get("email")
-        display = userinfo.get("displayName") or ""
         username = (email.split("@")[0] if email else None) or f"ms_{str(oauth_id)[:8]}"
     elif provider == "apple":
         oauth_id = userinfo.get("sub")
