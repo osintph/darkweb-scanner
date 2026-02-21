@@ -1,6 +1,6 @@
 # 🔍 Dark Web Scanner
 
-> Keyword monitoring tool for `.onion` sites — built for security researchers and threat intelligence professionals.
+> A Threat Intelligence Platform and Keyword monitoring tool for `.onion` sites — built for security researchers and threat intelligence professionals. Many more features have been added since.
 
 [![CI](https://github.com/osintph/darkweb-scanner/actions/workflows/ci.yml/badge.svg)](https://github.com/osintph/darkweb-scanner/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
