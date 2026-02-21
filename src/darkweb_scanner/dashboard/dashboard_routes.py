@@ -1123,7 +1123,7 @@ def api_dns_start():
         except Exception as e:
             import traceback
             storage.fail_dns_investigation(inv_id, str(e))
-            logger.error(f"DNS investigation {inv_id} failed: {traceback.format_exc()}")
+            print(f"DNS investigation {inv_id} failed: {traceback.format_exc()}", flush=True)
 
     t = threading.Thread(target=run, daemon=True)
     t.start()
@@ -1197,7 +1197,6 @@ def api_dns_pdf(inv_id: int):
     s_h1 = S("h1", fontSize=20, fontName="Helvetica-Bold", textColor=colors.HexColor("#0d1117"), spaceAfter=2, leading=24)
     s_tagline = S("tl", fontSize=10, textColor=colors.HexColor("#f85149"), fontName="Helvetica-Bold", spaceAfter=3, leading=14)
     s_meta = S("meta", fontSize=8, textColor=colors.HexColor("#8b949e"), spaceAfter=0, leading=12)
-    s_h2 = S("h2", fontSize=11, fontName="Helvetica-Bold", textColor=colors.HexColor("#0d1117"), spaceBefore=12, spaceAfter=4)
     s_body = S("body", fontSize=8.5, textColor=colors.HexColor("#24292f"), leading=13)
     s_small = S("small", fontSize=7.5, textColor=colors.HexColor("#57606a"), leading=11)
     s_mono = S("mono", fontSize=7, fontName="Courier", textColor=colors.HexColor("#0550ae"), leading=10, wordWrap="CJK")
