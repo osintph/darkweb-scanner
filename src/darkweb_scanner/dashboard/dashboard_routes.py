@@ -880,6 +880,175 @@ def api_ip_investigations_delete(inv_id):
     storage.delete_ip_investigation(inv_id)
     return jsonify({"ok": True})
 
+# ── Ransomware Tracker API ─────────────────────────────────────────────────────
+
+
+@dashboard_bp.route("/api/ransomware/groups", methods=["GET"])
+@require_login
+def api_ransomware_groups():
+    from ..ransomware_data import RANSOMWARE_GROUPS
+    storage = get_storage()
+    # Cross-reference each group's keywords against existing hits
+    enriched = []
+    for group in RANSOMWARE_GROUPS:
+        hit_count = 0
+        recent_hits = []
+        for kw in group.get("keywords", []):
+            hits = storage.get_hits_by_keyword(kw, limit=5)
+            hit_count += len(hits)
+            for h in hits:
+                recent_hits.append({
+                    "keyword": h.keyword,
+                    "url": h.url,
+                    "found_at": h.found_at.isoformat() if h.found_at else None,
+                    "context": (h.context or "")[:200],
+                })
+        enriched.append({**group, "hit_count": hit_count, "recent_hits": recent_hits[:5]})
+    # Sort: active + SEA targeting + most hits first
+    enriched.sort(key=lambda g: (
+        g["status"] != "active",
+        not g["targeting_sea"],
+        -g["hit_count"],
+    ))
+    return jsonify(enriched)
+
+
+@dashboard_bp.route("/api/ransomware/add-seeds", methods=["POST"])
+@require_admin
+def api_ransomware_add_seeds():
+    """Add all known ransomware .onion URLs to the seed list."""
+    from ..ransomware_data import RANSOMWARE_ONION_SEEDS
+    _ensure_data_dir()
+    existing = _load_seeds()
+    added = 0
+    for url in RANSOMWARE_ONION_SEEDS:
+        if url not in existing:
+            existing.append(url)
+            added += 1
+    SEEDS_FILE.write_text("\n".join(existing) + "\n")
+    return jsonify({"ok": True, "added": added, "total": len(RANSOMWARE_ONION_SEEDS)})
+
+
+@dashboard_bp.route("/api/ransomware/add-keywords", methods=["POST"])
+@require_admin
+def api_ransomware_add_keywords():
+    """Add all ransomware group names as keywords."""
+    import yaml
+    from ..ransomware_data import RANSOMWARE_GROUPS
+    _ensure_data_dir()
+    cats = _load_keywords()
+    cats.setdefault("ransomware", [])
+    added = 0
+    for group in RANSOMWARE_GROUPS:
+        for kw in group.get("keywords", []):
+            if kw not in cats["ransomware"]:
+                cats["ransomware"].append(kw)
+                added += 1
+    KEYWORDS_FILE.write_text(
+        yaml.dump({"keywords": cats}, default_flow_style=False, allow_unicode=True)
+    )
+    return jsonify({"ok": True, "added": added})
+
+
+# ── Threat Actors API ──────────────────────────────────────────────────────────
+
+
+@dashboard_bp.route("/api/threat-actors", methods=["GET"])
+@require_login
+def api_threat_actors():
+    from ..threat_actors import THREAT_ACTORS
+    storage = get_storage()
+    enriched = []
+    for actor in THREAT_ACTORS:
+        hit_count = 0
+        recent_hits = []
+        for kw in actor.get("keywords", []):
+            hits = storage.get_hits_by_keyword(kw, limit=3)
+            hit_count += len(hits)
+            for h in hits:
+                recent_hits.append({
+                    "keyword": h.keyword,
+                    "url": h.url,
+                    "found_at": h.found_at.isoformat() if h.found_at else None,
+                    "context": (h.context or "")[:200],
+                })
+        enriched.append({**actor, "hit_count": hit_count, "recent_hits": recent_hits[:3]})
+    enriched.sort(key=lambda a: (
+        a["risk_level"] not in ("critical", "high"),
+        not a["targeting_sea"],
+        -a["hit_count"],
+    ))
+    return jsonify(enriched)
+
+
+# ── Digest / Mailing List API ──────────────────────────────────────────────────
+
+
+@dashboard_bp.route("/api/digest/subscribers", methods=["GET"])
+@require_admin
+def api_digest_subscribers_get():
+    from ..digest import load_subscribers
+    return jsonify({"subscribers": load_subscribers()})
+
+
+@dashboard_bp.route("/api/digest/subscribers", methods=["POST"])
+@require_admin
+def api_digest_subscribers_add():
+    from ..digest import add_subscriber
+    body = request.get_json()
+    email = (body.get("email") or "").strip().lower()
+    if not email or "@" not in email:
+        return jsonify({"error": "valid email required"}), 400
+    added = add_subscriber(email)
+    return jsonify({"ok": True, "added": added})
+
+
+@dashboard_bp.route("/api/digest/subscribers", methods=["DELETE"])
+@require_admin
+def api_digest_subscribers_remove():
+    from ..digest import remove_subscriber
+    body = request.get_json()
+    email = (body.get("email") or "").strip().lower()
+    if not email:
+        return jsonify({"error": "email required"}), 400
+    remove_subscriber(email)
+    return jsonify({"ok": True})
+
+
+@dashboard_bp.route("/api/digest/send", methods=["POST"])
+@require_admin
+def api_digest_send():
+    from ..digest import send_digest
+    body = request.get_json() or {}
+    # Optional: send to specific emails instead of subscriber list
+    recipients = body.get("recipients") or None
+    storage = get_storage()
+    result = send_digest(storage, recipients=recipients)
+    if result["ok"]:
+        return jsonify(result)
+    return jsonify(result), 500
+
+
+@dashboard_bp.route("/api/digest/preview", methods=["GET"])
+@require_login
+def api_digest_preview():
+    """Download a preview of the digest PDF without sending."""
+    from ..digest import build_digest_pdf
+    storage = get_storage()
+    try:
+        pdf = build_digest_pdf(storage)
+        from datetime import datetime as dt
+        filename = f"digest-preview-{dt.utcnow().strftime('%Y%m%d')}.pdf"
+        return Response(
+            pdf,
+            mimetype="application/pdf",
+            headers={"Content-Disposition": f"attachment; filename={filename}"},
+        )
+    except Exception as e:
+        import traceback
+        return jsonify({"error": str(e), "trace": traceback.format_exc()}), 500
+
+
 # ── Health ─────────────────────────────────────────────────────────────────────
 
 

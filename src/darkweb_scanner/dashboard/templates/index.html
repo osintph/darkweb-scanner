@@ -108,7 +108,40 @@
     .session-detail td { padding: 0; background: var(--bg) !important; }
     .session-detail-inner { padding: 12px 20px; border-top: 1px solid var(--border); }
 
-    /* ── Top keywords pills ── */
+    /* ── Ransomware & Threat Actor cards ── */
+    .intel-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 14px; padding: 20px; }
+    .intel-card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 18px; position: relative; transition: border-color .2s; }
+    .intel-card:hover { border-color: var(--accent); }
+    .intel-card.risk-critical { border-left: 3px solid var(--red); }
+    .intel-card.risk-high { border-left: 3px solid var(--orange); }
+    .intel-card.risk-medium { border-left: 3px solid var(--yellow); }
+    .intel-card.risk-low { border-left: 3px solid var(--green); }
+    .intel-card-header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 8px; }
+    .intel-card-name { font-size: 1rem; font-weight: 700; color: var(--text); }
+    .intel-card-origin { font-size: 0.72rem; color: var(--muted); margin-top: 2px; }
+    .intel-badges { display: flex; gap: 5px; flex-wrap: wrap; margin-bottom: 8px; }
+    .intel-badge { font-size: 0.65rem; padding: 2px 7px; border-radius: 20px; font-weight: 700; font-family: var(--mono); letter-spacing: .04em; }
+    .badge-critical { background: rgba(248,81,73,.15); color: var(--red); border: 1px solid rgba(248,81,73,.3); }
+    .badge-high { background: rgba(240,136,62,.15); color: var(--orange); border: 1px solid rgba(240,136,62,.3); }
+    .badge-medium { background: rgba(210,153,34,.15); color: var(--yellow); border: 1px solid rgba(210,153,34,.3); }
+    .badge-active { background: rgba(63,185,80,.12); color: var(--green); border: 1px solid rgba(63,185,80,.25); }
+    .badge-disrupted { background: rgba(139,148,158,.12); color: var(--muted); border: 1px solid var(--border); }
+    .badge-sea { background: rgba(88,166,255,.12); color: var(--accent); border: 1px solid rgba(88,166,255,.25); }
+    .badge-type { background: rgba(188,140,255,.12); color: var(--purple); border: 1px solid rgba(188,140,255,.25); }
+    .intel-desc { font-size: 0.78rem; color: var(--muted); line-height: 1.55; margin-bottom: 10px; }
+    .intel-ttps { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 10px; }
+    .ttp-tag { font-size: 0.65rem; padding: 2px 6px; background: var(--surface2); border: 1px solid var(--border); border-radius: 4px; color: var(--muted); }
+    .intel-hits { display: flex; align-items: center; gap: 8px; font-size: 0.75rem; color: var(--muted); border-top: 1px solid var(--border); padding-top: 10px; margin-top: 10px; }
+    .intel-hit-count { font-size: 1.1rem; font-weight: 700; color: var(--accent); }
+    .intel-hit-count.has-hits { color: var(--red); }
+    .intel-filter-bar { display: flex; gap: 10px; padding: 16px 20px 0; flex-wrap: wrap; align-items: center; }
+    .intel-filter-btn { padding: 5px 12px; font-size: 0.76rem; background: var(--surface); border: 1px solid var(--border); color: var(--muted); cursor: pointer; border-radius: 20px; transition: all .15s; }
+    .intel-filter-btn.active { border-color: var(--accent); color: var(--accent); background: rgba(88,166,255,.08); }
+    .intel-search { flex: 1; max-width: 280px; padding: 6px 12px; background: var(--surface); border: 1px solid var(--border); color: var(--text); border-radius: 6px; font-size: 0.82rem; font-family: var(--mono); }
+    .intel-search:focus { outline: none; border-color: var(--accent); }
+    /* Digest subscriber list */
+    .subscriber-row { display: flex; align-items: center; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 0.83rem; }
+    .subscriber-row:last-child { border-bottom: none; }
     .kw-pills { display: flex; flex-wrap: wrap; gap: 8px; padding: 14px 18px; }
     .kw-pill { background: var(--surface2); border: 1px solid var(--border); border-radius: 20px; padding: 4px 12px; font-size: 0.79rem; display: flex; align-items: center; gap: 7px; cursor: pointer; transition: border-color .15s; }
     .kw-pill:hover { border-color: var(--accent); color: var(--accent); }
@@ -188,11 +221,12 @@
     <button class="nav-tab admin-only" id="tab-users" onclick="switchTab('users', this)">👥 Users</button>
     <button class="nav-tab" onclick="switchTab('investigations', this)">🔍 Investigations</button>
     <button class="nav-tab" onclick="switchTab('iplookup', this)">🌐 IP Lookup</button>
+    <button class="nav-tab" onclick="switchTab('ransomware', this)">☠️ Ransomware</button>
+    <button class="nav-tab" onclick="switchTab('threatactors', this)">🕵️ Threat Actors</button>
     <button class="nav-tab" onclick="switchTab('reports', this)">📄 Reports</button>
     <button class="nav-tab" onclick="switchTab('settings', this)">⚙️ Settings</button>
   </nav>
   <div class="header-right">
-    <button class="theme-btn" onclick="toggleTheme()" id="themeBtn">🌙</button>
     <button class="btn-crawl" id="crawlBtn" onclick="toggleCrawl()">▶ Start Crawl</button>
     <span class="user-pill">{{ username }}</span>
     <a href="/logout" class="sign-out">Sign out</a>
@@ -262,8 +296,8 @@
         </div>
         <div style="margin:14px 0 4px">
           <input type="text" id="keywordSearch" placeholder="🔍 Search keywords…" oninput="filterKeywords()"
-            style="width:100%;max-width:340px;padding:7px 12px;background:var(--surface);border:1px solid var(--border);color:var(--text);font-family:var(--mono);font-size:12px;outline:none"
-            onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--border)'"/>
+            style="width:100%;max-width:340px;padding:7px 12px;background:var(--surface);border:1px solid var(--border2);color:var(--text);font-family:var(--mono);font-size:12px;outline:none"
+            onfocus="this.style.borderColor='var(--cyan)'" onblur="this.style.borderColor='var(--border2)'"/>
         </div>
         <div id="keywordsList"><div class="empty"><div class="icon">🔑</div><p>Loading…</p></div></div>
       </div>
@@ -397,6 +431,39 @@
 
   </div>
 
+  <!-- ── Ransomware Tracker Tab ── -->
+  <div class="tab-panel" id="panel-ransomware">
+    <div class="intel-filter-bar">
+      <input class="intel-search" id="rwSearch" placeholder="🔍 Search groups…" oninput="filterRansomware()"/>
+      <button class="intel-filter-btn active" onclick="filterRwRisk('all', this)">All</button>
+      <button class="intel-filter-btn" onclick="filterRwRisk('critical', this)">🔴 Critical</button>
+      <button class="intel-filter-btn" onclick="filterRwRisk('high', this)">🟠 High</button>
+      <button class="intel-filter-btn" onclick="filterRwRisk('sea', this)">🌏 SEA Active</button>
+      <button class="intel-filter-btn" onclick="filterRwRisk('hits', this)">⚡ Has Hits</button>
+      <button class="btn btn-secondary" style="margin-left:auto" onclick="addRansomwareSeeds()">+ Add .onion Seeds</button>
+      <button class="btn btn-secondary" onclick="addRansomwareKeywords()">+ Add Keywords</button>
+    </div>
+    <div class="intel-grid" id="ransomwareGrid">
+      <div class="empty"><div class="icon">☠️</div><p>Loading ransomware intelligence…</p></div>
+    </div>
+  </div>
+
+  <!-- ── Threat Actors Tab ── -->
+  <div class="tab-panel" id="panel-threatactors">
+    <div class="intel-filter-bar">
+      <input class="intel-search" id="taSearch" placeholder="🔍 Search actors…" oninput="filterThreatActors()"/>
+      <button class="intel-filter-btn active" onclick="filterTaType('all', this)">All</button>
+      <button class="intel-filter-btn" onclick="filterTaType('nation-state', this)">🏴 Nation-State</button>
+      <button class="intel-filter-btn" onclick="filterTaType('cybercriminal', this)">💰 Criminal</button>
+      <button class="intel-filter-btn" onclick="filterTaType('hacktivist', this)">✊ Hacktivist</button>
+      <button class="intel-filter-btn" onclick="filterTaType('sea', this)">🌏 SEA Active</button>
+      <button class="intel-filter-btn" onclick="filterTaType('hits', this)">⚡ Has Hits</button>
+    </div>
+    <div class="intel-grid" id="threatActorsGrid">
+      <div class="empty"><div class="icon">🕵️</div><p>Loading threat actor profiles…</p></div>
+    </div>
+  </div>
+
   <!-- ── Reports Tab ── -->
   <div class="tab-panel" id="panel-reports">
     <div class="report-hero">
@@ -420,9 +487,32 @@
 
       <div id="reportStats" style="color:var(--muted);font-size:.84rem;margin-bottom:20px">Loading stats…</div>
 
-      <button class="btn btn-report" onclick="downloadReport()" style="padding:12px 32px;font-size:1rem">
-        ⬇ Download PDF Report
-      </button>
+      <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap">
+        <button class="btn btn-report" onclick="downloadReport()" style="padding:12px 32px;font-size:1rem">
+          ⬇ Download PDF Report
+        </button>
+        <button class="btn btn-report" onclick="downloadDigest()" style="padding:12px 32px;font-size:1rem;background:var(--surface);border:1px solid var(--border);color:var(--text)">
+          📋 Preview Daily Digest
+        </button>
+      </div>
+    </div>
+
+    <!-- Digest mailing list -->
+    <div class="panel" style="max-width:680px;margin:0 auto 24px">
+      <div class="panel-header">
+        <h2>📬 Daily Digest — Mailing List</h2>
+        <button class="btn btn-primary" onclick="sendDigestNow()" id="digestSendBtn">▶ Send Now</button>
+      </div>
+      <div class="panel-body">
+        <p style="color:var(--muted);font-size:.82rem;margin-bottom:14px">
+          Sends the daily threat intelligence digest PDF to all subscribers via Mailgun (<code>intel.osintph.info</code>).
+        </p>
+        <div class="form-row" style="margin-bottom:14px">
+          <input type="email" id="newSubscriberEmail" placeholder="subscriber@example.com" style="flex:1;padding:7px 12px;background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:5px;font-family:var(--mono);font-size:.82rem"/>
+          <button class="btn btn-secondary" onclick="addSubscriber()">+ Add</button>
+        </div>
+        <div id="subscribersList"><p style="color:var(--muted);font-size:.83rem">Loading subscribers…</p></div>
+      </div>
     </div>
   </div>
 
@@ -508,7 +598,9 @@
     if (tab === 'users' && isAdmin) loadUsers();
     if (tab === 'investigations') loadInvestigations();
     if (tab === 'iplookup') loadIPInvestigations();
-    if (tab === 'reports') loadReportPreview();
+    if (tab === 'ransomware') loadRansomware();
+    if (tab === 'threatactors') loadThreatActors();
+    if (tab === 'reports') { loadReportPreview(); if (isAdmin) loadSubscribers(); }
     if (tab === 'settings') loadSettings();
   }
 
@@ -1319,6 +1411,230 @@
     await fetch(`/api/ip-investigations/${id}`, { method: 'DELETE' });
     toast('Deleted');
     loadIPInvestigations();
+  }
+
+  // ── Ransomware Tracker ────────────────────────────────────────────────────
+  let rwData = [];
+  let rwRiskFilter = 'all';
+
+  async function loadRansomware() {
+    const grid = document.getElementById('ransomwareGrid');
+    grid.innerHTML = '<div class="empty"><div class="icon">⏳</div><p>Loading intelligence…</p></div>';
+    try {
+      rwData = await (await fetch('/api/ransomware/groups')).json();
+      renderRansomware();
+    } catch(e) {
+      grid.innerHTML = '<div class="empty"><div class="icon">⚠️</div><p>Failed to load.</p></div>';
+    }
+  }
+
+  function filterRwRisk(risk, btn) {
+    rwRiskFilter = risk;
+    document.querySelectorAll('#panel-ransomware .intel-filter-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    renderRansomware();
+  }
+
+  function filterRansomware() { renderRansomware(); }
+
+  function renderRansomware() {
+    const q = (document.getElementById('rwSearch')?.value || '').toLowerCase();
+    let data = rwData.filter(g => {
+      if (q && !g.name.toLowerCase().includes(q) && !g.description.toLowerCase().includes(q)) return false;
+      if (rwRiskFilter === 'critical') return g.risk_level === 'critical';
+      if (rwRiskFilter === 'high') return g.risk_level === 'high';
+      if (rwRiskFilter === 'sea') return g.targeting_sea;
+      if (rwRiskFilter === 'hits') return g.hit_count > 0;
+      return true;
+    });
+    const grid = document.getElementById('ransomwareGrid');
+    if (!data.length) { grid.innerHTML = '<div class="empty"><div class="icon">🔍</div><p>No groups match filter.</p></div>'; return; }
+    grid.innerHTML = data.map(g => `
+      <div class="intel-card risk-${g.risk_level}">
+        <div class="intel-card-header">
+          <div>
+            <div class="intel-card-name">${esc(g.name)}</div>
+            <div class="intel-card-origin">🌍 ${esc(g.origin)} · First seen ${esc(g.first_seen)}</div>
+          </div>
+        </div>
+        <div class="intel-badges">
+          <span class="intel-badge badge-${g.risk_level}">${g.risk_level.toUpperCase()}</span>
+          <span class="intel-badge badge-${g.status}">${g.status.toUpperCase()}</span>
+          ${g.targeting_sea ? '<span class="intel-badge badge-sea">🌏 SEA</span>' : ''}
+          ${g.sea_victims?.length ? `<span class="intel-badge badge-high">⚠ ${g.sea_victims.length} PH/SEA victim${g.sea_victims.length > 1 ? 's' : ''}</span>` : ''}
+        </div>
+        <div class="intel-desc">${esc(g.description)}</div>
+        <div class="intel-ttps">${(g.ttps||[]).map(t => `<span class="ttp-tag">${esc(t)}</span>`).join('')}</div>
+        ${g.sea_victims?.length ? `<div style="font-size:.73rem;color:var(--red);margin-bottom:8px">⚠ Known victims: ${g.sea_victims.map(v => esc(v)).join(', ')}</div>` : ''}
+        <div class="intel-hits">
+          <span class="intel-hit-count ${g.hit_count > 0 ? 'has-hits' : ''}">${g.hit_count}</span>
+          <span>keyword hits in database</span>
+          ${g.recent_hits?.length ? `<button class="btn btn-secondary" style="margin-left:auto;font-size:.7rem;padding:3px 8px" onclick="showRwHits(${JSON.stringify(g.name).replace(/"/g,'&quot;')}, this)">View hits</button>` : ''}
+        </div>
+        ${g.recent_hits?.length ? `<div class="rw-hits" style="display:none;margin-top:8px;background:var(--bg);border:1px solid var(--border);border-radius:5px;padding:8px;max-height:160px;overflow-y:auto">
+          ${g.recent_hits.map(h => `<div style="font-size:.72rem;padding:4px 0;border-bottom:1px solid var(--border)">
+            <span style="color:var(--accent);font-family:var(--mono)">${esc(h.keyword)}</span>
+            <span style="color:var(--muted);margin:0 6px">·</span>
+            <span style="color:var(--muted)">${h.found_at ? new Date(h.found_at+'Z').toLocaleDateString() : '—'}</span>
+            <div style="color:var(--muted);font-size:.68rem;margin-top:2px;font-family:var(--mono);word-break:break-all">${esc(h.url)}</div>
+          </div>`).join('')}
+        </div>` : ''}
+      </div>
+    `).join('');
+  }
+
+  function showRwHits(name, btn) {
+    const card = btn.closest('.intel-card');
+    const hits = card.querySelector('.rw-hits');
+    const open = hits.style.display !== 'none';
+    hits.style.display = open ? 'none' : 'block';
+    btn.textContent = open ? 'View hits' : 'Hide hits';
+  }
+
+  async function addRansomwareSeeds() {
+    if (!confirm('Add all known ransomware .onion URLs to your seed list?')) return;
+    const res = await fetch('/api/ransomware/add-seeds', { method: 'POST' });
+    const d = await res.json();
+    if (d.ok) toast(`Added ${d.added} new onion seeds`);
+    else toast(d.error || 'Error', 'error');
+  }
+
+  async function addRansomwareKeywords() {
+    if (!confirm('Add all ransomware group names as keywords to the scanner?')) return;
+    const res = await fetch('/api/ransomware/add-keywords', { method: 'POST' });
+    const d = await res.json();
+    if (d.ok) toast(`Added ${d.added} new ransomware keywords`);
+    else toast(d.error || 'Error', 'error');
+  }
+
+  // ── Threat Actors ─────────────────────────────────────────────────────────
+  let taData = [];
+  let taTypeFilter = 'all';
+
+  async function loadThreatActors() {
+    const grid = document.getElementById('threatActorsGrid');
+    grid.innerHTML = '<div class="empty"><div class="icon">⏳</div><p>Loading profiles…</p></div>';
+    try {
+      taData = await (await fetch('/api/threat-actors')).json();
+      renderThreatActors();
+    } catch(e) {
+      grid.innerHTML = '<div class="empty"><div class="icon">⚠️</div><p>Failed to load.</p></div>';
+    }
+  }
+
+  function filterTaType(type, btn) {
+    taTypeFilter = type;
+    document.querySelectorAll('#panel-threatactors .intel-filter-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    renderThreatActors();
+  }
+
+  function filterThreatActors() { renderThreatActors(); }
+
+  function renderThreatActors() {
+    const q = (document.getElementById('taSearch')?.value || '').toLowerCase();
+    let data = taData.filter(a => {
+      if (q && !a.name.toLowerCase().includes(q) && !a.description.toLowerCase().includes(q) && !(a.aliases||[]).join(' ').toLowerCase().includes(q)) return false;
+      if (taTypeFilter === 'nation-state') return a.type === 'nation-state';
+      if (taTypeFilter === 'cybercriminal') return a.type === 'cybercriminal';
+      if (taTypeFilter === 'hacktivist') return a.type === 'hacktivist';
+      if (taTypeFilter === 'sea') return a.targeting_sea;
+      if (taTypeFilter === 'hits') return a.hit_count > 0;
+      return true;
+    });
+    const grid = document.getElementById('threatActorsGrid');
+    if (!data.length) { grid.innerHTML = '<div class="empty"><div class="icon">🔍</div><p>No actors match filter.</p></div>'; return; }
+    const typeIcon = { 'nation-state': '🏴', 'cybercriminal': '💰', 'hacktivist': '✊' };
+    const riskColors = { critical: 'var(--red)', high: 'var(--orange)', medium: 'var(--yellow)' };
+    grid.innerHTML = data.map(a => `
+      <div class="intel-card risk-${a.risk_level}">
+        <div class="intel-card-header">
+          <div>
+            <div class="intel-card-name">${esc(a.name)}</div>
+            <div class="intel-card-origin">🌍 ${esc(a.origin)} · ${typeIcon[a.type] || '👤'} ${esc(a.type)} · Since ${esc(a.first_seen)}</div>
+          </div>
+        </div>
+        <div class="intel-badges">
+          <span class="intel-badge badge-${a.risk_level}">${a.risk_level.toUpperCase()}</span>
+          <span class="intel-badge badge-type">${esc(a.type)}</span>
+          <span class="intel-badge badge-${a.status === 'active' ? 'active' : 'disrupted'}">${a.status.toUpperCase()}</span>
+          ${a.targeting_sea ? '<span class="intel-badge badge-sea">🌏 SEA</span>' : ''}
+        </div>
+        ${a.aliases?.length ? `<div style="font-size:.71rem;color:var(--muted);margin-bottom:6px">Also known as: ${a.aliases.map(al => esc(al)).join(', ')}</div>` : ''}
+        <div class="intel-desc">${esc(a.description)}</div>
+        ${a.sectors?.length ? `<div style="font-size:.72rem;color:var(--muted);margin-bottom:6px">🎯 Sectors: ${a.sectors.map(s => esc(s)).join(', ')}</div>` : ''}
+        <div class="intel-ttps">${(a.ttps||[]).map(t => `<span class="ttp-tag">${esc(t)}</span>`).join('')}</div>
+        ${a.known_malware?.length ? `<div style="font-size:.71rem;color:var(--purple);margin:6px 0">🦠 Malware: ${a.known_malware.map(m => esc(m)).join(', ')}</div>` : ''}
+        <div class="intel-hits">
+          <span class="intel-hit-count ${a.hit_count > 0 ? 'has-hits' : ''}">${a.hit_count}</span>
+          <span>keyword hits in database</span>
+        </div>
+        ${a.recent_hits?.length ? `<div style="margin-top:8px;background:var(--bg);border:1px solid var(--border);border-radius:5px;padding:8px;max-height:120px;overflow-y:auto">
+          ${a.recent_hits.map(h => `<div style="font-size:.72rem;padding:3px 0;border-bottom:1px solid var(--border)">
+            <span style="color:var(--accent);font-family:var(--mono)">${esc(h.keyword)}</span>
+            <span style="color:var(--muted);margin:0 6px">·</span>
+            <span style="color:var(--muted)">${h.found_at ? new Date(h.found_at+'Z').toLocaleDateString() : '—'}</span>
+          </div>`).join('')}
+        </div>` : ''}
+      </div>
+    `).join('');
+  }
+
+  // ── Digest / Mailing List ─────────────────────────────────────────────────
+  async function loadSubscribers() {
+    const el = document.getElementById('subscribersList');
+    if (!el || !isAdmin) return;
+    try {
+      const data = await (await fetch('/api/digest/subscribers')).json();
+      const subs = data.subscribers || [];
+      if (!subs.length) {
+        el.innerHTML = '<p style="color:var(--muted);font-size:.83rem">No subscribers yet. Add the first one above.</p>';
+        return;
+      }
+      el.innerHTML = subs.map(s => `
+        <div class="subscriber-row">
+          <span style="font-family:var(--mono)">${esc(s)}</span>
+          <button class="btn btn-secondary" style="font-size:.72rem;padding:3px 10px;color:var(--red);border-color:rgba(248,81,73,.3)" onclick="removeSubscriber('${esc(s)}')">Remove</button>
+        </div>
+      `).join('');
+    } catch(e) { /* not admin */ }
+  }
+
+  async function addSubscriber() {
+    const email = document.getElementById('newSubscriberEmail').value.trim();
+    if (!email) return;
+    const res = await fetch('/api/digest/subscribers', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({email}) });
+    const d = await res.json();
+    if (d.ok) { toast('Subscriber added'); document.getElementById('newSubscriberEmail').value = ''; loadSubscribers(); }
+    else toast(d.error || 'Error', 'error');
+  }
+
+  async function removeSubscriber(email) {
+    if (!confirm(`Remove ${email} from digest list?`)) return;
+    await fetch('/api/digest/subscribers', { method: 'DELETE', headers: {'Content-Type':'application/json'}, body: JSON.stringify({email}) });
+    toast('Removed');
+    loadSubscribers();
+  }
+
+  async function sendDigestNow() {
+    const btn = document.getElementById('digestSendBtn');
+    btn.textContent = '⏳ Sending…';
+    btn.disabled = true;
+    try {
+      const res = await fetch('/api/digest/send', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({}) });
+      const d = await res.json();
+      if (d.ok) toast(`✅ Sent to ${d.sent}/${d.total} subscribers`);
+      else toast(d.error || `Failed — ${d.errors?.join(', ')}`, 'error');
+    } catch(e) {
+      toast('Network error', 'error');
+    } finally {
+      btn.textContent = '▶ Send Now';
+      btn.disabled = false;
+    }
+  }
+
+  async function downloadDigest() {
+    window.location.href = '/api/digest/preview';
   }
 
 </script>
