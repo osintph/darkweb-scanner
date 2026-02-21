@@ -214,23 +214,85 @@ def api_seeds_delete():
 
 
 # ── Crawl control API ──────────────────────────────────────────────────────────
-# The dashboard can't exec docker — instead it writes a flag file that the
-# scanner container watches. Run the scanner with: make scan
+
+_active_scan_thread = None  # track running scan thread
 
 
 @dashboard_bp.route("/api/crawl/start", methods=["POST"])
 @require_login
 def api_crawl_start():
-    try:
-        _ensure_data_dir()
-        if CRAWL_FLAG.exists():
-            return jsonify({"error": "Crawl flag already set"}), 409
-        CRAWL_FLAG.write_text(datetime.utcnow().isoformat())
-        return jsonify({"ok": True, "message": "Crawl flag set. Run: make scan on the server."})
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+    import asyncio
+    import threading
+    from pathlib import Path as _Path
+    from ..main import run_scan
+    from ..crawler import CrawlConfig
+    from ..scanner import KeywordConfig
+    from ..alerting import Alerter
 
+    global _active_scan_thread
 
+    _ensure_data_dir()
+
+    # Prevent double-start
+    if _active_scan_thread and _active_scan_thread.is_alive():
+        return jsonify({"error": "A crawl is already running"}), 409
+
+    # Resolve seeds and keywords files
+    seeds_path = DATA_DIR / "seeds.txt"
+    if not seeds_path.exists():
+        seeds_path = _Path("config/seeds.txt")
+    keywords_path = DATA_DIR / "keywords.yaml"
+    if not keywords_path.exists():
+        keywords_path = _Path("config/keywords.yaml")
+
+    if not seeds_path.exists():
+        return jsonify({"error": "No seeds file found. Add seeds in the Seeds tab first."}), 400
+    if not keywords_path.exists():
+        return jsonify({"error": "No keywords file found. Add keywords in the Keywords tab first."}), 400
+
+    seed_urls = [
+        line.strip()
+        for line in seeds_path.read_text().splitlines()
+        if line.strip() and not line.strip().startswith("#")
+    ]
+    if not seed_urls:
+        return jsonify({"error": "Seeds file is empty. Add at least one .onion URL."}), 400
+
+    # Clear any stale stop flag
+    if STOP_FLAG.exists():
+        STOP_FLAG.unlink()
+
+    storage = get_storage()
+
+    def run():
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        try:
+            keyword_config = KeywordConfig.from_yaml(str(keywords_path))
+            crawl_config = CrawlConfig()
+            alerter = Alerter()
+            loop.run_until_complete(
+                run_scan(
+                    seeds=seed_urls,
+                    keyword_config=keyword_config,
+                    crawl_config=crawl_config,
+                    storage=storage,
+                    alerter=alerter,
+                    check_tor=True,
+                    stop_flag=STOP_FLAG,
+                )
+            )
+        except Exception as e:
+            print(f"Scan thread error: {e}", flush=True)
+        finally:
+            loop.close()
+            if STOP_FLAG.exists():
+                STOP_FLAG.unlink()
+
+    _active_scan_thread = threading.Thread(target=run, daemon=True)
+    _active_scan_thread.start()
+
+    return jsonify({"ok": True, "message": "Crawl started."})
 
 
 @dashboard_bp.route("/api/crawl/stop", methods=["POST"])
@@ -250,6 +312,14 @@ def api_crawl_status():
         storage = get_storage()
         stats = storage.get_stats()
         active = storage.get_active_session()
+
+        # Auto-clear stale stop flag if no scan is actually running
+        if not active and STOP_FLAG.exists():
+            try:
+                STOP_FLAG.unlink()
+            except Exception:
+                pass
+
         session_data = None
         if active:
             live_hits = storage.count_session_hits(active["id"])

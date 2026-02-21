@@ -250,7 +250,7 @@
     <button class="nav-tab" onclick="switchTab('seeds', this)">🌱 Seeds</button>
     <button class="nav-tab admin-only" id="tab-users" onclick="switchTab('users', this)">👥 Users</button>
     <button class="nav-tab" onclick="switchTab('investigations', this)">🔍 Investigations</button>
-    <button class="nav-tab" onclick="switchTab('iplookup', this)">🌐 IP Lookup</button>
+    <button class="nav-tab" onclick="switchTab('iplookup', this)">🔎 IP Lookup</button>
     <button class="nav-tab" onclick="switchTab('ransomware', this)">☠️ Ransomware</button>
     <button class="nav-tab" onclick="switchTab('threatactors', this)">🕵️ Threat Actors</button>
     <button class="nav-tab" onclick="switchTab('dns', this)">🌐 DNS</button>
@@ -258,6 +258,7 @@
     <button class="nav-tab" onclick="switchTab('settings', this)">⚙️ Settings</button>
   </nav>
   <div class="header-right">
+    <button class="theme-btn" id="themeBtn" onclick="toggleTheme()" title="Toggle light/dark mode">🌙</button>
     <button class="btn-crawl" id="crawlBtn" onclick="toggleCrawl()">▶ Start Crawl</button>
     <span class="user-pill">{{ username }}</span>
     <a href="/logout" class="sign-out">Sign out</a>
@@ -274,7 +275,7 @@
       <div class="crawl-dot" id="crawlDot"></div>
       <div class="crawl-info">
         <div class="crawl-title" id="crawlTitle">No active crawl</div>
-        <div class="crawl-sub" id="crawlSub">Run <code>make scan</code> on the server to start a dark web crawl</div>
+        <div class="crawl-sub" id="crawlSub">Click ▶ Start Crawl to begin scanning</div>
       </div>
       <div class="crawl-stats" id="crawlLiveStats" style="display:none">
         <div class="crawl-stat"><div class="val" id="livePagesVal">0</div><div class="lbl">PAGES</div></div>
@@ -599,19 +600,6 @@
     setInterval(pollCrawlStatus, 5000);
   });
 
-  function toggleTheme() {
-    const light = document.body.classList.toggle('light');
-    document.getElementById('themeBtn').textContent = light ? '🌑' : '🌙';
-    localStorage.setItem('theme', light ? 'light' : 'dark');
-  }
-  if (localStorage.getItem('theme') === 'light') {
-    document.body.classList.add('light');
-    document.addEventListener('DOMContentLoaded', () => {
-      const b = document.getElementById('themeBtn');
-      if (b) b.textContent = '🌑';
-    });
-  }
-
   function esc(s) {
     if (!s) return '';
     return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
@@ -694,7 +682,7 @@
         card.className = 'crawl-card';
         dot.className = 'crawl-dot';
         title.textContent = 'No active crawl';
-        sub.innerHTML = 'Run <code>make scan</code> on the server to start a dark web crawl';
+        sub.innerHTML = 'Click ▶ Start Crawl to begin scanning';
         liveStats.style.display = 'none';
         btn.className = 'btn-crawl';
         btn.textContent = '▶ Start Crawl';
@@ -705,7 +693,60 @@
   }
 
   async function toggleCrawl() {
-    toast('Run "make scan" on the server to start a crawl', 'error');
+    const btn = document.getElementById('crawlBtn');
+    const isRunning = btn.classList.contains('running');
+
+    if (isRunning) {
+      // Stop crawl
+      btn.disabled = true;
+      btn.textContent = '⏳ Stopping…';
+      try {
+        const res = await fetch('/api/crawl/stop', { method: 'POST' });
+        const data = await res.json();
+        if (data.ok) {
+          toast('Stop signal sent — crawl will halt after current page.');
+        } else {
+          toast(data.error || 'Failed to stop crawl', 'error');
+        }
+      } catch(e) {
+        toast('Network error', 'error');
+      } finally {
+        btn.disabled = false;
+      }
+    } else {
+      // Start crawl
+      btn.disabled = true;
+      btn.textContent = '⏳ Starting…';
+      try {
+        const res = await fetch('/api/crawl/start', { method: 'POST' });
+        const data = await res.json();
+        if (data.ok) {
+          toast('Crawl started.');
+          btn.className = 'btn-crawl running';
+          btn.textContent = '⏹ Stop Crawl';
+          pollStatus();
+        } else {
+          toast(data.error || 'Failed to start crawl', 'error');
+          btn.textContent = '▶ Start Crawl';
+        }
+      } catch(e) {
+        toast('Network error', 'error');
+        btn.textContent = '▶ Start Crawl';
+      } finally {
+        btn.disabled = false;
+      }
+    }
+  }
+
+  function toggleTheme() {
+    const light = document.body.classList.toggle('light');
+    document.getElementById('themeBtn').textContent = light ? '🌑' : '🌙';
+    localStorage.setItem('theme', light ? 'light' : 'dark');
+  }
+  if (localStorage.getItem('theme') === 'light') {
+    document.body.classList.add('light');
+    const b = document.getElementById('themeBtn');
+    if (b) b.textContent = '🌑';
   }
 
   // ── Sessions ───────────────────────────────────────────────────────────────
@@ -716,7 +757,7 @@
     try {
       const sessions = await (await fetch('/api/sessions')).json();
       if (!sessions.length) {
-        el.innerHTML = '<div class="empty"><div class="icon">📋</div><p>No crawl sessions yet. Run <code>make scan</code> to start.</p></div>';
+        el.innerHTML = '<div class="empty"><div class="icon">📋</div><p>No crawl sessions yet. Click ▶ Start Crawl above to begin.</p></div>';
         return;
       }
       el.innerHTML = `<table>
