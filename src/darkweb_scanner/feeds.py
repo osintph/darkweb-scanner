@@ -6,7 +6,7 @@ API keys are read from environment — never hardcoded.
 
 import logging
 import os
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 from typing import Optional
 import requests
 
@@ -231,7 +231,6 @@ def fetch_rss_items(days_back: int = 1, limit_per_source: int = 5) -> list[dict]
     except ImportError:
         return []
 
-    cutoff = datetime.now(timezone.utc) - timedelta(days=days_back)
     all_items = []
 
     for source in RSS_SOURCES:
@@ -254,7 +253,6 @@ def fetch_rss_items(days_back: int = 1, limit_per_source: int = 5) -> list[dict]
                 title_el = item.find(f"{ns}title")
                 link_el = item.find(f"{ns}link") or item.find(f"{ns}id")
                 desc_el = item.find(f"{ns}description") or item.find(f"{ns}summary")
-                date_el = item.find(f"{ns}pubDate") or item.find(f"{ns}updated") or item.find(f"{ns}published")
 
                 title = (title_el.text or "") if title_el is not None else ""
                 link = (link_el.text or link_el.get("href", "")) if link_el is not None else ""
