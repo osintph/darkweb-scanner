@@ -1,4 +1,4 @@
-# 🔍 Dark Web Scanner
+# 🔍 Dark Web Scanner - Cyber Threat Intelligence Platform
 
 > A Threat Intelligence Platform and Keyword monitoring tool for `.onion` sites — built for security researchers and threat intelligence professionals. Many more features have been added since.
 
