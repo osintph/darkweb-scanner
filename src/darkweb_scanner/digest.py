@@ -76,27 +76,63 @@ def build_digest_pdf(feed_data: dict, scanner_summary: dict = None, date: dateti
     def S(name, **kw):
         return ParagraphStyle(name, parent=styles["Normal"], **kw)
 
-    s_h1 = S("h1", fontSize=22, fontName="Helvetica-Bold", textColor=colors.HexColor("#0d1117"), spaceAfter=0)
-    s_tagline = S("tl", fontSize=11, textColor=colors.HexColor("#f85149"), fontName="Helvetica-Bold", spaceAfter=2)
-    s_meta = S("meta", fontSize=8.5, textColor=colors.HexColor("#8b949e"), spaceAfter=2)
-    s_h2 = S("h2", fontSize=12, fontName="Helvetica-Bold", textColor=colors.HexColor("#0d1117"), spaceBefore=14, spaceAfter=5)
+    s_h1 = S("h1", fontSize=24, fontName="Helvetica-Bold", textColor=colors.HexColor("#0d1117"), spaceAfter=2, leading=28)
+    s_tagline = S("tl", fontSize=10, textColor=colors.HexColor("#f85149"), fontName="Helvetica-Bold", spaceAfter=4, leading=14)
+    s_meta = S("meta", fontSize=8, textColor=colors.HexColor("#8b949e"), spaceAfter=0, leading=12)
     s_h3 = S("h3", fontSize=9.5, fontName="Helvetica-Bold", textColor=colors.HexColor("#f85149"), spaceBefore=8, spaceAfter=2)
     s_body = S("body", fontSize=8.5, textColor=colors.HexColor("#24292f"), leading=13, spaceAfter=3)
     s_small = S("small", fontSize=7.5, textColor=colors.HexColor("#57606a"), leading=11, spaceAfter=2)
     s_mono = S("mono", fontSize=7, fontName="Courier", textColor=colors.HexColor("#0550ae"), leading=10, wordWrap="CJK")
+    s_link = S("link", fontSize=7.5, textColor=colors.HexColor("#0550ae"), leading=11, spaceAfter=2)
     s_src = S("src", fontSize=7, textColor=colors.HexColor("#8b949e"), fontName="Helvetica-Bold")
     s_footer = S("footer", fontSize=7, textColor=colors.HexColor("#8b949e"), leading=10)
 
     story = []
-    story.append(HRFlowable(width=PW, thickness=4, color=colors.HexColor("#f85149"), spaceAfter=8))
-    story.append(Paragraph("Daily Threat Intelligence", s_h1))
-    story.append(Paragraph("powered by OSINT PH", s_tagline))
-    story.append(Paragraph(f"Edition: {date_str} (PHT)  ·  Generated: {datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')}  ·  osintph.info", s_meta))
+
+    # ── Masthead: two-column header with logo left, text right ──
+    logo_cell = Table(
+        [[
+            Paragraph('<font color="#f85149" size="28"><b>⬡</b></font>', S("logo", fontSize=28, textColor=colors.HexColor("#f85149"), leading=32)),
+        ]],
+        colWidths=[14 * mm],
+    )
+    logo_cell.setStyle(TableStyle([
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("LEFTPADDING", (0, 0), (-1, -1), 0),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+        ("TOPPADDING", (0, 0), (-1, -1), 0),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
+    ]))
+    text_cell = Table(
+        [[Paragraph("Daily Threat Intelligence", s_h1)],
+         [Paragraph("powered by OSINT PH  ·  osintph.info", s_tagline)],
+         [Paragraph(f"Edition: {date_str} (PHT)  ·  Generated: {datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')}", s_meta)]],
+        colWidths=[PW - 16 * mm],
+    )
+    text_cell.setStyle(TableStyle([
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("LEFTPADDING", (0, 0), (-1, -1), 8),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+        ("TOPPADDING", (0, 0), (-1, -1), 0),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 1),
+    ]))
+    header_tbl = Table([[logo_cell, text_cell]], colWidths=[16 * mm, PW - 16 * mm])
+    header_tbl.setStyle(TableStyle([
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("LEFTPADDING", (0, 0), (-1, -1), 0),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+        ("TOPPADDING", (0, 0), (-1, -1), 0),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
+        ("LINEBELOW", (0, 0), (-1, -1), 0, colors.white),
+    ]))
+    story.append(HRFlowable(width=PW, thickness=4, color=colors.HexColor("#f85149"), spaceAfter=10))
+    story.append(header_tbl)
+    story.append(Spacer(1, 8))
     story.append(HRFlowable(width=PW, thickness=0.5, color=colors.HexColor("#d0d7de"), spaceAfter=10))
 
     def sec(emoji, title, color="#0d1117"):
         story.append(Spacer(1, 6))
-        story.append(Paragraph(f"{emoji}  {title}", S(f"sec{title[:10]}", fontSize=12, fontName="Helvetica-Bold",
+        story.append(Paragraph(f"{emoji}  {title}", S(f"sec{title[:8]}", fontSize=12, fontName="Helvetica-Bold",
             textColor=colors.HexColor(color), spaceBefore=10, spaceAfter=4)))
         story.append(HRFlowable(width=PW, thickness=0.5, color=colors.HexColor("#d0d7de"), spaceAfter=4))
 
@@ -104,12 +140,14 @@ def build_digest_pdf(feed_data: dict, scanner_summary: dict = None, date: dateti
         bg = colors.HexColor("#fff8f8") if highlight else colors.HexColor("#f6f8fa")
         border = colors.HexColor("#f85149") if highlight else colors.HexColor("#d0d7de")
         tag_str = "  ".join([f"[{t}]" for t in (tags or [])[:5]])
-        inner = [[Paragraph(f"<b>{title[:120]}</b>", s_body)],
-                 [Paragraph((desc or "")[:350] + ("..." if len(desc or "") > 350 else ""), s_small)]]
+        title_para = Paragraph(f"<b>{title[:120]}</b>", s_body)
+        desc_para = Paragraph((desc or "")[:350] + ("..." if len(desc or "") > 350 else ""), s_small)
+        inner = [[title_para], [desc_para]]
         if tag_str:
             inner.append([Paragraph(tag_str, s_src)])
         if url:
-            inner.append([Paragraph(f"Link: {url[:90]}", s_mono)])
+            # Clickable link in PDF
+            inner.append([Paragraph(f'<link href="{url}" color="#0550ae">\u2192 {url[:90]}</link>', s_link)])
         inner.append([Paragraph(f"Source: {source}", s_src)])
         tbl = Table(inner, colWidths=[PW - 10])
         tbl.setStyle(TableStyle([
@@ -126,13 +164,17 @@ def build_digest_pdf(feed_data: dict, scanner_summary: dict = None, date: dateti
 
     kev = feed_data.get("cisa_kev", [])
     if kev:
-        sec("CRITICAL", "CISA Known Exploited Vulnerabilities", "#f85149")
+        sec("🚨", "CISA Known Exploited Vulnerabilities", "#f85149")
         story.append(Paragraph("Patch immediately if affected products are in use.", s_small))
         story.append(Spacer(1, 4))
         kd = [["CVE", "Vulnerability", "Vendor / Product", "Due"]]
         for v in kev[:10]:
-            kd.append([Paragraph(v["cve"], s_mono), Paragraph(v["title"][:60], s_small),
-                       Paragraph(f"{v['vendor']} - {v['product']}"[:50], s_small), Paragraph(v["due_date"], s_small)])
+            cve_link = Paragraph(
+                f'<link href="{v["url"]}" color="#0550ae">{v["cve"]}</link>', s_mono
+            )
+            kd.append([cve_link, Paragraph(v["title"][:60], s_small),
+                       Paragraph(f"{v['vendor']} - {v['product']}"[:50], s_small),
+                       Paragraph(v["due_date"], s_small)])
         kt = Table(kd, colWidths=[PW*0.16, PW*0.36, PW*0.30, PW*0.18], repeatRows=1)
         kt.setStyle(TableStyle([
             ("BACKGROUND", (0,0),(-1,0), colors.HexColor("#f85149")),
@@ -150,12 +192,12 @@ def build_digest_pdf(feed_data: dict, scanner_summary: dict = None, date: dateti
     sea_otx = [p for p in otx if p.get("sea_relevant")]
     other_otx = [p for p in otx if not p.get("sea_relevant")]
     if sea_otx:
-        sec("PHILIPPINES & SEA", "Threat Intelligence — Regional Focus")
+        sec("🌏", "Philippines & SEA Threat Intelligence")
         for p in sea_otx[:6]:
             item_block(f"OTX · {p.get('author','')}", p.get("title",""), p.get("description",""),
                       p.get("url",""), p.get("tags",[])[:5], highlight=True)
     if other_otx:
-        sec("GLOBAL", "Threat Intelligence (OTX)")
+        sec("🔭", "Global Threat Intelligence (OTX)")
         for p in other_otx[:4]:
             item_block(f"OTX · {p.get('author','')}", p.get("title",""), p.get("description",""),
                       p.get("url",""), p.get("tags",[])[:4])
@@ -164,23 +206,27 @@ def build_digest_pdf(feed_data: dict, scanner_summary: dict = None, date: dateti
     sea_rss = [r for r in rss if r.get("sea_relevant")]
     other_rss = [r for r in rss if not r.get("sea_relevant")]
     if sea_rss:
-        sec("SEA NEWS", "Cybersecurity News — Philippines & Region")
+        sec("📰", "SEA Cybersecurity News")
         for r in sea_rss[:5]:
             item_block(r["source"], r["title"], r["description"], r.get("url",""), highlight=True)
     if other_rss:
-        sec("GLOBAL NEWS", "Cybersecurity News")
+        sec("🌐", "Global Cybersecurity News")
         for r in other_rss[:5]:
             item_block(r["source"], r["title"], r["description"], r.get("url",""))
 
     urlhaus = feed_data.get("urlhaus", [])
     feodo = [f for f in feed_data.get("feodo", []) if f.get("sea_relevant")]
     if urlhaus or feodo:
-        sec("MALWARE IOCs", "Active Malware Infrastructure")
+        sec("🦠", "Active Malware Infrastructure (IOCs)")
         if urlhaus:
-            story.append(Paragraph("Recent Malicious URLs (URLhaus)", s_h3))
+            story.append(Paragraph("Recent Malicious URLs — URLhaus (abuse.ch)", s_h3))
             ud = [["Host", "Threat", "Tags", "Status"]]
             for u in urlhaus[:8]:
-                ud.append([Paragraph(u["host"][:40], s_mono), Paragraph(u["threat"][:25], s_small),
+                host_link = Paragraph(
+                    f'<link href="https://urlhaus.abuse.ch/host/{u["host"]}/" color="#0550ae">{u["host"][:40]}</link>',
+                    s_mono
+                )
+                ud.append([host_link, Paragraph(u["threat"][:25], s_small),
                            Paragraph(", ".join(u["tags"][:3]), s_small), Paragraph(u["status"], s_small)])
             ut = Table(ud, colWidths=[PW*0.35, PW*0.22, PW*0.28, PW*0.15], repeatRows=1)
             ut.setStyle(TableStyle([
@@ -193,10 +239,14 @@ def build_digest_pdf(feed_data: dict, scanner_summary: dict = None, date: dateti
             story.append(ut)
         if feodo:
             story.append(Spacer(1, 6))
-            story.append(Paragraph("SEA C2 Botnet IPs (Feodo Tracker)", s_h3))
+            story.append(Paragraph("SEA C2 Botnet IPs — Feodo Tracker (abuse.ch)", s_h3))
             fd = [["IP", "Port", "Malware", "Country"]]
             for f in feodo[:6]:
-                fd.append([f["ip"], str(f["port"]), f["malware"], f["country"]])
+                ip_link = Paragraph(
+                    f'<link href="https://feodotracker.abuse.ch/browse/?search={f["ip"]}" color="#0550ae">{f["ip"]}</link>',
+                    s_mono
+                )
+                fd.append([ip_link, str(f["port"]), f["malware"], f["country"]])
             ft = Table(fd, colWidths=[PW*0.3, PW*0.12, PW*0.28, PW*0.3])
             ft.setStyle(TableStyle([
                 ("BACKGROUND",(0,0),(-1,0),colors.HexColor("#161b22")),("TEXTCOLOR",(0,0),(-1,0),colors.white),
@@ -206,29 +256,15 @@ def build_digest_pdf(feed_data: dict, scanner_summary: dict = None, date: dateti
             ]))
             story.append(ft)
 
-    if scanner_summary and scanner_summary.get("total_hits", 0) > 0:
-        sec("SCANNER", "Dark Web Scanner Summary")
-        story.append(Paragraph("Brief summary only. Full Scanner Intelligence Report available separately.", s_small))
-        sd = [["Metric","Value"],
-              ["Keyword Hits", f"{scanner_summary.get('total_hits',0):,}"],
-              ["Pages Crawled", f"{scanner_summary.get('total_pages',0):,}"],
-              ["Top Keyword", scanner_summary.get("top_keyword","—")]]
-        st = Table(sd, colWidths=[PW*0.6, PW*0.4])
-        st.setStyle(TableStyle([
-            ("BACKGROUND",(0,0),(-1,0),colors.HexColor("#0d1117")),("TEXTCOLOR",(0,0),(-1,0),colors.white),
-            ("FONTNAME",(0,0),(-1,0),"Helvetica-Bold"),("FONTSIZE",(0,0),(-1,-1),8.5),
-            ("ROWBACKGROUNDS",(0,1),(-1,-1),[colors.HexColor("#f6f8fa"),colors.white]),
-            ("GRID",(0,0),(-1,-1),0.5,colors.HexColor("#d0d7de")),("PADDING",(0,0),(-1,-1),6),
-            ("ALIGN",(1,0),(1,-1),"CENTER"),
-        ]))
-        story.append(st)
+    # Scanner summary intentionally excluded — available in separate Scanner Intelligence Report
 
     story.append(Spacer(1, 20))
     story.append(HRFlowable(width=PW, thickness=0.5, color=colors.HexColor("#d0d7de")))
     story.append(Spacer(1, 5))
     story.append(Paragraph(
-        f"CONFIDENTIAL — Daily Threat Intelligence powered by OSINT PH · osintph.info · "
-        f"To unsubscribe reply UNSUBSCRIBE · Report ID: OSINTPH-DIGEST-{date_label}", s_footer))
+        f'CONFIDENTIAL — Daily Threat Intelligence powered by <link href="https://osintph.info" color="#f85149">OSINT PH</link> · '
+        f'To unsubscribe reply UNSUBSCRIBE · Report ID: OSINTPH-DIGEST-{date_label}',
+        s_footer))
     doc.build(story)
     buf.seek(0)
     return buf.read()
@@ -249,7 +285,23 @@ def build_email_html(feed_data: dict, date_str: str, stats: dict) -> str:
         rows = ""
         for item in items:
             bg = "#fff8f8" if highlight else "#ffffff"
-            rows += f'<tr style="background:{bg}"><td style="padding:10px 12px;border-bottom:1px solid #d0d7de"><div style="font-size:13px;font-weight:600;color:#0d1117;margin-bottom:3px">{item.get("title","")[:100]}</div><div style="font-size:11px;color:#57606a;margin-bottom:4px">{(item.get("description","") or "")[:200]}</div><div style="font-size:10px;color:#8b949e"><b style="color:#f85149">{item.get("source","")}</b>{f' · <a href="{item.get("url","")}" style="color:#58a6ff">Read more</a>' if item.get("url") else ""}</div></td></tr>'
+            title = item.get("title", "")[:100]
+            desc = (item.get("description", "") or "")[:200]
+            source = item.get("source", "")
+            url = item.get("url", "")
+            read_more = (
+                f' \u00b7 <a href="{url}" style="color:#58a6ff">Read more</a>'
+                if url else ""
+            )
+            rows += (
+                f'<tr style="background:{bg}">'
+                f'<td style="padding:10px 12px;border-bottom:1px solid #d0d7de">'
+                f'<div style="font-size:13px;font-weight:600;color:#0d1117;margin-bottom:3px">{title}</div>'
+                f'<div style="font-size:11px;color:#57606a;margin-bottom:4px">{desc}</div>'
+                f'<div style="font-size:10px;color:#8b949e">'
+                f'<b style="color:#f85149">{source}</b>{read_more}'
+                f'</div></td></tr>'
+            )
         return rows
 
     kev_section = "" if not kev else f'''
