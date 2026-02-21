@@ -1088,6 +1088,346 @@ def api_public_subscribe():
     return jsonify({"ok": True, "new": added})
 
 
+# ── DNS Crawler API ────────────────────────────────────────────────────────────
+
+
+@dashboard_bp.route("/api/dns/investigations", methods=["GET"])
+@require_login
+def api_dns_list():
+    storage = get_storage()
+    return jsonify(storage.get_dns_investigations(limit=100))
+
+
+@dashboard_bp.route("/api/dns/investigate", methods=["POST"])
+@require_login
+def api_dns_start():
+    """Start a DNS investigation — runs in background thread."""
+    import threading
+    from ..dns_crawler import run_dns_recon
+
+    body = request.get_json() or {}
+    domain = (body.get("domain") or "").strip().lower()
+    if not domain:
+        return jsonify({"error": "domain required"}), 400
+    # Basic sanity check
+    if len(domain) > 253 or " " in domain:
+        return jsonify({"error": "invalid domain"}), 400
+
+    storage = get_storage()
+    inv_id = storage.create_dns_investigation(domain)
+
+    def run():
+        try:
+            result = run_dns_recon(domain)
+            storage.complete_dns_investigation(inv_id, result)
+        except Exception as e:
+            import traceback
+            storage.fail_dns_investigation(inv_id, str(e))
+            logger.error(f"DNS investigation {inv_id} failed: {traceback.format_exc()}")
+
+    t = threading.Thread(target=run, daemon=True)
+    t.start()
+
+    return jsonify({"ok": True, "id": inv_id, "domain": domain})
+
+
+@dashboard_bp.route("/api/dns/investigations/<int:inv_id>", methods=["GET"])
+@require_login
+def api_dns_get(inv_id: int):
+    storage = get_storage()
+    result = storage.get_dns_investigation(inv_id)
+    if not result:
+        return jsonify({"error": "not found"}), 404
+    return jsonify(result)
+
+
+@dashboard_bp.route("/api/dns/investigations/<int:inv_id>", methods=["DELETE"])
+@require_login
+def api_dns_delete(inv_id: int):
+    storage = get_storage()
+    storage.delete_dns_investigation(inv_id)
+    return jsonify({"ok": True})
+
+
+@dashboard_bp.route("/api/dns/investigations/<int:inv_id>/pdf", methods=["GET"])
+@require_login
+def api_dns_pdf(inv_id: int):
+    """Export DNS investigation as PDF report."""
+    from io import BytesIO
+    from datetime import datetime as dt
+
+    from reportlab.lib import colors
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
+    from reportlab.lib.units import mm
+    from reportlab.platypus import (
+        HRFlowable, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle,
+    )
+
+    storage = get_storage()
+    inv = storage.get_dns_investigation(inv_id)
+    if not inv:
+        return jsonify({"error": "not found"}), 404
+    if inv["status"] != "complete":
+        return jsonify({"error": "investigation not complete yet"}), 400
+
+    r = inv.get("result", {})
+    domain = inv["domain"]
+    created = inv.get("created_at", "")[:16].replace("T", " ")
+    dns = r.get("dns_records", {})
+    zt = r.get("zone_transfer", {})
+    email_sec = r.get("email_security", {})
+    resolved = r.get("subdomains_resolved", [])
+    passive = r.get("subdomains_passive", [])
+    ip_geo = r.get("ip_geo", {})
+    ptr = r.get("ptr_records", {})
+    zt_success = any(v.get("success") for v in zt.values() if isinstance(v, dict))
+
+    buf = BytesIO()
+    W, H = A4
+    M = 18 * mm
+    doc = SimpleDocTemplate(buf, pagesize=A4, leftMargin=M, rightMargin=M,
+                            topMargin=M, bottomMargin=M)
+    PW = W - 2 * M
+    styles = getSampleStyleSheet()
+
+    def S(name, **kw):
+        return ParagraphStyle(name, parent=styles["Normal"], **kw)
+
+    s_h1 = S("h1", fontSize=20, fontName="Helvetica-Bold", textColor=colors.HexColor("#0d1117"), spaceAfter=2, leading=24)
+    s_tagline = S("tl", fontSize=10, textColor=colors.HexColor("#f85149"), fontName="Helvetica-Bold", spaceAfter=3, leading=14)
+    s_meta = S("meta", fontSize=8, textColor=colors.HexColor("#8b949e"), spaceAfter=0, leading=12)
+    s_h2 = S("h2", fontSize=11, fontName="Helvetica-Bold", textColor=colors.HexColor("#0d1117"), spaceBefore=12, spaceAfter=4)
+    s_body = S("body", fontSize=8.5, textColor=colors.HexColor("#24292f"), leading=13)
+    s_small = S("small", fontSize=7.5, textColor=colors.HexColor("#57606a"), leading=11)
+    s_mono = S("mono", fontSize=7, fontName="Courier", textColor=colors.HexColor("#0550ae"), leading=10, wordWrap="CJK")
+    s_warn = S("warn", fontSize=8, textColor=colors.HexColor("#f85149"), fontName="Helvetica-Bold", leading=12)
+    s_footer = S("footer", fontSize=7, textColor=colors.HexColor("#8b949e"), leading=10)
+
+    no_pad = TableStyle([
+        ("LEFTPADDING", (0, 0), (-1, -1), 0),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+        ("TOPPADDING", (0, 0), (-1, -1), 0),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 1),
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+    ])
+
+    story = []
+
+    # ── Masthead: logo left, stacked text right (prevents overlap) ──
+    story.append(HRFlowable(width=PW, thickness=4, color=colors.HexColor("#f85149"), spaceAfter=10))
+    logo_tbl = Table([[Paragraph('<font color="#f85149" size="26"><b>⬡</b></font>',
+        S("logo_d", fontSize=26, textColor=colors.HexColor("#f85149"), leading=30))]], colWidths=[14 * mm])
+    logo_tbl.setStyle(no_pad)
+    text_tbl = Table([
+        [Paragraph("DNS Reconnaissance Report", s_h1)],
+        [Paragraph("powered by OSINT PH  ·  osintph.info", s_tagline)],
+        [Paragraph(f"Target: {domain}  ·  Investigated: {created}  ·  Generated: {dt.utcnow().strftime('%Y-%m-%d %H:%M UTC')}", s_meta)],
+    ], colWidths=[PW - 16 * mm])
+    text_tbl.setStyle(TableStyle([
+        ("LEFTPADDING", (0, 0), (-1, -1), 8),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+        ("TOPPADDING", (0, 0), (-1, -1), 0),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 1),
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+    ]))
+    header_tbl = Table([[logo_tbl, text_tbl]], colWidths=[16 * mm, PW - 16 * mm])
+    header_tbl.setStyle(TableStyle([
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("LEFTPADDING", (0, 0), (-1, -1), 0),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+        ("TOPPADDING", (0, 0), (-1, -1), 0),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
+    ]))
+    story.append(header_tbl)
+    story.append(Spacer(1, 8))
+    story.append(HRFlowable(width=PW, thickness=0.5, color=colors.HexColor("#d0d7de"), spaceAfter=10))
+    s_body = S("body", fontSize=8.5, textColor=colors.HexColor("#24292f"), leading=13)
+    s_small = S("small", fontSize=7.5, textColor=colors.HexColor("#57606a"), leading=11)
+    s_mono = S("mono", fontSize=7, fontName="Courier", textColor=colors.HexColor("#0550ae"), leading=10, wordWrap="CJK")
+    s_warn = S("warn", fontSize=8, textColor=colors.HexColor("#f85149"), fontName="Helvetica-Bold", leading=12)
+    s_footer = S("footer", fontSize=7, textColor=colors.HexColor("#8b949e"), leading=10)
+
+    def section(title, color="#0d1117"):
+        story.append(Spacer(1, 4))
+        story.append(Paragraph(title, S(f"sh{title[:8]}", fontSize=11, fontName="Helvetica-Bold",
+            textColor=colors.HexColor(color), spaceBefore=10, spaceAfter=3)))
+        story.append(HRFlowable(width=PW, thickness=0.5, color=colors.HexColor("#d0d7de"), spaceAfter=3))
+
+    def make_table(headers, rows, col_widths, row_bg=None):
+        data = [headers] + rows
+        tbl = Table(data, colWidths=col_widths, repeatRows=1)
+        tbl.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#0d1117")),
+            ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+            ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+            ("FONTSIZE", (0, 0), (-1, -1), 7.5),
+            ("ROWBACKGROUNDS", (0, 1), (-1, -1), row_bg or [colors.HexColor("#f6f8fa"), colors.white]),
+            ("GRID", (0, 0), (-1, -1), 0.4, colors.HexColor("#d0d7de")),
+            ("PADDING", (0, 0), (-1, -1), 5),
+            ("VALIGN", (0, 0), (-1, -1), "TOP"),
+        ]))
+        return tbl
+
+    # ── Summary ──
+    section("Executive Summary")
+    main_ips = dns.get("A", []) + dns.get("AAAA", [])
+    summary_data = [
+        ["Metric", "Value"],
+        ["Domain", domain],
+        ["Subdomains Discovered", str(inv.get("subdomain_count") or 0)],
+        ["Subdomains Resolved", str(inv.get("resolved_count") or 0)],
+        ["IP Addresses", str(len(main_ips))],
+        ["Zone Transfer", "⚠ VULNERABLE — Transfer Succeeded" if zt_success else "Secure (refused)"],
+        ["SPF Record", "✓ Present" if email_sec.get("spf_valid") else "✗ Missing — spoofing risk"],
+        ["DMARC Record", "✓ Present" if email_sec.get("dmarc_valid") else "✗ Missing — no enforcement"],
+        ["DKIM Selectors", ", ".join(email_sec.get("dkim_selectors_found", [])) or "None found"],
+    ]
+    tbl = Table(summary_data, colWidths=[PW * 0.45, PW * 0.55])
+    tbl.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#0d1117")),
+        ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+        ("FONTSIZE", (0, 0), (-1, -1), 8.5),
+        ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.HexColor("#f6f8fa"), colors.white]),
+        ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#d0d7de")),
+        ("PADDING", (0, 0), (-1, -1), 6),
+        # Highlight zone transfer row red if vulnerable
+        *(
+            [("TEXTCOLOR", (1, 5), (1, 5), colors.HexColor("#f85149")),
+             ("FONTNAME", (1, 5), (1, 5), "Helvetica-Bold")]
+            if zt_success else []
+        ),
+    ]))
+    story.append(tbl)
+
+    # ── Email security issues ──
+    issues = email_sec.get("issues", [])
+    if issues:
+        section("⚠ Email Security Issues", "#f85149")
+        for issue in issues:
+            story.append(Paragraph(f"• {issue}", s_warn))
+            story.append(Spacer(1, 2))
+
+    # ── DNS Records ──
+    section("DNS Records")
+    rec_types = ["A", "AAAA", "MX", "NS", "TXT", "CNAME", "SOA", "CAA"]
+    rec_rows = []
+    for rtype in rec_types:
+        for val in dns.get(rtype, []):
+            geo = ip_geo.get(val, {})
+            geo_str = f"{geo.get('city', '')} {geo.get('country', '')} · {geo.get('org', '')}".strip(" ·")
+            ptr_str = ptr.get(val, "")
+            rec_rows.append([
+                Paragraph(rtype, S(f"rt{rtype}", fontSize=7, fontName="Helvetica-Bold",
+                    textColor=colors.white, backColor=colors.HexColor("#161b22"),
+                    borderPadding=(2, 4, 2, 4))),
+                Paragraph(val, s_mono),
+                Paragraph(ptr_str, s_small) if ptr_str else Paragraph("", s_small),
+                Paragraph(geo_str, s_small),
+            ])
+    if rec_rows:
+        story.append(make_table(
+            [Paragraph(h, S(f"rh{h}", fontSize=7.5, textColor=colors.white, fontName="Helvetica-Bold"))
+             for h in ["Type", "Value", "PTR / Hostname", "Geolocation"]],
+            rec_rows,
+            [PW * 0.08, PW * 0.28, PW * 0.28, PW * 0.36],
+        ))
+
+    # ── Email security records ──
+    if email_sec.get("spf") or email_sec.get("dmarc"):
+        section("Email Authentication Records")
+        email_rows = []
+        if email_sec.get("spf"):
+            email_rows.append([Paragraph("SPF", s_body), Paragraph(email_sec["spf"], s_mono)])
+        if email_sec.get("dmarc"):
+            email_rows.append([Paragraph("DMARC", s_body), Paragraph(email_sec["dmarc"], s_mono)])
+        if email_sec.get("dkim_selectors_found"):
+            email_rows.append([Paragraph("DKIM", s_body),
+                Paragraph("Selectors: " + ", ".join(email_sec["dkim_selectors_found"]), s_body)])
+        story.append(make_table(
+            [Paragraph(h, S(f"eh{h}", fontSize=7.5, textColor=colors.white, fontName="Helvetica-Bold"))
+             for h in ["Record", "Value"]],
+            email_rows, [PW * 0.12, PW * 0.88],
+        ))
+
+    # ── Zone transfer ──
+    if zt_success:
+        section("🚨 Zone Transfer — CRITICAL FINDING", "#f85149")
+        story.append(Paragraph(
+            "Zone transfer succeeded. The DNS server is leaking its full zone data to unauthorized parties. "
+            "This exposes all DNS records and subdomains. Restrict AXFR to authorised secondary nameservers immediately.",
+            s_warn))
+        story.append(Spacer(1, 6))
+        for ns, info in zt.items():
+            if not info.get("success"):
+                continue
+            story.append(Paragraph(f"Nameserver: {ns} — {info['record_count']} records exposed", s_body))
+            zt_rows = [
+                [Paragraph(rec["name"], s_mono), Paragraph(rec["type"], s_body), Paragraph(rec["value"], s_mono)]
+                for rec in (info.get("records") or [])[:100]
+            ]
+            if zt_rows:
+                story.append(Spacer(1, 4))
+                story.append(make_table(
+                    [Paragraph(h, S(f"zh{h}", fontSize=7.5, textColor=colors.white, fontName="Helvetica-Bold"))
+                     for h in ["Name", "Type", "Value"]],
+                    zt_rows, [PW * 0.3, PW * 0.1, PW * 0.6],
+                    row_bg=[colors.HexColor("#fff8f8"), colors.white],
+                ))
+
+    # ── Resolved subdomains ──
+    if resolved:
+        section(f"Resolved Subdomains ({len(resolved)})")
+        sub_rows = []
+        for s in resolved[:200]:
+            ips = ", ".join(s.get("ips", []))
+            geo_parts = [f"{g.get('city','')} {g.get('countryCode','')}".strip()
+                         for g in (s.get("geo") or []) if g and g.get("country")]
+            geo = " / ".join(geo_parts)
+            sub_rows.append([Paragraph(s["subdomain"], s_mono), Paragraph(ips, s_mono), Paragraph(geo, s_small)])
+        story.append(make_table(
+            [Paragraph(h, S(f"sbh{h}", fontSize=7.5, textColor=colors.white, fontName="Helvetica-Bold"))
+             for h in ["Subdomain", "IP Address(es)", "Location"]],
+            sub_rows, [PW * 0.42, PW * 0.28, PW * 0.30],
+        ))
+
+    # ── Certificate transparency ──
+    if passive:
+        section(f"Certificate Transparency — crt.sh ({len(passive)} certificates)")
+        cert_rows = []
+        for c in passive[:150]:
+            issuer = (c.get("issuer") or "").split("O=")[-1].split(",")[0][:40]
+            cert_rows.append([
+                Paragraph(c.get("subdomain", ""), s_mono),
+                Paragraph(issuer, s_small),
+                Paragraph((c.get("not_after") or "")[:10], s_small),
+            ])
+        story.append(make_table(
+            [Paragraph(h, S(f"ch{h}", fontSize=7.5, textColor=colors.white, fontName="Helvetica-Bold"))
+             for h in ["Subdomain / SAN", "Issuer", "Expires"]],
+            cert_rows, [PW * 0.5, PW * 0.3, PW * 0.2],
+        ))
+
+    # ── Footer ──
+    story.append(Spacer(1, 20))
+    story.append(HRFlowable(width=PW, thickness=0.5, color=colors.HexColor("#d0d7de")))
+    story.append(Spacer(1, 5))
+    story.append(Paragraph(
+        f"CONFIDENTIAL — DNS Reconnaissance Report powered by OSINT PH · osintph.info · "
+        f"Target: {domain} · Report ID: OSINTPH-DNS-{inv_id}-{dt.utcnow().strftime('%Y%m%d')}",
+        s_footer))
+
+    doc.build(story)
+    buf.seek(0)
+    filename = f"osintph-dns-{domain}-{dt.utcnow().strftime('%Y%m%d')}.pdf"
+    return Response(
+        buf.read(),
+        mimetype="application/pdf",
+        headers={"Content-Disposition": f"attachment; filename={filename}"},
+    )
+
+
 # ── Health ─────────────────────────────────────────────────────────────────────
 
 

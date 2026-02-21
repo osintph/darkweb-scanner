@@ -137,6 +137,24 @@ class IPInvestigation(Base):
     country = Column(String(10), nullable=True)
     isp = Column(String(255), nullable=True)
 
+
+class DNSInvestigation(Base):
+    __tablename__ = "dns_investigations"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    domain = Column(String(255), nullable=False, index=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    status = Column(String(50), default="running")  # running | complete | error
+    result_json = Column(Text, nullable=True)        # full result dict as JSON
+    subdomain_count = Column(Integer, nullable=True)
+    resolved_count = Column(Integer, nullable=True)
+    zone_transfer_success = Column(Boolean, default=False)
+    has_spf = Column(Boolean, default=False)
+    has_dmarc = Column(Boolean, default=False)
+    error = Column(Text, nullable=True)
+
+    __table_args__ = (Index("ix_dns_domain_created", "domain", "created_at"),)
+
 class Storage:
     def __init__(self, database_url: Optional[str] = None):
         self.database_url = database_url or os.getenv(
@@ -305,7 +323,8 @@ class Storage:
 
     def create_user(self, username: str, password_hash: str = None,
                     email: str = None, oauth_provider: str = None,
-                    oauth_id: str = None, is_admin: bool = False, must_change_password: bool = False):
+                    oauth_id: str = None, is_admin: bool = False,
+                    must_change_password: bool = False):
         with self.get_session() as session:
             user = User(
                 username=username,
@@ -320,6 +339,14 @@ class Storage:
             session.commit()
             session.refresh(user)
             return user.id
+
+
+    def set_must_change_password(self, user_id: int, value: bool = False):
+        with self.get_session() as session:
+            user = session.get(User, user_id)
+            if user:
+                user.must_change_password = value
+                session.commit()
 
     def update_user_login(self, user_id: int):
         with self.get_session() as session:
@@ -659,5 +686,94 @@ class Storage:
                 "hits_found": r.hits_found or 0,
                 "status": r.status,
             }
+
+    # ── DNS Investigations ──────────────────────────────────────────────────
+
+    def create_dns_investigation(self, domain: str) -> int:
+        with self.get_session() as session:
+            r = DNSInvestigation(domain=domain, status="running")
+            session.add(r)
+            session.commit()
+            session.refresh(r)
+            return r.id
+
+    def complete_dns_investigation(self, inv_id: int, result: dict):
+        with self.get_session() as session:
+            r = session.get(DNSInvestigation, inv_id)
+            if not r:
+                return
+            email_sec = result.get("email_security", {})
+            zt = result.get("zone_transfer", {})
+            zt_success = any(v.get("success") for v in zt.values() if isinstance(v, dict))
+            r.status = "complete"
+            r.result_json = json.dumps(result)
+            r.subdomain_count = result.get("subdomain_count", 0)
+            r.resolved_count = result.get("resolved_count", 0)
+            r.zone_transfer_success = zt_success
+            r.has_spf = email_sec.get("spf_valid", False)
+            r.has_dmarc = email_sec.get("dmarc_valid", False)
+            session.commit()
+
+    def fail_dns_investigation(self, inv_id: int, error: str):
+        with self.get_session() as session:
+            r = session.get(DNSInvestigation, inv_id)
+            if r:
+                r.status = "error"
+                r.error = error[:500]
+                session.commit()
+
+    def get_dns_investigations(self, limit: int = 50) -> list[dict]:
+        with self.get_session() as session:
+            rows = (
+                session.query(DNSInvestigation)
+                .order_by(DNSInvestigation.created_at.desc())
+                .limit(limit)
+                .all()
+            )
+            return [
+                {
+                    "id": r.id,
+                    "domain": r.domain,
+                    "status": r.status,
+                    "subdomain_count": r.subdomain_count,
+                    "resolved_count": r.resolved_count,
+                    "zone_transfer_success": r.zone_transfer_success,
+                    "has_spf": r.has_spf,
+                    "has_dmarc": r.has_dmarc,
+                    "error": r.error,
+                    "created_at": r.created_at.isoformat() if r.created_at else None,
+                }
+                for r in rows
+            ]
+
+    def get_dns_investigation(self, inv_id: int) -> Optional[dict]:
+        with self.get_session() as session:
+            r = session.get(DNSInvestigation, inv_id)
+            if not r:
+                return None
+            try:
+                result = json.loads(r.result_json or "{}")
+            except Exception:
+                result = {}
+            return {
+                "id": r.id,
+                "domain": r.domain,
+                "status": r.status,
+                "subdomain_count": r.subdomain_count,
+                "resolved_count": r.resolved_count,
+                "zone_transfer_success": r.zone_transfer_success,
+                "has_spf": r.has_spf,
+                "has_dmarc": r.has_dmarc,
+                "error": r.error,
+                "created_at": r.created_at.isoformat() if r.created_at else None,
+                "result": result,
+            }
+
+    def delete_dns_investigation(self, inv_id: int):
+        with self.get_session() as session:
+            r = session.get(DNSInvestigation, inv_id)
+            if r:
+                session.delete(r)
+                session.commit()
 
 

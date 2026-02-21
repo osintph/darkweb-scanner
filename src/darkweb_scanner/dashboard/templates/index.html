@@ -142,6 +142,36 @@
     /* Digest subscriber list */
     .subscriber-row { display: flex; align-items: center; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 0.83rem; }
     .subscriber-row:last-child { border-bottom: none; }
+    /* ── DNS Crawler ── */
+    .dns-input-bar { display:flex; gap:10px; padding:20px; align-items:center; flex-wrap:wrap; }
+    .dns-input { flex:1; min-width:240px; max-width:420px; padding:9px 14px; background:var(--surface); border:1px solid var(--border); color:var(--text); border-radius:6px; font-size:.9rem; font-family:var(--mono); }
+    .dns-input:focus { outline:none; border-color:var(--accent); }
+    .dns-history { padding:0 20px 20px; }
+    .dns-history-row { display:flex; align-items:center; gap:10px; padding:10px 14px; background:var(--surface); border:1px solid var(--border); border-radius:6px; margin-bottom:8px; cursor:pointer; transition:border-color .15s; }
+    .dns-history-row:hover { border-color:var(--accent); }
+    .dns-history-domain { font-family:var(--mono); font-size:.88rem; font-weight:700; color:var(--text); flex:1; }
+    .dns-history-meta { font-size:.74rem; color:var(--muted); }
+    .dns-detail { padding:0 20px 20px; }
+    .dns-section { background:var(--surface); border:1px solid var(--border); border-radius:8px; margin-bottom:14px; overflow:hidden; }
+    .dns-section-hdr { display:flex; align-items:center; justify-content:space-between; padding:10px 16px; background:var(--surface2); border-bottom:1px solid var(--border); cursor:pointer; user-select:none; }
+    .dns-section-title { font-size:.85rem; font-weight:700; color:var(--text); }
+    .dns-section-body { padding:14px 16px; }
+    .dns-record-table { width:100%; border-collapse:collapse; font-size:.78rem; }
+    .dns-record-table th { text-align:left; padding:6px 10px; background:var(--surface2); color:var(--muted); font-weight:600; font-size:.72rem; border-bottom:1px solid var(--border); }
+    .dns-record-table td { padding:6px 10px; border-bottom:1px solid var(--border); vertical-align:top; word-break:break-all; }
+    .dns-record-table tr:last-child td { border-bottom:none; }
+    .dns-record-table tr:hover td { background:var(--surface2); }
+    .dns-badge-ok { color:var(--green); font-size:.72rem; font-weight:700; }
+    .dns-badge-warn { color:var(--yellow); font-size:.72rem; font-weight:700; }
+    .dns-badge-fail { color:var(--red); font-size:.72rem; font-weight:700; }
+    .dns-zt-success { background:rgba(248,81,73,.1); border:1px solid rgba(248,81,73,.3); border-radius:6px; padding:10px 14px; color:var(--red); font-size:.82rem; font-weight:700; }
+    .dns-summary-cards { display:grid; grid-template-columns:repeat(auto-fill,minmax(140px,1fr)); gap:10px; margin-bottom:14px; }
+    .dns-summary-card { background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:14px; text-align:center; }
+    .dns-summary-num { font-size:1.6rem; font-weight:800; color:var(--accent); }
+    .dns-summary-label { font-size:.72rem; color:var(--muted); margin-top:2px; }
+    .dns-running { display:flex; align-items:center; gap:10px; padding:20px; color:var(--muted); font-size:.85rem; }
+    .dns-spinner { width:18px; height:18px; border:2px solid var(--border); border-top-color:var(--accent); border-radius:50%; animation:spin 1s linear infinite; }
+    @keyframes spin { to { transform:rotate(360deg); } }
     .kw-pills { display: flex; flex-wrap: wrap; gap: 8px; padding: 14px 18px; }
     .kw-pill { background: var(--surface2); border: 1px solid var(--border); border-radius: 20px; padding: 4px 12px; font-size: 0.79rem; display: flex; align-items: center; gap: 7px; cursor: pointer; transition: border-color .15s; }
     .kw-pill:hover { border-color: var(--accent); color: var(--accent); }
@@ -223,6 +253,7 @@
     <button class="nav-tab" onclick="switchTab('iplookup', this)">🌐 IP Lookup</button>
     <button class="nav-tab" onclick="switchTab('ransomware', this)">☠️ Ransomware</button>
     <button class="nav-tab" onclick="switchTab('threatactors', this)">🕵️ Threat Actors</button>
+    <button class="nav-tab" onclick="switchTab('dns', this)">🌐 DNS</button>
     <button class="nav-tab" onclick="switchTab('reports', this)">📄 Reports</button>
     <button class="nav-tab" onclick="switchTab('settings', this)">⚙️ Settings</button>
   </nav>
@@ -464,6 +495,18 @@
     </div>
   </div>
 
+  <!-- ── DNS Crawler Tab ── -->
+  <div class="tab-panel" id="panel-dns">
+    <div class="dns-input-bar">
+      <input class="dns-input" id="dnsInput" placeholder="example.com" onkeydown="if(event.key==='Enter')startDNS()"/>
+      <button class="btn btn-primary" onclick="startDNS()" id="dnsBtn">🔍 Investigate</button>
+      <button class="btn btn-secondary" onclick="showDNSHistory()" id="dnsHistoryBtn">📋 History</button>
+    </div>
+    <div id="dnsContent">
+      <div class="empty"><div class="icon">🌐</div><p>Enter a domain to start DNS reconnaissance</p></div>
+    </div>
+  </div>
+
   <!-- ── Reports Tab ── -->
   <div class="tab-panel" id="panel-reports">
     <div class="report-hero">
@@ -600,6 +643,7 @@
     if (tab === 'iplookup') loadIPInvestigations();
     if (tab === 'ransomware') loadRansomware();
     if (tab === 'threatactors') loadThreatActors();
+    if (tab === 'dns') loadDNSInvestigations();
     if (tab === 'reports') { loadReportPreview(); if (isAdmin) loadSubscribers(); }
     if (tab === 'settings') loadSettings();
   }
@@ -1635,6 +1679,248 @@
 
   async function downloadDigest() {
     window.location.href = '/api/digest/preview';
+  }
+
+  // ── DNS Crawler ───────────────────────────────────────────────────────────
+  let dnsPolling = null;
+
+  async function loadDNSInvestigations() {
+    showDNSHistory();
+  }
+
+  async function showDNSHistory() {
+    const el = document.getElementById('dnsContent');
+    el.innerHTML = '<div class="dns-running"><div class="dns-spinner"></div> Loading history…</div>';
+    try {
+      const data = await (await fetch('/api/dns/investigations')).json();
+      if (!data.length) {
+        el.innerHTML = '<div class="empty"><div class="icon">🌐</div><p>No DNS investigations yet. Enter a domain above.</p></div>';
+        return;
+      }
+      el.innerHTML = '<div class="dns-history">' + data.map(r => `
+        <div class="dns-history-row" onclick="loadDNSResult(${r.id})">
+          <div class="dns-history-domain">${esc(r.domain)}</div>
+          ${r.zone_transfer_success ? '<span class="dns-badge-fail">⚠ ZONE TRANSFER</span>' : ''}
+          <span class="dns-history-meta">${r.subdomain_count ?? '?'} subdomains</span>
+          <span class="dns-history-meta">${r.has_spf ? '✓ SPF' : '<span style="color:var(--red)">✗ SPF</span>'}</span>
+          <span class="dns-history-meta">${r.has_dmarc ? '✓ DMARC' : '<span style="color:var(--red)">✗ DMARC</span>'}</span>
+          <span class="dns-history-meta" style="color:var(--muted)">${fmtTime(r.created_at)}</span>
+          <span class="dns-badge-${r.status === 'complete' ? 'ok' : r.status === 'running' ? 'warn' : 'fail'}">${r.status.toUpperCase()}</span>
+          <button class="btn btn-secondary" style="font-size:.7rem;padding:3px 8px;color:var(--red)" onclick="event.stopPropagation();deleteDNS(${r.id})">✕</button>
+        </div>`).join('') + '</div>';
+    } catch(e) {
+      el.innerHTML = '<div class="empty"><div class="icon">⚠️</div><p>Failed to load history.</p></div>';
+    }
+  }
+
+  async function startDNS() {
+    const domain = document.getElementById('dnsInput').value.trim();
+    if (!domain) return;
+    const btn = document.getElementById('dnsBtn');
+    btn.disabled = true; btn.textContent = '⏳ Starting…';
+    try {
+      const res = await fetch('/api/dns/investigate', {
+        method: 'POST', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({domain})
+      });
+      const d = await res.json();
+      if (d.ok) {
+        toast(`DNS recon started for ${domain}`);
+        pollDNS(d.id);
+      } else {
+        toast(d.error || 'Error', 'error');
+      }
+    } catch(e) {
+      toast('Network error', 'error');
+    } finally {
+      btn.disabled = false; btn.textContent = '🔍 Investigate';
+    }
+  }
+
+  function pollDNS(id) {
+    if (dnsPolling) clearInterval(dnsPolling);
+    const el = document.getElementById('dnsContent');
+    el.innerHTML = `<div class="dns-running"><div class="dns-spinner"></div> Running DNS recon — querying records, crt.sh, zone transfer, geolocation…</div>`;
+    dnsPolling = setInterval(async () => {
+      try {
+        const data = await (await fetch(`/api/dns/investigations/${id}`)).json();
+        if (data.status === 'complete') {
+          clearInterval(dnsPolling);
+          renderDNSResult(data);
+        } else if (data.status === 'error') {
+          clearInterval(dnsPolling);
+          el.innerHTML = `<div class="empty"><div class="icon">⚠️</div><p>Recon failed: ${esc(data.error || 'unknown error')}</p></div>`;
+        }
+      } catch(e) { clearInterval(dnsPolling); }
+    }, 2500);
+  }
+
+  async function loadDNSResult(id) {
+    const el = document.getElementById('dnsContent');
+    el.innerHTML = '<div class="dns-running"><div class="dns-spinner"></div> Loading…</div>';
+    try {
+      const data = await (await fetch(`/api/dns/investigations/${id}`)).json();
+      if (data.status === 'running') { pollDNS(id); return; }
+      renderDNSResult(data);
+    } catch(e) {
+      el.innerHTML = '<div class="empty"><div class="icon">⚠️</div><p>Failed to load result.</p></div>';
+    }
+  }
+
+  function renderDNSResult(data) {
+    const el = document.getElementById('dnsContent');
+    const r = data.result || {};
+    const dns = r.dns_records || {};
+    const zt = r.zone_transfer || {};
+    const email = r.email_security || {};
+    const resolved = r.subdomains_resolved || [];
+    const passive = r.subdomains_passive || [];
+    const ipGeo = r.ip_geo || {};
+    const ptr = r.ptr_records || {};
+    const ztSuccess = Object.values(zt).some(v => v && v.success);
+
+    let html = `<div class="dns-detail">`;
+
+    // ── Back button ──
+    html += `<div style="margin-bottom:14px;display:flex;align-items:center;gap:10px">
+      <button class="btn btn-secondary" onclick="showDNSHistory()">← History</button>
+      <span style="font-family:var(--mono);font-size:1rem;font-weight:700">${esc(data.domain)}</span>
+      <span style="font-size:.75rem;color:var(--muted)">${fmtTime(data.created_at)}</span>
+      <button class="btn btn-primary" style="margin-left:auto" onclick="exportDNSpdf(${data.id}, '${esc(data.domain)}')">⬇ Export PDF</button>
+    </div>`;
+
+    // ── Summary cards ──
+    const mainIPs = (dns.A || []).concat(dns.AAAA || []);
+    html += `<div class="dns-summary-cards">
+      <div class="dns-summary-card"><div class="dns-summary-num">${data.subdomain_count ?? 0}</div><div class="dns-summary-label">Subdomains Found</div></div>
+      <div class="dns-summary-card"><div class="dns-summary-num">${data.resolved_count ?? 0}</div><div class="dns-summary-label">Resolved</div></div>
+      <div class="dns-summary-card"><div class="dns-summary-num">${mainIPs.length}</div><div class="dns-summary-label">IP Addresses</div></div>
+      <div class="dns-summary-card"><div class="dns-summary-num ${ztSuccess ? 'dns-badge-fail' : ''}">${ztSuccess ? '⚠ YES' : 'No'}</div><div class="dns-summary-label">Zone Transfer</div></div>
+      <div class="dns-summary-card"><div class="dns-summary-num ${email.spf_valid ? 'dns-badge-ok' : 'dns-badge-fail'}">${email.spf_valid ? '✓' : '✗'}</div><div class="dns-summary-label">SPF</div></div>
+      <div class="dns-summary-card"><div class="dns-summary-num ${email.dmarc_valid ? 'dns-badge-ok' : 'dns-badge-fail'}">${email.dmarc_valid ? '✓' : '✗'}</div><div class="dns-summary-label">DMARC</div></div>
+    </div>`;
+
+    // ── Zone transfer warning ──
+    if (ztSuccess) {
+      const ns = Object.entries(zt).filter(([,v]) => v.success).map(([k]) => k).join(', ');
+      html += `<div class="dns-zt-success">⚠ ZONE TRANSFER SUCCEEDED on ${esc(ns)} — full zone data exposed. This is a critical misconfiguration.</div><br/>`;
+    }
+
+    // ── Email security issues ──
+    const issues = email.issues || [];
+    if (issues.length) {
+      html += dnsSection('⚠ Email Security Issues', issues.map(i =>
+        `<div style="padding:5px 0;color:var(--yellow);font-size:.82rem">• ${esc(i)}</div>`
+      ).join(''));
+    }
+
+    // ── DNS Records ──
+    const recTypes = ['A','AAAA','MX','NS','TXT','CNAME','SOA','CAA'];
+    let recRows = '';
+    for (const type of recTypes) {
+      if (!dns[type]) continue;
+      for (const val of dns[type]) {
+        const geo = (type === 'A' || type === 'AAAA') ? ipGeo[val] : null;
+        const geoStr = geo ? ` <span style="color:var(--muted);font-size:.7rem">(${geo.city || ''} ${geo.country || ''} · ${geo.org || ''})</span>` : '';
+        const ptrStr = ptr[val] ? ` <span style="color:var(--muted);font-size:.7rem">→ ${esc(ptr[val])}</span>` : '';
+        recRows += `<tr><td><span class="badge badge-active" style="font-size:.65rem">${type}</span></td><td style="font-family:var(--mono)">${esc(val)}${ptrStr}${geoStr}</td></tr>`;
+      }
+    }
+    if (recRows) {
+      html += dnsSection('📋 DNS Records',
+        `<table class="dns-record-table"><thead><tr><th>Type</th><th>Value</th></tr></thead><tbody>${recRows}</tbody></table>`
+      );
+    }
+
+    // ── Email security detail ──
+    let emailRows = '';
+    if (email.spf) emailRows += `<tr><td>SPF</td><td style="font-family:var(--mono);font-size:.72rem">${esc(email.spf)}</td></tr>`;
+    if (email.dmarc) emailRows += `<tr><td>DMARC</td><td style="font-family:var(--mono);font-size:.72rem">${esc(email.dmarc)}</td></tr>`;
+    if (email.dkim_selectors_found?.length) {
+      emailRows += `<tr><td>DKIM</td><td>Selectors found: ${email.dkim_selectors_found.map(s => `<code>${esc(s)}</code>`).join(', ')}</td></tr>`;
+    }
+    if (emailRows) {
+      html += dnsSection('📧 Email Security',
+        `<table class="dns-record-table"><thead><tr><th>Record</th><th>Value</th></tr></thead><tbody>${emailRows}</tbody></table>`
+      );
+    }
+
+    // ── Zone transfer detail ──
+    if (ztSuccess) {
+      for (const [ns, info] of Object.entries(zt)) {
+        if (!info.success) continue;
+        const rows = (info.records || []).slice(0, 100).map(rec =>
+          `<tr><td>${esc(rec.name)}</td><td><span class="badge badge-active" style="font-size:.65rem">${esc(rec.type)}</span></td><td style="font-family:var(--mono);font-size:.72rem">${esc(rec.value)}</td></tr>`
+        ).join('');
+        html += dnsSection(`🚨 Zone Transfer — ${esc(ns)} (${info.record_count} records)`,
+          `<table class="dns-record-table"><thead><tr><th>Name</th><th>Type</th><th>Value</th></tr></thead><tbody>${rows}</tbody></table>`
+        );
+      }
+    }
+
+    // ── Subdomains resolved ──
+    if (resolved.length) {
+      const subRows = resolved.map(s => {
+        const ips = s.ips.join(', ');
+        const geo = (s.geo || []).filter(g => g && g.country).map(g =>
+          `${g.city || ''} ${g.countryCode || ''}`).join(' / ');
+        return `<tr><td style="font-family:var(--mono)">${esc(s.subdomain)}</td><td style="font-family:var(--mono)">${esc(ips)}</td><td>${esc(geo)}</td></tr>`;
+      }).join('');
+      html += dnsSection(`🔎 Resolved Subdomains (${resolved.length})`,
+        `<table class="dns-record-table"><thead><tr><th>Subdomain</th><th>IP(s)</th><th>Location</th></tr></thead><tbody>${subRows}</tbody></table>`
+      );
+    }
+
+    // ── Certificate transparency ──
+    if (passive.length) {
+      const certRows = passive.slice(0, 100).map(c =>
+        `<tr><td style="font-family:var(--mono)">${esc(c.subdomain)}</td><td style="font-size:.72rem;color:var(--muted)">${esc((c.issuer||'').split('O=')[1]?.split(',')[0] || c.issuer || '')}</td><td style="font-size:.72rem;color:var(--muted)">${(c.not_after||'').substring(0,10)}</td></tr>`
+      ).join('');
+      html += dnsSection(`🔐 Certificate Transparency — crt.sh (${passive.length} certs)`,
+        `<table class="dns-record-table"><thead><tr><th>Subdomain</th><th>Issuer</th><th>Expires</th></tr></thead><tbody>${certRows}</tbody></table>`
+      );
+    }
+
+    // ── Errors ──
+    if (r.errors?.length) {
+      html += dnsSection('ℹ️ Notes',
+        r.errors.map(e => `<div style="font-size:.78rem;color:var(--muted);padding:3px 0">• ${esc(e)}</div>`).join('')
+      );
+    }
+
+    html += `</div>`;
+    el.innerHTML = html;
+  }
+
+  function dnsSection(title, body) {
+    const id = 'dss' + Math.random().toString(36).slice(2,8);
+    return `<div class="dns-section">
+      <div class="dns-section-hdr" onclick="toggleDNSSection('${id}')">
+        <span class="dns-section-title">${title}</span>
+        <span id="arr${id}" style="color:var(--muted);font-size:.8rem">▾</span>
+      </div>
+      <div class="dns-section-body" id="${id}">${body}</div>
+    </div>`;
+  }
+
+  function toggleDNSSection(id) {
+    const el = document.getElementById(id);
+    const arr = document.getElementById('arr' + id);
+    const open = el.style.display !== 'none';
+    el.style.display = open ? 'none' : 'block';
+    arr.textContent = open ? '▸' : '▾';
+  }
+
+  function exportDNSpdf(id, domain) {
+    toast(`Generating PDF for ${domain}…`);
+    window.location.href = `/api/dns/investigations/${id}/pdf`;
+  }
+
+  async function deleteDNS(id) {
+    if (!confirm('Delete this DNS investigation?')) return;
+    await fetch(`/api/dns/investigations/${id}`, {method:'DELETE'});
+    toast('Deleted');
+    showDNSHistory();
   }
 
 </script>

@@ -41,6 +41,7 @@ dashboard = [
     "requests>=2.31",
     "telethon>=1.36",
     "reportlab>=4.0",
+    "dnspython>=2.4",
 ]
 dev = [
     "pytest>=7.4",
@@ -60,6 +61,7 @@ all = [
     "requests>=2.31",
     "telethon>=1.36",
     "reportlab>=4.0",
+    "dnspython>=2.4",
     "flask>=3.0",
     "gunicorn>=21.0",
 ]
