@@ -221,6 +221,8 @@ _active_scan_thread = None  # track running scan thread
 @dashboard_bp.route("/api/crawl/start", methods=["POST"])
 @require_login
 def api_crawl_start():
+    # Clear any stale stop flag before starting
+    STOP_FLAG.unlink(missing_ok=True)
     import asyncio
     import threading
     from pathlib import Path as _Path
@@ -289,7 +291,7 @@ def api_crawl_start():
             if STOP_FLAG.exists():
                 STOP_FLAG.unlink()
 
-    _active_scan_thread = threading.Thread(target=run, daemon=True)
+    _active_scan_thread = threading.Thread(target=run, daemon=True, name="crawl_thread")
     _active_scan_thread.start()
 
     return jsonify({"ok": True, "message": "Crawl started."})
@@ -310,6 +312,16 @@ def api_crawl_stop():
 def api_crawl_status():
     try:
         storage = get_storage()
+        # If DB shows running but no thread is alive, mark it completed
+        active = storage.get_active_session()
+        if active and active.get("status") == "running":
+            thread_alive = any(t.name == "crawl_thread" and t.is_alive()
+                               for t in __import__("threading").enumerate())
+            if not thread_alive:
+                from sqlalchemy import text as _text
+                with storage.get_session() as sess:
+                    sess.execute(_text("UPDATE crawl_sessions SET status='completed', ended_at=datetime('now') WHERE status='running'"))
+                    sess.commit()
         stats = storage.get_stats()
         active = storage.get_active_session()
 
