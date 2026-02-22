@@ -230,6 +230,44 @@ class ProjectHit(Base):
         Index("ix_project_hits_hit", "hit_id"),
     )
 
+
+
+# ── Paste Monitor Models ────────────────────────────────────────────────────────
+
+class SeenPaste(Base):
+    __tablename__ = "seen_pastes"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    source = Column(String(50), nullable=False)       # pastebin|rentry|pastesio|controlc|ghostbin
+    paste_id = Column(String(200), nullable=False)
+    url = Column(Text, nullable=False)
+    fetched_at = Column(DateTime, default=datetime.utcnow)
+    had_hits = Column(Boolean, default=False)
+
+    __table_args__ = (
+        Index("ix_seen_pastes_source_id", "source", "paste_id", unique=True),
+        Index("ix_seen_pastes_fetched", "fetched_at"),
+    )
+
+
+class PasteHit(Base):
+    __tablename__ = "paste_hits"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    paste_id = Column(String(200), nullable=False)
+    url = Column(Text, nullable=False)
+    source = Column(String(50), nullable=False)
+    matched_pattern = Column(String(100), nullable=False)  # pattern name e.g. ph_mobile
+    matched_value = Column(String(500), nullable=True)     # the actual matched string
+    context = Column(Text, nullable=True)
+    found_at = Column(DateTime, default=datetime.utcnow)
+
+    __table_args__ = (
+        Index("ix_paste_hits_found_at", "found_at"),
+        Index("ix_paste_hits_source", "source"),
+        Index("ix_paste_hits_pattern", "matched_pattern"),
+    )
+
 class Storage:
     def __init__(self, database_url: Optional[str] = None):
         self.database_url = database_url or os.getenv(
@@ -1057,6 +1095,84 @@ class Storage:
                 "total_hits": total_hits,
                 "top_keywords": [{"keyword": k, "count": c} for k, c in top_keywords],
             }
+
+
+    # ── Paste Monitor ─────────────────────────────────────────────────────────────
+
+    def is_paste_seen(self, source: str, paste_id: str) -> bool:
+        with self.get_session() as session:
+            return session.query(SeenPaste).filter(
+                SeenPaste.source == source,
+                SeenPaste.paste_id == paste_id,
+            ).first() is not None
+
+    def mark_paste_seen(self, source: str, paste_id: str, url: str, had_hits: bool = False):
+        with self.get_session() as session:
+            existing = session.query(SeenPaste).filter(
+                SeenPaste.source == source,
+                SeenPaste.paste_id == paste_id,
+            ).first()
+            if not existing:
+                session.add(SeenPaste(source=source, paste_id=paste_id,
+                                      url=url, had_hits=had_hits))
+                session.commit()
+
+    def save_paste_hit(self, paste_id: str, url: str, source: str,
+                       matched_pattern: str, matched_value: str = None,
+                       context: str = None) -> int:
+        with self.get_session() as session:
+            h = PasteHit(paste_id=paste_id, url=url, source=source,
+                         matched_pattern=matched_pattern,
+                         matched_value=matched_value, context=context)
+            session.add(h)
+            session.commit()
+            session.refresh(h)
+            return h.id
+
+    def get_recent_paste_hits(self, limit: int = 100, source: str = None,
+                               pattern: str = None) -> list[dict]:
+        with self.get_session() as session:
+            q = session.query(PasteHit)
+            if source:
+                q = q.filter(PasteHit.source == source)
+            if pattern:
+                q = q.filter(PasteHit.matched_pattern == pattern)
+            hits = q.order_by(PasteHit.found_at.desc()).limit(limit).all()
+            return [{
+                "id": h.id, "paste_id": h.paste_id, "url": h.url,
+                "source": h.source, "matched_pattern": h.matched_pattern,
+                "matched_value": h.matched_value, "context": h.context,
+                "found_at": h.found_at.isoformat() if h.found_at else None,
+            } for h in hits]
+
+    def get_paste_stats(self) -> dict:
+        with self.get_session() as session:
+            total_hits = session.query(func.count(PasteHit.id)).scalar() or 0
+            total_scanned = session.query(func.count(SeenPaste.id)).scalar() or 0
+            total_with_hits = session.query(func.count(SeenPaste.id)).filter(
+                SeenPaste.had_hits.is_(True)).scalar() or 0
+            by_pattern = (
+                session.query(PasteHit.matched_pattern,
+                              func.count(PasteHit.id).label("count"))
+                .group_by(PasteHit.matched_pattern)
+                .order_by(func.count(PasteHit.id).desc())
+                .all()
+            )
+            by_source = (
+                session.query(PasteHit.source,
+                              func.count(PasteHit.id).label("count"))
+                .group_by(PasteHit.source)
+                .order_by(func.count(PasteHit.id).desc())
+                .all()
+            )
+            return {
+                "total_hits": total_hits,
+                "total_scanned": total_scanned,
+                "total_with_hits": total_with_hits,
+                "by_pattern": [{"pattern": p, "count": c} for p, c in by_pattern],
+                "by_source": [{"source": s, "count": c} for s, c in by_source],
+            }
+
 
     def delete_dns_investigation(self, inv_id: int):
         with self.get_session() as session:

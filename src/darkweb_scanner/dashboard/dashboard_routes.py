@@ -1734,6 +1734,41 @@ def api_project_stats(project_id):
     return jsonify(get_storage().get_project_stats(project_id))
 
 
+
+
+# ── Paste Monitor API ──────────────────────────────────────────────────────────
+
+@dashboard_bp.route("/api/paste/hits", methods=["GET"])
+@require_login
+def api_paste_hits():
+    limit = int(request.args.get("limit", 100))
+    source = request.args.get("source")
+    pattern = request.args.get("pattern")
+    return jsonify(get_storage().get_recent_paste_hits(limit=limit, source=source, pattern=pattern))
+
+
+@dashboard_bp.route("/api/paste/stats", methods=["GET"])
+@require_login
+def api_paste_stats():
+    return jsonify(get_storage().get_paste_stats())
+
+
+@dashboard_bp.route("/api/paste/scan", methods=["POST"])
+@require_login
+def api_paste_scan():
+    """Trigger a one-shot paste scan (admin only)."""
+    storage = get_storage()
+    user = storage.get_user_by_id(session["user_id"])
+    if not user.is_admin:
+        return jsonify({"error": "Admin only"}), 403
+    try:
+        from darkweb_scanner.paste_monitor import run_paste_monitor
+        result = run_paste_monitor(storage, single_run=True)
+        return jsonify({"ok": True, **result})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
 # ── Health ─────────────────────────────────────────────────────────────────────
 
 
