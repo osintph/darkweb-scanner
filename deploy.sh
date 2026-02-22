@@ -3,12 +3,15 @@
 #  darkweb-scanner — Zero-prerequisite deployment script
 #  Repo: https://github.com/osintph/darkweb-scanner
 #
-#  Usage:
+#  Usage (recommended):
+#    curl -fsSL https://raw.githubusercontent.com/osintph/darkweb-scanner/main/deploy.sh -o /tmp/deploy.sh && sudo bash /tmp/deploy.sh
+#
+#  Or if already downloaded:
 #    sudo bash deploy.sh
 #
 #  Optional env overrides:
 #    INSTALL_DIR=/opt/darkweb-scanner sudo bash deploy.sh
-#    DOMAIN=scanner.example.com SSL_EMAIL=you@example.com sudo bash deploy.sh
+#    DOMAIN=scanner.example.com SSL_EMAIL=you@email.com sudo bash deploy.sh
 #    INSTALL_TIMER=1 sudo bash deploy.sh
 # =============================================================================
 set -euo pipefail
@@ -225,6 +228,14 @@ else
   echo -e "  💡 For a real SSL cert, redeploy with:"
   echo -e "     ${YELLOW}DOMAIN=yourdomain.com SSL_EMAIL=you@email.com sudo bash deploy.sh${NC}"
 fi
+echo ""
+echo -e "${YELLOW}First-time setup — create your admin account:${NC}"
+if [[ -n "$DOMAIN" ]]; then
+  echo -e "  👉 Visit ${CYAN}https://${DOMAIN}/register${NC} to create your admin account"
+else
+  echo -e "  👉 Visit ${CYAN}https://YOUR_SERVER_IP/register${NC} to create your admin account"
+fi
+echo -e "  (Registration is only open when no users exist — it closes after the first account is created)"
 echo ""
 echo -e "${YELLOW}Edit your configuration before running scans:${NC}"
 echo -e "  nano ${INSTALL_DIR}/.env"
