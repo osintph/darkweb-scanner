@@ -64,6 +64,7 @@ all = [
     "telethon>=1.36",
     "reportlab>=4.0",
     "dnspython>=2.4",
+    "feedparser>=6.0",
     "flask>=3.0",
     "gunicorn>=21.0",
 ]
