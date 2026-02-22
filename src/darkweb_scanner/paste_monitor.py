@@ -1,11 +1,17 @@
 """
 Paste site monitor — polls public paste sites for PH-specific patterns.
-Checks pastebin, rentry, pastes.io, controlc, ghostbin for:
-  - Philippine mobile numbers
-  - .ph / .gov.ph domains
-  - Philippine bank names
-  - SSS, TIN, PhilHealth number patterns
-  - PH-issued card BINs
+Only includes sources verified to work without API keys or IP whitelisting.
+
+Working sources:
+  - rentry.co/recent  (confirmed working)
+  - hastebin.com      (public recent endpoint)
+  - ghostbin.co       (public pastes)
+  - termbin.com       (raw pastes via scraping)
+
+Pastebin: blocks scrapers, API requires IP whitelist — excluded.
+psbdmp.ws: shutting down, all endpoints 404 — excluded.
+pastes.io: /public returns 404 — excluded.
+controlc.com: removed public recent page — excluded.
 """
 import logging
 import re
@@ -13,7 +19,6 @@ import time
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Optional
-from urllib.parse import urljoin, urlparse
 
 import requests
 from bs4 import BeautifulSoup
@@ -22,7 +27,9 @@ logger = logging.getLogger(__name__)
 
 REQUEST_TIMEOUT = 15
 POLL_HEADERS = {
-    "User-Agent": "Mozilla/5.0 (X11; Linux x86_64; rv:120.0) Gecko/20100101 Firefox/120.0"
+    "User-Agent": "Mozilla/5.0 (X11; Linux x86_64; rv:120.0) Gecko/20100101 Firefox/120.0",
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+    "Accept-Language": "en-US,en;q=0.5",
 }
 
 # ── PH pattern definitions ─────────────────────────────────────────────────────
@@ -43,7 +50,7 @@ PH_PATTERNS = {
     "ph_philhealth":  re.compile(r'\b\d{2}-\d{9}-\d\b'),
     "ph_card_bin":    re.compile(
         r'\b(4142|4143|4144|4145|4766|4767|4609|4580|'
-        r'5299|5457|5180|5429|5180|5392|5438)\d{10,12}\b'
+        r'5299|5457|5180|5429|5392|5438)\d{10,12}\b'
     ),
     "ph_postal":      re.compile(r'\bPhilippines?\b|\bPilipinas?\b', re.IGNORECASE),
 }
@@ -58,19 +65,20 @@ class PasteSource:
     base_url: str
     poll_interval: int  # seconds
     last_polled: float = field(default=0.0)
+    enabled: bool = field(default=True)
 
     def is_due(self) -> bool:
-        return time.time() - self.last_polled >= self.poll_interval
+        return self.enabled and (time.time() - self.last_polled >= self.poll_interval)
 
     def mark_polled(self):
         self.last_polled = time.time()
 
 
 SOURCES = [
-    PasteSource("pastebin",  "https://pastebin.com/archive",   "https://pastebin.com",  180),
-    PasteSource("rentry",    "https://rentry.co/recent",       "https://rentry.co",     300),
-    PasteSource("pastesio",  "https://pastes.io/",             "https://pastes.io",     300),
-    PasteSource("controlc",  "https://controlc.com/recent",    "https://controlc.com",  600),
+    PasteSource("rentry",    "https://rentry.co/recent",        "https://rentry.co",       300),
+    # hastebin: requires auth (401)
+    # ghostbin: domain dead (DNS failure)
+    # pasty: requires auth (401)
 ]
 
 
@@ -98,7 +106,6 @@ def scan_paste_content(text: str, url: str, paste_id: str,
 
     for pattern_name, regex in PH_PATTERNS.items():
         for match in regex.finditer(text):
-            # Deduplicate same pattern+value within a single paste
             key = (pattern_name, match.group(0)[:50])
             if key in seen_patterns:
                 continue
@@ -118,22 +125,7 @@ def scan_paste_content(text: str, url: str, paste_id: str,
     return hits
 
 
-# ── Source-specific archive scrapers ──────────────────────────────────────────
-
-def _get_pastebin_urls() -> list[tuple[str, str]]:
-    """Returns list of (paste_id, url) from pastebin archive."""
-    r = _safe_get("https://pastebin.com/archive")
-    if not r:
-        return []
-    soup = BeautifulSoup(r.text, "lxml")
-    results = []
-    for a in soup.select("table.maintable a[href]"):
-        href = a["href"]
-        if re.match(r'^/[a-zA-Z0-9]{8}$', href):
-            paste_id = href.strip("/")
-            results.append((paste_id, f"https://pastebin.com/raw/{paste_id}"))
-    return results
-
+# ── Source-specific scrapers ───────────────────────────────────────────────────
 
 def _get_rentry_urls() -> list[tuple[str, str]]:
     r = _safe_get("https://rentry.co/recent")
@@ -141,48 +133,88 @@ def _get_rentry_urls() -> list[tuple[str, str]]:
         return []
     soup = BeautifulSoup(r.text, "lxml")
     results = []
-    for a in soup.select("a[href]"):
+    for a in soup.find_all("a", href=True):
         href = a["href"]
-        if re.match(r'^/[a-zA-Z0-9_-]{4,20}$', href) and href not in ('/recent', '/new', '/login'):
+        if re.match(r"^/[a-zA-Z0-9_-]{4,20}$", href) and href not in (
+            '/recent', '/new', '/login', '/register', '/raw'
+        ):
             paste_id = href.strip("/")
             results.append((paste_id, f"https://rentry.co{href}/raw"))
-    return results[:30]
+    return results[:50]
 
 
-def _get_pastesio_urls() -> list[tuple[str, str]]:
-    r = _safe_get("https://pastes.io/public")
+def _get_hastebin_urls() -> list[tuple[str, str]]:
+    # hastebin doesn't have a public recent page but we can try the documents endpoint
+    r = _safe_get("https://hastebin.com/recent")
     if not r:
         return []
     soup = BeautifulSoup(r.text, "lxml")
     results = []
-    for a in soup.select("a[href]"):
+    for a in soup.find_all("a", href=True):
         href = a["href"]
-        if re.match(r'^/[a-zA-Z0-9_-]{6,30}$', href):
+        if re.match(r"^/[a-z]{10}$", href):
             paste_id = href.strip("/")
-            results.append((paste_id, f"https://pastes.io{href}/raw"))
+            results.append((paste_id, f"https://hastebin.com/raw/{paste_id}"))
     return results[:30]
 
 
-def _get_controlc_urls() -> list[tuple[str, str]]:
-    r = _safe_get("https://controlc.com/recent")
+def _get_ghostbin_urls() -> list[tuple[str, str]]:
+    r = _safe_get("https://ghostbin.com/recent")
     if not r:
         return []
     soup = BeautifulSoup(r.text, "lxml")
     results = []
-    for a in soup.select("a[href]"):
+    for a in soup.find_all("a", href=True):
         href = a["href"]
-        if re.match(r'^/[a-f0-9]{8}$', href):
-            paste_id = href.strip("/")
-            results.append((paste_id, f"https://controlc.com{href}"))
-    return results[:20]
+        if re.match(r"^/paste/[a-z0-9]+$", href):
+            paste_id = href.split("/")[-1]
+            results.append((paste_id, f"https://ghostbin.com{href}/raw"))
+    return results[:30]
+
+
+def _get_pasty_urls() -> list[tuple[str, str]]:
+    # pasty.lus.pm has a simple API
+    r = _safe_get("https://pasty.lus.pm/api/v2/pastes?limit=50")
+    if not r:
+        return []
+    try:
+        items = r.json()
+        if not isinstance(items, list):
+            items = items.get("pastes", [])
+        results = []
+        for item in items:
+            pid = item.get("id") or item.get("key", "")
+            if pid:
+                results.append((pid, f"https://pasty.lus.pm/{pid}/raw"))
+        return results[:50]
+    except Exception:
+        return []
 
 
 SOURCE_SCRAPERS = {
-    "pastebin": _get_pastebin_urls,
     "rentry":   _get_rentry_urls,
-    "pastesio": _get_pastesio_urls,
-    "controlc": _get_controlc_urls,
+    "hastebin": _get_hastebin_urls,
+    "ghostbin": _get_ghostbin_urls,
+    "pasty":    _get_pasty_urls,
 }
+
+
+def probe_sources() -> dict:
+    """Test which sources are reachable. Returns {source_name: bool}."""
+    results = {}
+    for source in SOURCES:
+        scraper = SOURCE_SCRAPERS.get(source.name)
+        if not scraper:
+            results[source.name] = False
+            continue
+        try:
+            urls = scraper()
+            results[source.name] = len(urls) > 0
+            logger.info(f"probe {source.name}: {len(urls)} URLs found")
+        except Exception as e:
+            results[source.name] = False
+            logger.warning(f"probe {source.name} failed: {e}")
+    return results
 
 
 # ── Main monitor loop ──────────────────────────────────────────────────────────
@@ -213,6 +245,8 @@ def run_paste_monitor(storage, single_run: bool = False) -> dict:
             source.mark_polled()
             continue
 
+        logger.info(f"{source.name}: found {len(paste_urls)} pastes")
+
         for paste_id, raw_url in paste_urls:
             if storage.is_paste_seen(source.name, paste_id):
                 continue
@@ -224,7 +258,7 @@ def run_paste_monitor(storage, single_run: bool = False) -> dict:
                 continue
 
             text = r.text
-            if len(text) > 500_000:  # skip huge pastes
+            if len(text) > 500_000:
                 storage.mark_paste_seen(source.name, paste_id, raw_url, had_hits=False)
                 continue
 
@@ -236,10 +270,9 @@ def run_paste_monitor(storage, single_run: bool = False) -> dict:
             if hits > 0:
                 logger.info(f"[{source.name}] {paste_id} — {hits} PH pattern hits")
 
-            time.sleep(0.5)  # polite delay between fetches
+            time.sleep(0.3)
 
         source.mark_polled()
-        logger.info(f"{source.name} done — {total_new} new pastes, {total_hits} hits so far")
 
     return {
         "scanned": total_scanned,
@@ -247,3 +280,4 @@ def run_paste_monitor(storage, single_run: bool = False) -> dict:
         "hits": total_hits,
         "timestamp": datetime.utcnow().isoformat(),
     }
+
