@@ -184,3 +184,64 @@ docker compose up -d
 **Digest not sending:** Check `MAILGUN_API_KEY` is set in `.env`
 
 **Full restart:** `docker compose down && docker compose up -d`
+
+---
+
+## Web Check Integration
+
+Web Check provides OSINT analysis for any domain — DNS, SSL, headers, ports, tech stack, and more. It runs as a separate service at `webcheck.osintph.info` and is accessible via the **🔍 Web Check** button in the dashboard nav bar.
+
+### Fresh Deploy Steps
+
+Web Check lives outside the main repo at `/root/web-check` and must be set up manually after deploying the main platform:
+
+**1. Install Node.js 20+ and yarn**
+```bash
+curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
+apt install nodejs -y
+npm install -g yarn
+```
+
+**2. Clone and build web-check**
+```bash
+cd /root
+git clone https://github.com/lissy93/web-check.git
+cd web-check
+BASE_URL=/ yarn install && yarn build
+```
+
+**3. Add DNS record**
+
+Add an A record for `webcheck.YOURDOMAIN` pointing to your server IP. Set to DNS only (grey cloud) in Cloudflare during cert issuance.
+
+**4. Start the container**
+```bash
+cd /root/darkweb-scanner
+docker compose up -d webcheck
+```
+
+**5. Issue SSL certificate**
+```bash
+docker compose exec nginx certbot certonly --webroot --webroot-path /var/www/certbot \
+  --email YOUR_SSL_EMAIL --agree-tos --no-eff-email \
+  -d webcheck.YOURDOMAIN
+```
+
+**6. Link cert and reload nginx**
+```bash
+docker compose exec nginx sh -c "
+  ln -sf /etc/letsencrypt/live/webcheck.YOURDOMAIN/fullchain.pem /etc/nginx/certs/webcheck-cert.pem &&
+  ln -sf /etc/letsencrypt/live/webcheck.YOURDOMAIN/privkey.pem /etc/nginx/certs/webcheck-key.pem
+"
+docker compose up -d --build nginx
+```
+
+### SSL Renewal
+
+The webcheck.osintph.info cert renews automatically via the certbot cron job inside the nginx container as long as the container stays running.
+
+### Troubleshooting
+
+**Web Check not loading:** `docker compose logs webcheck`
+
+**502 Bad Gateway on webcheck subdomain:** Container may still be starting — wait 30 seconds and retry.
