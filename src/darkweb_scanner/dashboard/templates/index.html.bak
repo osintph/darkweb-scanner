@@ -280,9 +280,7 @@
     <button class="nav-tab" onclick="switchTab('ransomware', this)">☠️ Ransomware</button>
     <button class="nav-tab" onclick="switchTab('threatactors', this)">🕵️ Threat Actors</button>
     <button class="nav-tab" onclick="switchTab('projects', this)">📁 Projects</button>
-    <button class="nav-tab" onclick="switchTab('paste', this)">📋 Paste Monitor</button>
     <button class="nav-tab" onclick="switchTab('dns', this)">🌐 DNS</button>
-    <button class="nav-tab" onclick="switchTab('webcheck', this)">🔍 Web Check</button>
     <button class="nav-tab" onclick="switchTab('reports', this)">📄 Reports</button>
     <button class="nav-tab" onclick="switchTab('settings', this)">⚙️ Settings</button>
   </nav>
@@ -611,50 +609,6 @@
     </div>
   </div>
 
-  <!-- ── Paste Monitor Tab ── -->
-  <div class="tab-panel" id="panel-paste">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;flex-wrap:wrap;gap:10px">
-      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
-        <select id="pasteSourceFilter" onchange="filterPasteHits()" style="background:var(--surface);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:6px 10px;font-size:.85rem">
-          <option value="">All Sources</option>
-          <option value="pastebin">Pastebin</option>
-          <option value="rentry">Rentry</option>
-          <option value="pastesio">Pastes.io</option>
-          <option value="controlc">ControlC</option>
-        </select>
-        <select id="pastePatternFilter" onchange="filterPasteHits()" style="background:var(--surface);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:6px 10px;font-size:.85rem">
-          <option value="">All Patterns</option>
-          <option value="ph_mobile">PH Mobile</option>
-          <option value="ph_domain">.ph Domain</option>
-          <option value="ph_gov_domain">.gov.ph Domain</option>
-          <option value="ph_bank">PH Bank</option>
-          <option value="ph_sss">SSS Number</option>
-          <option value="ph_tin">TIN</option>
-          <option value="ph_philhealth">PhilHealth</option>
-          <option value="ph_card_bin">Card BIN</option>
-          <option value="ph_postal">PH Postal</option>
-        </select>
-      </div>
-      <div style="display:flex;gap:8px">
-        <button class="btn btn-secondary" onclick="loadPasteHits()">🔄 Refresh</button>
-        <button class="btn btn-primary admin-only" onclick="triggerPasteScan()" id="pasteScanBtn">▶ Scan Now</button>
-      </div>
-    </div>
-
-    <!-- Stats row -->
-    <div id="pasteStatsRow" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px;margin-bottom:20px"></div>
-
-    <!-- Hits table -->
-    <div id="pasteHitsContainer">
-      <div class="empty"><div class="icon">📋</div><p>No paste hits yet. Click Scan Now to start monitoring.</p></div>
-    </div>
-  </div>
-
-  <!-- ── Web Check Tab ── -->
-  <div class="tab-panel" id="panel-webcheck">
-    <iframe src="/webcheck/" style="width:100%;height:calc(100vh - 120px);border:none;border-radius:8px;background:#0d1117;" allowfullscreen></iframe>
-  </div>
-
   <!-- ── DNS Crawler Tab ── -->
   <div class="tab-panel" id="panel-dns">
     <div class="dns-input-bar">
@@ -791,9 +745,7 @@
     if (tab === 'ransomware') loadRansomware();
     if (tab === 'threatactors') loadThreatActors();
     if (tab === 'projects') loadProjects();
-    if (tab === 'paste') loadPasteHits();
     if (tab === 'dns') loadDNSInvestigations();
-    if (tab === 'webcheck') document.querySelector('#panel-webcheck iframe').src = '/webcheck/';
     if (tab === 'reports') { loadReportPreview(); if (isAdmin) loadSubscribers(); }
     if (tab === 'settings') loadSettings();
   }
@@ -1135,111 +1087,6 @@
       const r = await fetch(url, opts);
       return await r.json();
     } catch(e) { console.error('apiFetch error', url, e); return null; }
-  }
-
-  // ── Paste Monitor ──────────────────────────────────────────────────────────
-  const PASTE_PATTERN_LABELS = {
-    ph_mobile:     '📱 PH Mobile',
-    ph_domain:     '🌐 .ph Domain',
-    ph_gov_domain: '🏛 .gov.ph',
-    ph_bank:       '🏦 PH Bank',
-    ph_sss:        '🪪 SSS',
-    ph_tin:        '🧾 TIN',
-    ph_philhealth: '🏥 PhilHealth',
-    ph_card_bin:   '💳 Card BIN',
-    ph_postal:     '📍 PH Postal',
-  };
-
-  const PASTE_SOURCE_COLORS = {
-    pastebin: '#f85149',
-    rentry:   '#3fb950',
-    pastesio: '#388bfd',
-    controlc: '#d29922',
-    ghostbin: '#a371f7',
-  };
-
-  async function loadPasteHits() {
-    const source = document.getElementById('pasteSourceFilter').value;
-    const pattern = document.getElementById('pastePatternFilter').value;
-    let url = `/api/paste/hits?limit=200`;
-    if (source) url += `&source=${source}`;
-    if (pattern) url += `&pattern=${pattern}`;
-
-    const [hits, stats] = await Promise.all([
-      apiFetch(url),
-      apiFetch('/api/paste/stats'),
-    ]);
-
-    renderPasteStats(stats);
-    renderPasteHits(hits || []);
-  }
-
-  function filterPasteHits() { loadPasteHits(); }
-
-  function renderPasteStats(stats) {
-    if (!stats) return;
-    const row = document.getElementById('pasteStatsRow');
-    row.innerHTML = `
-      <div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:14px">
-        <div style="font-size:.72rem;color:var(--muted);text-transform:uppercase;margin-bottom:4px">Total Hits</div>
-        <div style="font-size:1.5rem;font-weight:700;color:var(--accent)">${stats.total_hits || 0}</div>
-      </div>
-      <div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:14px">
-        <div style="font-size:.72rem;color:var(--muted);text-transform:uppercase;margin-bottom:4px">Pastes Scanned</div>
-        <div style="font-size:1.5rem;font-weight:700">${stats.total_scanned || 0}</div>
-      </div>
-      <div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:14px">
-        <div style="font-size:.72rem;color:var(--muted);text-transform:uppercase;margin-bottom:4px">Pastes w/ Hits</div>
-        <div style="font-size:1.5rem;font-weight:700;color:#d29922">${stats.total_with_hits || 0}</div>
-      </div>
-      ${(stats.by_source || []).map(s => `
-      <div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:14px">
-        <div style="font-size:.72rem;color:var(--muted);text-transform:uppercase;margin-bottom:4px">${s.source}</div>
-        <div style="font-size:1.5rem;font-weight:700;color:${PASTE_SOURCE_COLORS[s.source]||'var(--text)'}">${s.count}</div>
-      </div>`).join('')}`;
-  }
-
-  function renderPasteHits(hits) {
-    const container = document.getElementById('pasteHitsContainer');
-    if (!hits.length) {
-      container.innerHTML = '<div class="empty"><div class="icon">📋</div><p>No paste hits found for the selected filters.</p></div>';
-      return;
-    }
-    container.innerHTML = `<table class="proj-table">
-      <thead><tr>
-        <th>Pattern</th>
-        <th>Matched Value</th>
-        <th>Source</th>
-        <th>URL</th>
-        <th>Context</th>
-        <th>Found At</th>
-      </tr></thead>
-      <tbody>${hits.map(h => `<tr>
-        <td><span style="background:rgba(56,139,253,.15);color:#58a6ff;padding:2px 8px;border-radius:4px;font-size:.75rem;white-space:nowrap">${PASTE_PATTERN_LABELS[h.matched_pattern] || h.matched_pattern}</span></td>
-        <td style="font-family:monospace;font-size:.8rem;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${h.matched_value||''}">${h.matched_value || '—'}</td>
-        <td><span style="background:${PASTE_SOURCE_COLORS[h.source]||'var(--surface)'}22;color:${PASTE_SOURCE_COLORS[h.source]||'var(--muted)'};padding:2px 8px;border-radius:4px;font-size:.75rem">${h.source}</span></td>
-        <td style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
-          <a href="${h.url}" target="_blank" style="color:var(--accent);font-size:.78rem">${h.url.replace('https://','')}</a>
-        </td>
-        <td style="font-size:.78rem;color:var(--muted);max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${(h.context||'').replace(/"/g,'&quot;')}">${h.context ? h.context.slice(0,80)+'…' : '—'}</td>
-        <td style="font-size:.75rem;white-space:nowrap;color:var(--muted)">${h.found_at ? h.found_at.slice(0,16).replace('T',' ') : '—'}</td>
-      </tr>`).join('')}</tbody>
-    </table>`;
-  }
-
-  async function triggerPasteScan() {
-    const btn = document.getElementById('pasteScanBtn');
-    btn.disabled = true;
-    btn.textContent = '⏳ Scanning…';
-    const result = await apiFetch('/api/paste/scan', 'POST');
-    btn.disabled = false;
-    btn.textContent = '▶ Scan Now';
-    if (result && result.ok) {
-      toast(`Paste scan complete — ${result.scanned} pastes scanned, ${result.hits} hits found`);
-      loadPasteHits();
-    } else {
-      toast('Scan failed — check logs');
-    }
   }
 
   // ── Projects ───────────────────────────────────────────────────────────────

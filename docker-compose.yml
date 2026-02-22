@@ -76,6 +76,19 @@ services:
     networks:
       - scanner_net
 
+  # ── Web Check ───────────────────────────────────────────────────────────────
+  webcheck:
+    build:
+      context: /root/web-check
+    restart: unless-stopped
+    environment:
+      - PORT=3000
+      - DISABLE_GUI=false
+    expose:
+      - "3000"
+    networks:
+      - scanner_net
+
 volumes:
   tor_data:
   app_data:
