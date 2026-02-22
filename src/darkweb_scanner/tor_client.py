@@ -67,7 +67,10 @@ class TorClient:
         """Request a new Tor identity via the control port."""
         try:
             with Controller.from_port(port=self.control_port) as controller:
-                controller.authenticate(password=self.control_password)
+                try:
+                    controller.authenticate()
+                except Exception:
+                    controller.authenticate(password=self.control_password)
                 controller.signal(Signal.NEWNYM)
                 self._last_rotation = time.time()
                 logger.info("Tor circuit rotated successfully")

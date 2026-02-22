@@ -42,6 +42,7 @@ async def run_scan(
     storage: Storage,
     alerter: Alerter,
     check_tor: bool = True,
+    stop_flag=None,
 ):
     tor = create_tor_client()
     crawler = Crawler(tor, crawl_config)

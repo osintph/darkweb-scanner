@@ -126,11 +126,15 @@ class Crawler:
                 url=url, status_code=0, html="", text="", links=[], depth=0, error=str(e)
             )
 
-    async def _crawl_url(self, url: str, depth: int, session: aiohttp.ClientSession) -> CrawlResult:
+    async def _crawl_url(self, url: str, depth: int) -> CrawlResult:
         async with self._semaphore:
+            stop_flag = pathlib.Path(os.environ.get("DATA_DIR", "/app/data")) / "crawl.stop"
+            if stop_flag.exists():
+                return CrawlResult(url=url, status_code=0, html="", text="", links=[], depth=depth, error="stopped")
             delay = random.uniform(self.config.delay_min, self.config.delay_max)
             await asyncio.sleep(delay)
             logger.info(f"Fetching [{depth}] {url}")
+            session = await self.tor.get_session()
             result = await self._fetch(url, session)
             result.depth = depth
             self._pages_crawled += 1
@@ -154,8 +158,6 @@ class Crawler:
             queue.append((normalized, 0, domain))
             self._visited.add(normalized)
 
-        session = await self.tor.get_session()
-
         stop_flag = pathlib.Path(os.environ.get("DATA_DIR", "/app/data")) / "crawl.stop"
 
         while queue:
@@ -172,7 +174,7 @@ class Crawler:
             while queue and len(batch) < self.config.max_concurrent:
                 batch.append(queue.popleft())
 
-            tasks = [self._crawl_url(url, depth, session) for url, depth, _ in batch]
+            tasks = [self._crawl_url(url, depth) for url, depth, _ in batch]
             results = await asyncio.gather(*tasks, return_exceptions=True)
 
             for i, result in enumerate(results):
