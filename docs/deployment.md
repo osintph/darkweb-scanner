@@ -5,7 +5,7 @@
 The fastest way to get running on any fresh Linux server:
 
 ```bash
-sudo bash <(curl -fsSL https://raw.githubusercontent.com/osintph/darkweb-scanner/main/deploy.sh)
+curl -fsSL https://raw.githubusercontent.com/osintph/darkweb-scanner/main/deploy.sh -o /tmp/deploy.sh && sudo bash /tmp/deploy.sh
 ```
 
 This installs Docker, clones the repo, configures Tor, generates secrets, and starts all services automatically.
@@ -26,7 +26,7 @@ You need a domain name pointed at your server's public IP.
 
 **Option A — Set domain at deploy time:**
 ```bash
-DOMAIN=scanner.yourdomain.com SSL_EMAIL=you@example.com sudo bash deploy.sh
+DOMAIN=scanner.yourdomain.com SSL_EMAIL=you@example.com sudo bash /tmp/deploy.sh
 ```
 
 **Option B — Set domain after deployment:**
@@ -64,8 +64,8 @@ ufw enable
 
 ```bash
 su - scanner
-DOMAIN=scanner.yourdomain.com SSL_EMAIL=you@example.com sudo bash \
-  <(curl -fsSL https://raw.githubusercontent.com/osintph/darkweb-scanner/main/deploy.sh)
+curl -fsSL https://raw.githubusercontent.com/osintph/darkweb-scanner/main/deploy.sh -o /tmp/deploy.sh && \
+  DOMAIN=scanner.yourdomain.com SSL_EMAIL=you@example.com sudo bash /tmp/deploy.sh
 ```
 
 ### 3. Configure API keys
