@@ -282,7 +282,7 @@
     <button class="nav-tab" onclick="switchTab('projects', this)">📁 Projects</button>
     <button class="nav-tab" onclick="switchTab('paste', this)">📋 Paste Monitor</button>
     <button class="nav-tab" onclick="switchTab('dns', this)">🌐 DNS</button>
-    <button class="nav-tab" onclick="switchTab('webcheck', this)">🔍 Web Check</button>
+    <button class="nav-tab" onclick="window.open('https://webcheck.osintph.info', '_blank')">🔍 Web Check</button>
     <button class="nav-tab" onclick="switchTab('reports', this)">📄 Reports</button>
     <button class="nav-tab" onclick="switchTab('settings', this)">⚙️ Settings</button>
   </nav>
@@ -648,11 +648,6 @@
     <div id="pasteHitsContainer">
       <div class="empty"><div class="icon">📋</div><p>No paste hits yet. Click Scan Now to start monitoring.</p></div>
     </div>
-  </div>
-
-  <!-- ── Web Check Tab ── -->
-  <div class="tab-panel" id="panel-webcheck">
-    <iframe src="/webcheck/" style="width:100%;height:calc(100vh - 120px);border:none;border-radius:8px;background:#0d1117;" allowfullscreen></iframe>
   </div>
 
   <!-- ── DNS Crawler Tab ── -->

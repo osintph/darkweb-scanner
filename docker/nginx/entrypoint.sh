@@ -47,15 +47,6 @@ server {
         proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto \$scheme;
         proxy_read_timeout 120s;
-    }
-    location /webcheck/ {
-        proxy_pass http://webcheck:3000/;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-        proxy_read_timeout 120s;
-        proxy_connect_timeout 10s;
         proxy_connect_timeout 10s;
     }
     location /ws {
@@ -104,6 +95,31 @@ server {
 EOF
     echo "[nginx] www virtual host configured for: ${WWW_DOMAIN}"
   fi
+  cat >> /etc/nginx/conf.d/darkweb.conf <<WCEOF
+server {
+    listen 80;
+    server_name webcheck.${DOMAIN#*.};
+    location /.well-known/acme-challenge/ { root /var/www/certbot; }
+    location / { return 301 https://\$host\$request_uri; }
+}
+server {
+    listen 443 ssl;
+    server_name webcheck.${DOMAIN#*.};
+    ssl_certificate     $CERT_DIR/webcheck-cert.pem;
+    ssl_certificate_key $CERT_DIR/webcheck-key.pem;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    add_header X-Frame-Options DENY always;
+    add_header X-Content-Type-Options nosniff always;
+    location / {
+        proxy_pass http://webcheck:3000;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_read_timeout 120s;
+    }
+}
+WCEOF
   echo "[nginx] Config written."
 }
 
