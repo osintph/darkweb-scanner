@@ -1497,6 +1497,243 @@ def api_dns_pdf(inv_id: int):
     )
 
 
+
+
+# ── Projects API ───────────────────────────────────────────────────────────────
+
+
+def _check_project_access(project_id: int, require_owner: bool = False):
+    """Returns (project_dict, error_response). Checks auth and ownership."""
+    storage = get_storage()
+    project = storage.get_project(project_id)
+    if not project:
+        return None, (jsonify({"error": "Project not found"}), 404)
+    user = storage.get_user_by_id(session["user_id"])
+    if not user.is_admin and project["owner_id"] != session["user_id"]:
+        return None, (jsonify({"error": "Access denied"}), 403)
+    return project, None
+
+
+@dashboard_bp.route("/api/projects", methods=["GET"])
+@require_login
+def api_projects_list():
+    storage = get_storage()
+    user = storage.get_user_by_id(session["user_id"])
+    if user.is_admin:
+        projects = storage.list_projects()
+    else:
+        projects = storage.list_projects(owner_id=session["user_id"])
+    # attach owner username
+    for p in projects:
+        owner = storage.get_user_by_id(p["owner_id"])
+        p["owner_username"] = owner.username if owner else "unknown"
+    return jsonify(projects)
+
+
+@dashboard_bp.route("/api/projects", methods=["POST"])
+@require_login
+def api_projects_create():
+    body = request.get_json() or {}
+    name = (body.get("name") or "").strip()
+    if not name:
+        return jsonify({"error": "Project name required"}), 400
+    storage = get_storage()
+    project_id = storage.create_project(
+        name=name,
+        owner_id=session["user_id"],
+        description=(body.get("description") or "").strip() or None,
+        color=body.get("color") or "#f85149",
+        tags=body.get("tags") or [],
+        alert_threshold=int(body.get("alert_threshold") or 1),
+    )
+    return jsonify({"ok": True, "id": project_id})
+
+
+@dashboard_bp.route("/api/projects/<int:project_id>", methods=["GET"])
+@require_login
+def api_projects_get(project_id):
+    project, err = _check_project_access(project_id)
+    if err:
+        return err
+    storage = get_storage()
+    owner = storage.get_user_by_id(project["owner_id"])
+    project["owner_username"] = owner.username if owner else "unknown"
+    return jsonify(project)
+
+
+@dashboard_bp.route("/api/projects/<int:project_id>", methods=["PUT"])
+@require_login
+def api_projects_update(project_id):
+    project, err = _check_project_access(project_id)
+    if err:
+        return err
+    body = request.get_json() or {}
+    allowed = ["name", "description", "status", "color", "tags", "alert_threshold"]
+    updates = {k: v for k, v in body.items() if k in allowed}
+    if not updates:
+        return jsonify({"error": "No valid fields to update"}), 400
+    get_storage().update_project(project_id, **updates)
+    return jsonify({"ok": True})
+
+
+@dashboard_bp.route("/api/projects/<int:project_id>", methods=["DELETE"])
+@require_login
+def api_projects_delete(project_id):
+    project, err = _check_project_access(project_id)
+    if err:
+        return err
+    get_storage().delete_project(project_id)
+    return jsonify({"ok": True})
+
+
+@dashboard_bp.route("/api/projects/<int:project_id>/status", methods=["PATCH"])
+@require_login
+def api_projects_status(project_id):
+    project, err = _check_project_access(project_id)
+    if err:
+        return err
+    body = request.get_json() or {}
+    status = body.get("status")
+    if status not in ("active", "paused", "archived"):
+        return jsonify({"error": "status must be active, paused, or archived"}), 400
+    get_storage().update_project(project_id, status=status)
+    return jsonify({"ok": True})
+
+
+# Keywords
+@dashboard_bp.route("/api/projects/<int:project_id>/keywords", methods=["GET"])
+@require_login
+def api_project_keywords_get(project_id):
+    _, err = _check_project_access(project_id)
+    if err:
+        return err
+    return jsonify(get_storage().get_project_keywords(project_id))
+
+
+@dashboard_bp.route("/api/projects/<int:project_id>/keywords", methods=["POST"])
+@require_login
+def api_project_keywords_add(project_id):
+    _, err = _check_project_access(project_id)
+    if err:
+        return err
+    body = request.get_json() or {}
+    keyword = (body.get("keyword") or "").strip()
+    if not keyword:
+        return jsonify({"error": "keyword required"}), 400
+    kid = get_storage().add_project_keyword(
+        project_id, keyword,
+        category=body.get("category") or "custom",
+        is_regex=bool(body.get("is_regex", False)),
+    )
+    return jsonify({"ok": True, "id": kid})
+
+
+@dashboard_bp.route("/api/projects/<int:project_id>/keywords/<int:keyword_id>", methods=["DELETE"])
+@require_login
+def api_project_keywords_delete(project_id, keyword_id):
+    _, err = _check_project_access(project_id)
+    if err:
+        return err
+    get_storage().delete_project_keyword(keyword_id)
+    return jsonify({"ok": True})
+
+
+# Domains
+@dashboard_bp.route("/api/projects/<int:project_id>/domains", methods=["GET"])
+@require_login
+def api_project_domains_get(project_id):
+    _, err = _check_project_access(project_id)
+    if err:
+        return err
+    return jsonify(get_storage().get_project_domains(project_id))
+
+
+@dashboard_bp.route("/api/projects/<int:project_id>/domains", methods=["POST"])
+@require_login
+def api_project_domains_add(project_id):
+    _, err = _check_project_access(project_id)
+    if err:
+        return err
+    body = request.get_json() or {}
+    domain = (body.get("domain") or "").strip()
+    if not domain:
+        return jsonify({"error": "domain required"}), 400
+    did = get_storage().add_project_domain(
+        project_id, domain,
+        priority=int(body.get("priority") or 3),
+        notes=body.get("notes"),
+    )
+    return jsonify({"ok": True, "id": did})
+
+
+@dashboard_bp.route("/api/projects/<int:project_id>/domains/<int:domain_id>", methods=["DELETE"])
+@require_login
+def api_project_domains_delete(project_id, domain_id):
+    _, err = _check_project_access(project_id)
+    if err:
+        return err
+    get_storage().delete_project_domain(domain_id)
+    return jsonify({"ok": True})
+
+
+# Entities
+@dashboard_bp.route("/api/projects/<int:project_id>/entities", methods=["GET"])
+@require_login
+def api_project_entities_get(project_id):
+    _, err = _check_project_access(project_id)
+    if err:
+        return err
+    return jsonify(get_storage().get_project_entities(project_id))
+
+
+@dashboard_bp.route("/api/projects/<int:project_id>/entities", methods=["POST"])
+@require_login
+def api_project_entities_add(project_id):
+    _, err = _check_project_access(project_id)
+    if err:
+        return err
+    body = request.get_json() or {}
+    entity_type = (body.get("entity_type") or "").strip()
+    value = (body.get("value") or "").strip()
+    valid_types = ("person", "organization", "brand", "ip", "email", "bitcoin_address")
+    if entity_type not in valid_types:
+        return jsonify({"error": f"entity_type must be one of {valid_types}"}), 400
+    if not value:
+        return jsonify({"error": "value required"}), 400
+    eid = get_storage().add_project_entity(project_id, entity_type, value, body.get("notes"))
+    return jsonify({"ok": True, "id": eid})
+
+
+@dashboard_bp.route("/api/projects/<int:project_id>/entities/<int:entity_id>", methods=["DELETE"])
+@require_login
+def api_project_entities_delete(project_id, entity_id):
+    _, err = _check_project_access(project_id)
+    if err:
+        return err
+    get_storage().delete_project_entity(entity_id)
+    return jsonify({"ok": True})
+
+
+# Hits & Stats
+@dashboard_bp.route("/api/projects/<int:project_id>/hits", methods=["GET"])
+@require_login
+def api_project_hits(project_id):
+    _, err = _check_project_access(project_id)
+    if err:
+        return err
+    limit = int(request.args.get("limit", 100))
+    return jsonify(get_storage().get_project_hits(project_id, limit=limit))
+
+
+@dashboard_bp.route("/api/projects/<int:project_id>/stats", methods=["GET"])
+@require_login
+def api_project_stats(project_id):
+    _, err = _check_project_access(project_id)
+    if err:
+        return err
+    return jsonify(get_storage().get_project_stats(project_id))
+
+
 # ── Health ─────────────────────────────────────────────────────────────────────
 
 

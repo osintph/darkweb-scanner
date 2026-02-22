@@ -221,6 +221,15 @@ RSS_SOURCES = [
     {"name": "Krebs on Security", "url": "https://krebsonsecurity.com/feed/", "priority": "high"},
     {"name": "Recorded Future Blog", "url": "https://www.recordedfuture.com/feed", "priority": "medium"},
     {"name": "CISA Advisories", "url": "https://www.cisa.gov/cybersecurity-advisories/all.xml", "priority": "critical"},
+    {"name": "Security Online", "url": "https://securityonline.info/feed/", "priority": "high"},
+    {"name": "Cyber Security News", "url": "https://cybersecuritynews.com/feed/", "priority": "high"},
+    {"name": "The Cyber Express", "url": "https://thecyberexpress.com/feed/", "priority": "medium"},
+    {"name": "Ransomware.live", "url": "https://www.ransomware.live/feed.xml", "priority": "critical"},
+    {"name": "Threatpost", "url": "https://threatpost.com/feed/", "priority": "medium"},
+    {"name": "Schneier on Security", "url": "https://www.schneier.com/feed/atom/", "priority": "medium"},
+    {"name": "NVD CVE Recent", "url": "https://nvd.nist.gov/feeds/json/cve/1.1/nvdcve-1.1-recent.json.gz", "priority": "high"},
+    {"name": "Google Project Zero", "url": "https://googleprojectzero.blogspot.com/feeds/posts/default", "priority": "medium"},
+    {"name": "Mandiant Blog", "url": "https://www.mandiant.com/resources/blog/rss.xml", "priority": "high"},
 ]
 
 

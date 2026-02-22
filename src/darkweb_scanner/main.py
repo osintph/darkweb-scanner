@@ -35,6 +35,54 @@ logger = logging.getLogger(__name__)
 # ── Core orchestration ─────────────────────────────────────────────────────────
 
 
+
+
+def match_hit_to_projects(hit_id: int, url: str, keyword: str, context: str, storage):
+    """Match a newly saved hit against all active projects."""
+    import re as _re
+    try:
+        projects = storage.get_active_projects_with_config()
+        for project in projects:
+            matched_on = None
+            matched_value = None
+
+            # Match on project keyword
+            for kw in project.get("keywords", []):
+                kw_val = kw.keyword if hasattr(kw, 'keyword') else kw.get("keyword", "")
+                is_regex = kw.is_regex if hasattr(kw, 'is_regex') else kw.get("is_regex", False)
+                if is_regex:
+                    try:
+                        if _re.search(kw_val, (context or ""), _re.IGNORECASE):
+                            matched_on = "keyword"
+                            matched_value = kw_val
+                    except Exception:
+                        pass
+                else:
+                    if kw_val.lower() in (keyword or "").lower():
+                        matched_on = "keyword"
+                        matched_value = kw_val
+
+            # Match on project domain
+            if not matched_on:
+                for domain in project.get("domains", []):
+                    d_val = domain.domain if hasattr(domain, 'domain') else domain.get("domain", "")
+                    if d_val and d_val in (url or ""):
+                        matched_on = "domain"
+                        matched_value = d_val
+
+            # Match on project entity
+            if not matched_on:
+                for entity in project.get("entities", []):
+                    e_val = entity.value if hasattr(entity, 'value') else entity.get("value", "")
+                    if e_val and e_val.lower() in (context or "").lower():
+                        matched_on = "entity"
+                        matched_value = e_val
+
+            if matched_on:
+                storage.create_project_hit(project["id"], hit_id, matched_on, matched_value)
+    except Exception as e:
+        logger.warning(f"Project hit matching error: {e}")
+
 async def run_scan(
     seeds: list[str],
     keyword_config: KeywordConfig,
@@ -91,6 +139,7 @@ async def run_scan(
                     session_id=session_id,
                 )
                 hits_found += 1
+                match_hit_to_projects(hit_id, hit.url, hit.keyword, hit.context, storage)
                 if alerter.alert(hit):
                     storage.mark_alerted(hit_id)
 

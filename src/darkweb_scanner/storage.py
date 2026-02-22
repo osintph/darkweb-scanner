@@ -155,6 +155,81 @@ class DNSInvestigation(Base):
 
     __table_args__ = (Index("ix_dns_domain_created", "domain", "created_at"),)
 
+
+
+# ── Projects Models ─────────────────────────────────────────────────────────────
+
+class Project(Base):
+    __tablename__ = "projects"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    name = Column(String(200), nullable=False)
+    description = Column(Text, nullable=True)
+    status = Column(String(20), default="active")  # active | paused | archived
+    owner_id = Column(Integer, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow)
+    alert_threshold = Column(Integer, default=1)
+    color = Column(String(7), default="#f85149")
+    tags = Column(Text, default="[]")  # JSON array
+
+    __table_args__ = (
+        Index("ix_projects_owner", "owner_id"),
+        Index("ix_projects_status", "status"),
+    )
+
+
+class ProjectKeyword(Base):
+    __tablename__ = "project_keywords"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    project_id = Column(Integer, nullable=False)
+    keyword = Column(String(200), nullable=False)
+    category = Column(String(100), default="custom")
+    is_regex = Column(Boolean, default=False)
+
+    __table_args__ = (Index("ix_project_keywords_project", "project_id"),)
+
+
+class ProjectDomain(Base):
+    __tablename__ = "project_domains"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    project_id = Column(Integer, nullable=False)
+    domain = Column(String(500), nullable=False)
+    priority = Column(Integer, default=3)
+    notes = Column(Text, nullable=True)
+
+    __table_args__ = (Index("ix_project_domains_project", "project_id"),)
+
+
+class ProjectEntity(Base):
+    __tablename__ = "project_entities"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    project_id = Column(Integer, nullable=False)
+    entity_type = Column(String(50), nullable=False)
+    value = Column(String(500), nullable=False)
+    notes = Column(Text, nullable=True)
+
+    __table_args__ = (Index("ix_project_entities_project", "project_id"),)
+
+
+class ProjectHit(Base):
+    __tablename__ = "project_hits"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    project_id = Column(Integer, nullable=False)
+    hit_id = Column(Integer, nullable=False)
+    matched_on = Column(String(20), nullable=False)  # keyword|domain|entity
+    matched_value = Column(String(200), nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    __table_args__ = (
+        Index("ix_project_hits_project", "project_id"),
+        Index("ix_project_hits_hit", "hit_id"),
+    )
+
 class Storage:
     def __init__(self, database_url: Optional[str] = None):
         self.database_url = database_url or os.getenv(
@@ -767,6 +842,220 @@ class Storage:
                 "error": r.error,
                 "created_at": r.created_at.isoformat() if r.created_at else None,
                 "result": result,
+            }
+
+
+    # ── Projects ──────────────────────────────────────────────────────────────────
+
+    def create_project(self, name: str, owner_id: int, description: str = None,
+                       color: str = "#f85149", tags: list = None, alert_threshold: int = 1) -> int:
+        import json
+        with self.get_session() as session:
+            p = Project(
+                name=name, description=description, owner_id=owner_id,
+                color=color, tags=json.dumps(tags or []), alert_threshold=alert_threshold,
+            )
+            session.add(p)
+            session.commit()
+            session.refresh(p)
+            return p.id
+
+    def _project_to_dict(self, p) -> dict:
+        import json
+        return {
+            "id": p.id, "name": p.name, "description": p.description,
+            "status": p.status, "owner_id": p.owner_id,
+            "created_at": p.created_at.isoformat() if p.created_at else None,
+            "updated_at": p.updated_at.isoformat() if p.updated_at else None,
+            "alert_threshold": p.alert_threshold, "color": p.color,
+            "tags": json.loads(p.tags or "[]"),
+        }
+
+    def get_project(self, project_id: int) -> dict | None:
+        with self.get_session() as session:
+            p = session.get(Project, project_id)
+            if not p:
+                return None
+            d = self._project_to_dict(p)
+            d["keywords"] = self.get_project_keywords(project_id)
+            d["domains"] = self.get_project_domains(project_id)
+            d["entities"] = self.get_project_entities(project_id)
+            d["hit_count"] = session.query(func.count(ProjectHit.id)).filter(
+                ProjectHit.project_id == project_id).scalar() or 0
+            return d
+
+    def list_projects(self, owner_id: int = None) -> list[dict]:
+        with self.get_session() as session:
+            q = session.query(Project)
+            if owner_id is not None:
+                q = q.filter(Project.owner_id == owner_id)
+            projects = q.order_by(Project.created_at.desc()).all()
+            result = []
+            for p in projects:
+                d = self._project_to_dict(p)
+                d["hit_count"] = session.query(func.count(ProjectHit.id)).filter(
+                    ProjectHit.project_id == p.id).scalar() or 0
+                result.append(d)
+            return result
+
+    def update_project(self, project_id: int, **kwargs) -> bool:
+        import json
+        with self.get_session() as session:
+            p = session.get(Project, project_id)
+            if not p:
+                return False
+            for k, v in kwargs.items():
+                if k == "tags":
+                    v = json.dumps(v)
+                if hasattr(p, k):
+                    setattr(p, k, v)
+            p.updated_at = datetime.utcnow()
+            session.commit()
+            return True
+
+    def delete_project(self, project_id: int):
+        with self.get_session() as session:
+            session.query(ProjectKeyword).filter(ProjectKeyword.project_id == project_id).delete()
+            session.query(ProjectDomain).filter(ProjectDomain.project_id == project_id).delete()
+            session.query(ProjectEntity).filter(ProjectEntity.project_id == project_id).delete()
+            session.query(ProjectHit).filter(ProjectHit.project_id == project_id).delete()
+            p = session.get(Project, project_id)
+            if p:
+                session.delete(p)
+            session.commit()
+
+    def get_active_projects_with_config(self) -> list:
+        with self.get_session() as session:
+            projects = session.query(Project).filter(Project.status == "active").all()
+            result = []
+            for p in projects:
+                d = self._project_to_dict(p)
+                d["keywords"] = session.query(ProjectKeyword).filter(
+                    ProjectKeyword.project_id == p.id).all()
+                d["domains"] = session.query(ProjectDomain).filter(
+                    ProjectDomain.project_id == p.id).all()
+                d["entities"] = session.query(ProjectEntity).filter(
+                    ProjectEntity.project_id == p.id).all()
+                result.append(d)
+            return result
+
+    def add_project_keyword(self, project_id: int, keyword: str,
+                            category: str = "custom", is_regex: bool = False) -> int:
+        with self.get_session() as session:
+            kw = ProjectKeyword(project_id=project_id, keyword=keyword,
+                                category=category, is_regex=is_regex)
+            session.add(kw)
+            session.commit()
+            session.refresh(kw)
+            return kw.id
+
+    def get_project_keywords(self, project_id: int) -> list[dict]:
+        with self.get_session() as session:
+            kws = session.query(ProjectKeyword).filter(
+                ProjectKeyword.project_id == project_id).all()
+            return [{"id": k.id, "keyword": k.keyword, "category": k.category,
+                     "is_regex": k.is_regex} for k in kws]
+
+    def delete_project_keyword(self, keyword_id: int):
+        with self.get_session() as session:
+            kw = session.get(ProjectKeyword, keyword_id)
+            if kw:
+                session.delete(kw)
+                session.commit()
+
+    def add_project_domain(self, project_id: int, domain: str,
+                           priority: int = 3, notes: str = None) -> int:
+        with self.get_session() as session:
+            d = ProjectDomain(project_id=project_id, domain=domain,
+                              priority=priority, notes=notes)
+            session.add(d)
+            session.commit()
+            session.refresh(d)
+            return d.id
+
+    def get_project_domains(self, project_id: int) -> list[dict]:
+        with self.get_session() as session:
+            domains = session.query(ProjectDomain).filter(
+                ProjectDomain.project_id == project_id).all()
+            return [{"id": d.id, "domain": d.domain, "priority": d.priority,
+                     "notes": d.notes} for d in domains]
+
+    def delete_project_domain(self, domain_id: int):
+        with self.get_session() as session:
+            d = session.get(ProjectDomain, domain_id)
+            if d:
+                session.delete(d)
+                session.commit()
+
+    def add_project_entity(self, project_id: int, entity_type: str,
+                           value: str, notes: str = None) -> int:
+        with self.get_session() as session:
+            e = ProjectEntity(project_id=project_id, entity_type=entity_type,
+                              value=value, notes=notes)
+            session.add(e)
+            session.commit()
+            session.refresh(e)
+            return e.id
+
+    def get_project_entities(self, project_id: int) -> list[dict]:
+        with self.get_session() as session:
+            entities = session.query(ProjectEntity).filter(
+                ProjectEntity.project_id == project_id).all()
+            return [{"id": e.id, "entity_type": e.entity_type, "value": e.value,
+                     "notes": e.notes} for e in entities]
+
+    def delete_project_entity(self, entity_id: int):
+        with self.get_session() as session:
+            e = session.get(ProjectEntity, entity_id)
+            if e:
+                session.delete(e)
+                session.commit()
+
+    def create_project_hit(self, project_id: int, hit_id: int,
+                           matched_on: str, matched_value: str = None):
+        with self.get_session() as session:
+            existing = session.query(ProjectHit).filter(
+                ProjectHit.project_id == project_id,
+                ProjectHit.hit_id == hit_id,
+            ).first()
+            if not existing:
+                ph = ProjectHit(project_id=project_id, hit_id=hit_id,
+                                matched_on=matched_on, matched_value=matched_value)
+                session.add(ph)
+                session.commit()
+
+    def get_project_hits(self, project_id: int, limit: int = 100) -> list[dict]:
+        with self.get_session() as session:
+            rows = (
+                session.query(ProjectHit, KeywordHitRecord)
+                .join(KeywordHitRecord, ProjectHit.hit_id == KeywordHitRecord.id)
+                .filter(ProjectHit.project_id == project_id)
+                .order_by(ProjectHit.created_at.desc())
+                .limit(limit)
+                .all()
+            )
+            return [{
+                "id": ph.id, "hit_id": h.id, "url": h.url,
+                "keyword": h.keyword, "category": h.category, "context": h.context,
+                "depth": h.depth, "found_at": h.found_at.isoformat() if h.found_at else None,
+                "matched_on": ph.matched_on, "matched_value": ph.matched_value,
+            } for ph, h in rows]
+
+    def get_project_stats(self, project_id: int) -> dict:
+        with self.get_session() as session:
+            total_hits = session.query(func.count(ProjectHit.id)).filter(
+                ProjectHit.project_id == project_id).scalar() or 0
+            top_keywords = (
+                session.query(ProjectHit.matched_value, func.count(ProjectHit.id).label("count"))
+                .filter(ProjectHit.project_id == project_id, ProjectHit.matched_on == "keyword")
+                .group_by(ProjectHit.matched_value)
+                .order_by(func.count(ProjectHit.id).desc())
+                .limit(10)
+                .all()
+            )
+            return {
+                "total_hits": total_hits,
+                "top_keywords": [{"keyword": k, "count": c} for k, c in top_keywords],
             }
 
     def delete_dns_investigation(self, inv_id: int):
