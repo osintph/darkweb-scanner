@@ -1,8 +1,8 @@
 # 🔍 Dark Web Scanner — Cyber Threat Intelligence Platform
 
-> A self-hosted, open-source threat intelligence platform built for the Philippine and Southeast Asian security landscape. Crawls .onion networks, monitors Telegram channels, tracks ransomware groups, profiles threat actors, and delivers a daily intelligence digest — all from a single Docker deployment.
+A self-hosted, open-source threat intelligence platform built for the Philippine and Southeast Asian security landscape. Crawls .onion networks, monitors Telegram channels, tracks ransomware groups, profiles threat actors, and delivers a daily intelligence digest — all from a single Docker deployment.
 
-[![License: AGPL v3](https://img.shields.io/badge/License-AGPL%20v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
+**License: AGPL v3**
 
 ---
 
@@ -16,8 +16,7 @@ Works on Ubuntu 22.04/24.04, Debian, and most Debian-based distros. The script i
 
 > **Note:** After deployment, visit `https://YOUR_SERVER_IP/register` to create your admin account. Registration is only open when no users exist — it closes automatically after the first account is created.
 
-### With a real domain and SSL certificate
-
+**With a real domain and SSL certificate:**
 ```bash
 DOMAIN=scanner.yourdomain.com SSL_EMAIL=you@example.com \
   curl -fsSL https://raw.githubusercontent.com/osintph/darkweb-scanner/main/deploy.sh -o /tmp/deploy.sh && \
@@ -33,6 +32,7 @@ DOMAIN=scanner.yourdomain.com SSL_EMAIL=you@example.com \
 - **Projects** — scoped monitoring engagements with per-project keywords, target domains, entities, and hit tracking
 - **IP Investigation** — parallel AbuseIPDB + VirusTotal lookups with geolocation, ASN, and history
 - **DNS Reconnaissance** — full passive/active DNS recon, zone transfer attempts, certificate transparency, SPF/DMARC analysis
+- **Web Check** — on-demand OSINT analysis for any domain: SSL, headers, open ports, tech stack, WHOIS, and more — available at `webcheck.osintph.info`
 - **Ransomware Tracker** — live tracking of active ransomware groups with SEA/PH regional focus
 - **Threat Actor Profiles** — structured APT and cybercriminal profiles relevant to Southeast Asia
 - **Daily Digest** — morning email with CISA KEV, OTX pulses, abuse.ch feeds, and curated RSS — delivered via Mailgun
@@ -54,15 +54,29 @@ DOMAIN=scanner.yourdomain.com SSL_EMAIL=you@example.com \
 
 1. Visit `https://YOUR_SERVER_IP/register` and create your admin account
 2. Edit your configuration:
-   ```bash
-   nano ~/darkweb-scanner/.env
-   nano ~/darkweb-scanner/config/keywords.yaml
-   nano ~/darkweb-scanner/config/seeds.txt
-   ```
+```bash
+nano ~/darkweb-scanner/.env
+nano ~/darkweb-scanner/config/keywords.yaml
+nano ~/darkweb-scanner/config/seeds.txt
+```
 3. Restart to apply config changes:
-   ```bash
-   cd ~/darkweb-scanner && docker compose restart dashboard
-   ```
+```bash
+cd ~/darkweb-scanner && docker compose restart dashboard
+```
+
+### Web Check (manual step — not in deploy.sh)
+
+Web Check runs as a separate service and must be set up manually after the main platform is deployed. See [docs/deployment.md](docs/deployment.md#web-check-integration) for full instructions.
+
+```bash
+# Short version
+cd /root
+git clone https://github.com/lissy93/web-check.git
+cd web-check && BASE_URL=/ yarn install && yarn build
+cd /root/darkweb-scanner && docker compose up -d webcheck
+```
+
+Then issue an SSL cert for `webcheck.YOURDOMAIN` and reload nginx — full steps in the deployment docs.
 
 ### Updating
 
@@ -149,6 +163,7 @@ src/darkweb_scanner/
 docker/
   app/Dockerfile
   tor/Dockerfile
+  nginx/               # nginx with auto SSL entrypoint
 deploy.sh              # zero-prerequisite deployment script
 ```
 
@@ -180,7 +195,7 @@ make stop          # stop all containers
 
 ## 📄 License
 
-Licensed under the **GNU Affero General Public License v3.0 (AGPL-3.0-only)**.
+Licensed under the GNU Affero General Public License v3.0 (AGPL-3.0-only).
 
 You may use, modify, and distribute this software. If you run a modified version as a network service, you must make the source code available to users of that service.
 
@@ -194,5 +209,4 @@ Pull requests are welcome. If you're a Philippine or Southeast Asian security re
 
 Issues and feature requests: https://github.com/osintph/darkweb-scanner/issues
 
-**OSINT PH:** https://www.osintph.info
-
+OSINT PH: https://www.osintph.info
