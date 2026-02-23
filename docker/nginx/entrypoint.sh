@@ -95,7 +95,8 @@ server {
 EOF
     echo "[nginx] www virtual host configured for: ${WWW_DOMAIN}"
   fi
-  cat >> /etc/nginx/conf.d/darkweb.conf <<WCEOF
+  if [[ -f "$CERT_DIR/webcheck-cert.pem" ]]; then
+    cat >> /etc/nginx/conf.d/darkweb.conf <<WCEOF
 server {
     listen 80;
     server_name webcheck.${DOMAIN#*.};
@@ -120,6 +121,10 @@ server {
     }
 }
 WCEOF
+    echo "[nginx] webcheck vhost configured."
+  else
+    echo "[nginx] No webcheck cert found — skipping webcheck vhost."
+  fi
   echo "[nginx] Config written."
 }
 
