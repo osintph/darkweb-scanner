@@ -244,6 +244,8 @@ The webcheck.osintph.info cert renews automatically via the certbot cron job ins
 
 **Web Check not loading:** `docker compose logs webcheck`
 
+> **Note:** After deploying your own instance, update the Web Check button URL in `src/darkweb_scanner/dashboard/templates/index.html` — search for `webcheck.osintph.info` and replace with your own domain e.g. `webcheck.yourdomain.com`.
+
 **502 Bad Gateway on webcheck subdomain:** Container may still be starting — wait 30 seconds and retry.
 
 ---

@@ -78,6 +78,8 @@ cd /root/darkweb-scanner && docker compose up -d webcheck
 
 Then issue an SSL cert for `webcheck.YOURDOMAIN` and reload nginx — full steps in the deployment docs.
 
+> **Note:** The dashboard nav bar contains a **🔍 Web Check** button hardcoded to `https://webcheck.osintph.info`. After deploying your own instance, update this URL in `src/darkweb_scanner/dashboard/templates/index.html` to point to your own webcheck subdomain.
+
 ### Updating
 
 ```bash
