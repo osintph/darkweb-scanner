@@ -15,6 +15,24 @@ services:
       retries: 3
       start_period: 30s
 
+  # ── PostgreSQL ─────────────────────────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      - POSTGRES_DB=darkweb_scanner
+      - POSTGRES_USER=scanner
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    networks:
+      - scanner_net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U scanner -d darkweb_scanner"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   # ── Scanner / crawler ───────────────────────────────────────────────────────
   scanner:
     build:
@@ -43,6 +61,7 @@ services:
     restart: unless-stopped
     depends_on:
       - tor
+      - postgres
     env_file:
       - .env
     volumes:
@@ -95,6 +114,7 @@ volumes:
   nginx_certs:
   letsencrypt:
   certbot_webroot:
+  pg_data:
 
 networks:
   scanner_net:

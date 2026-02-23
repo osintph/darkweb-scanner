@@ -121,6 +121,9 @@ success "Config files ready."
 # ── Patch .env ────────────────────────────────────────────────────────────────
 SECRET_KEY="$(openssl rand -hex 32)"
 sed -i "s/^DASHBOARD_SECRET_KEY=.*/DASHBOARD_SECRET_KEY=${SECRET_KEY}/" .env
+PG_PASS="$(openssl rand -hex 24)"
+sed -i "s/^POSTGRES_PASSWORD=.*/POSTGRES_PASSWORD=${PG_PASS}/" .env
+sed -i "s|^DATABASE_URL=.*|DATABASE_URL=postgresql://scanner:${PG_PASS}@postgres:5432/darkweb_scanner|" .env
 
 # Set domain and SSL email if provided
 if [[ -n "$DOMAIN" ]]; then
@@ -157,6 +160,22 @@ success "Images built."
 
 # ── Start all services ────────────────────────────────────────────────────────
 info "Starting all containers..."
+# Start postgres first and wait for it to be healthy
+info "Starting PostgreSQL..."
+docker compose up -d postgres
+info "Waiting for PostgreSQL to be ready..."
+timeout=30
+until docker compose exec postgres pg_isready -U scanner -d darkweb_scanner >/dev/null 2>&1; do
+  timeout=$((timeout-1))
+  if [[ $timeout -le 0 ]]; then
+    warn "PostgreSQL did not become ready in time — continuing anyway"
+    break
+  fi
+  sleep 1
+done
+success "PostgreSQL is ready."
+
+# Start remaining services
 docker compose up -d
 success "Containers started."
 
