@@ -43,6 +43,7 @@ dashboard = [
     "requests>=2.31",
     "telethon>=1.36",
     "reportlab>=4.0",
+    "psycopg2-binary>=2.9",
     "dnspython>=2.4",
 ]
 dev = [
@@ -63,6 +64,7 @@ all = [
     "requests>=2.31",
     "telethon>=1.36",
     "reportlab>=4.0",
+    "psycopg2-binary>=2.9",
     "dnspython>=2.4",
     "feedparser>=6.0",
     "flask>=3.0",
