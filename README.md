@@ -28,6 +28,7 @@ DOMAIN=scanner.yourdomain.com SSL_EMAIL=you@example.com \
 ## 🧩 Features
 
 - **Dark Web Crawler** — async Tor-based crawler for .onion sites, configurable keyword monitoring, real-time alerts
+- **Channel Monitor** — interactive dashboard tab to scrape any Telegram channel on demand, auto-translate messages to English, download results as a ZIP (HTML report + media)
 - **Telegram Scraper** — monitors public Telegram channels for keyword hits using the same engine as the crawler
 - **Projects** — scoped monitoring engagements with per-project keywords, target domains, entities, and hit tracking
 - **IP Investigation** — parallel AbuseIPDB + VirusTotal lookups with geolocation, ASN, and history
@@ -125,7 +126,90 @@ All configuration lives in `.env`. **Never commit this file.**
 |----------|-------------|
 | `TELEGRAM_API_ID` | From my.telegram.org/apps |
 | `TELEGRAM_API_HASH` | From my.telegram.org/apps |
-| `TELEGRAM_CHANNELS` | Comma-separated channel usernames (no @) |
+| `TELEGRAM_PHONE` | Your phone number with country code — required for Channel Monitor tab |
+| `TELEGRAM_CHANNELS` | Comma-separated channel usernames (no @) — used by background scraper |
+
+---
+
+## 📡 Channel Monitor
+
+The **Channel Monitor** tab lets you scrape any public Telegram channel on demand directly from the dashboard — no CLI required. It fetches messages, auto-detects and translates them to English, downloads media (photos and videos), and packages everything into a downloadable ZIP.
+
+### Setup
+
+Add the following to your `.env` (same credentials used by the existing Telegram scraper):
+
+```env
+TELEGRAM_API_ID=12345678
+TELEGRAM_API_HASH=abcdef1234567890abcdef1234567890
+TELEGRAM_PHONE=+639XXXXXXXXX
+```
+
+`TELEGRAM_PHONE` is the only new variable — your phone number with country code (e.g. `+63` for Philippines).
+
+### First-time authentication
+
+Telegram requires an interactive login the first time. Run this once on the server:
+
+```bash
+cd ~/darkweb-scanner
+docker compose exec dashboard python3 -c "
+import asyncio
+from telethon import TelegramClient
+import os
+from dotenv import load_dotenv
+load_dotenv('/app/.env')
+async def auth():
+    c = TelegramClient('/app/data/channel_monitor/channel_monitor', int(os.environ['TELEGRAM_API_ID']), os.environ['TELEGRAM_API_HASH'])
+    await c.start(phone=os.environ['TELEGRAM_PHONE'])
+    print('Auth OK:', (await c.get_me()).username)
+    await c.disconnect()
+asyncio.run(auth())
+"
+```
+
+Enter the OTP sent to your Telegram app when prompted. The session is saved to `/app/data/channel_monitor/channel_monitor.session` and persists across restarts — you only need to do this once.
+
+### Using the tab
+
+1. Click **📡 Channel Monitor** in the nav bar
+2. Enter a channel username (e.g. `irna_1931`), invite link, or `@handle`
+3. Configure options:
+   - **Message Limit** — how many messages to fetch (0 = all)
+   - **Last N Days** — only fetch messages from the last N days
+   - **Force Source Language** — override auto-detection (useful for mixed-language channels)
+   - **Max Video Size** — skip videos larger than this (MB). Set to 0 to skip all videos
+   - **Min Free Disk** — abort if server disk drops below this threshold (GB)
+   - **Skip English translation** — skip the translation step if message is already in English
+4. Click **▶ Start Scan** — output streams live in the console panel
+5. When complete, click **⬇ Download ZIP** to get:
+   - `messages.html` — full rendered report with original text, English translations, and inline media
+   - `messages.json` — raw structured data
+   - `media/` — all downloaded photos and videos
+
+### Notes
+
+- Only **public** channels are supported
+- The scan runs in a background thread — you can navigate away and come back
+- Job history is kept in memory for the current server session; it resets on container restart
+- Output files are stored under `/app/data/channel_monitor/{job_id}/` on the server
+
+### Dependencies
+
+The Channel Monitor requires two additional Python packages (already added to `pyproject.toml`):
+
+```
+deep-translator>=1.11
+langdetect>=1.0
+```
+
+After copying the updated files, rebuild the container to install them:
+
+```bash
+cd ~/darkweb-scanner
+docker compose build --no-cache dashboard
+docker compose up -d
+```
 
 ### Alerting
 
@@ -153,13 +237,15 @@ src/darkweb_scanner/
   digest.py            # daily email digest
   dns_crawler.py       # DNS reconnaissance module
   ip_lookup.py         # IP investigation module
-  telegram_scraper.py  # Telegram channel scraper
+  telegram_scraper.py  # Telegram channel scraper (keyword hit pipeline)
+  channel_monitor.py   # Telegram channel monitor (on-demand scrape + translate)
   threat_actors.py     # threat actor profile data
   ransomware_data.py   # ransomware group data
   dashboard/
     app.py             # Flask application factory
     auth_routes.py     # login, register, TOTP, OAuth
     dashboard_routes.py # all API and dashboard routes
+    channel_monitor_routes.py # Channel Monitor API routes + job runner
     templates/
       index.html       # single-page dashboard UI
 docker/

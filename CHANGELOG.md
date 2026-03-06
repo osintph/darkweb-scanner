@@ -5,6 +5,30 @@ The format follows **Keep a Changelog**. This project adheres to **Semantic Vers
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-03-06
+
+### Added
+- **Channel Monitor tab** — on-demand Telegram channel scraping directly from the dashboard UI
+  - Enter any public channel username, invite link, or @handle and run a scan without CLI access
+  - Configurable options: message limit, date range (last N days), forced source language, max video size, min free disk threshold, skip-English toggle
+  - Auto-detects message language per-message using `langdetect`
+  - Auto-translates all non-English messages to English using `deep-translator` (Google Translate)
+  - Downloads photos and videos inline; videos skipped if they exceed the configured size limit
+  - Live streaming log — output appears in the dashboard console panel in real time (1.5s polling)
+  - Results packaged as a downloadable ZIP: `messages.html` (full rendered report with inline media), `messages.json` (raw data), and `media/` folder
+  - Job history table with view-log, re-download, and delete actions for the current server session
+  - Credential check on tab load — shows warning banner if `TELEGRAM_API_ID`, `TELEGRAM_API_HASH`, or `TELEGRAM_PHONE` are not set
+- `channel_monitor.py` — standalone channel scraping module (also usable from CLI)
+- `channel_monitor_routes.py` — new Flask blueprint for all Channel Monitor API endpoints
+- `TELEGRAM_PHONE` environment variable — required for Channel Monitor interactive auth
+- `deep-translator>=1.11` and `langdetect>=1.0` added to dashboard dependencies
+
+### Changed
+- `app.py` — registers the new `channel_monitor_bp` blueprint
+- `index.html` — adds **📡 Channel Monitor** nav tab, panel UI, and all supporting JS
+- `pyproject.toml` — adds `deep-translator` and `langdetect` to `[project.optional-dependencies.dashboard]`
+- `.env.example` — documents `TELEGRAM_PHONE`
+
 ## [0.6.0] - 2026-02-23
 
 ### Added

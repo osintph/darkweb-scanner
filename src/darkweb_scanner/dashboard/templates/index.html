@@ -283,6 +283,7 @@
     <button class="nav-tab" onclick="switchTab('paste', this)">📋 Paste Monitor</button>
     <button class="nav-tab" onclick="switchTab('dns', this)">🌐 DNS</button>
     <button class="nav-tab" onclick="window.open('https://webcheck.osintph.info', '_blank')">🔍 Web Check</button>
+    <button class="nav-tab" onclick="switchTab('channelmonitor', this)">📡 Channel Monitor</button>
     <button class="nav-tab" onclick="switchTab('reports', this)">📄 Reports</button>
     <button class="nav-tab" onclick="switchTab('settings', this)">⚙️ Settings</button>
   </nav>
@@ -662,6 +663,114 @@
     </div>
   </div>
 
+  <!-- ── Channel Monitor Tab ── -->
+  <div class="tab-panel" id="panel-channelmonitor">
+
+    <!-- Cred warning banner -->
+    <div id="cmCredBanner" class="info-banner" style="display:none;background:rgba(248,81,73,.08);border:1px solid rgba(248,81,73,.3);color:#f85149;padding:10px 16px;border-radius:8px;margin-bottom:18px;font-size:.83rem;">
+      ⚠️ Telegram credentials not configured. Add <code>TELEGRAM_API_ID</code>, <code>TELEGRAM_API_HASH</code>, and <code>TELEGRAM_PHONE</code> to your <code>.env</code> file, then restart the server.
+    </div>
+
+    <div style="display:grid;grid-template-columns:380px 1fr;gap:20px;align-items:start;">
+
+      <!-- ── Config Form ── -->
+      <div class="panel" id="cmConfigPanel">
+        <div class="panel-header"><h2>📡 Channel Monitor</h2><span style="color:var(--muted);font-size:.79rem">Scrape &amp; translate</span></div>
+        <div class="panel-body" style="display:flex;flex-direction:column;gap:14px;">
+
+          <div>
+            <label style="font-size:.78rem;color:var(--muted);display:block;margin-bottom:4px;">Telegram Channel <span style="color:var(--red)">*</span></label>
+            <input id="cmChannel" class="input" placeholder="e.g. irna_1931 or t.me/channelname" style="width:100%;font-family:var(--mono);font-size:.85rem;" />
+            <div style="font-size:.72rem;color:var(--muted);margin-top:3px;">Username, @handle, or invite link</div>
+          </div>
+
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+            <div>
+              <label style="font-size:.78rem;color:var(--muted);display:block;margin-bottom:4px;">Message Limit</label>
+              <input id="cmLimit" class="input" type="number" value="200" min="0" style="width:100%;" />
+              <div style="font-size:.72rem;color:var(--muted);margin-top:3px;">0 = all messages</div>
+            </div>
+            <div>
+              <label style="font-size:.78rem;color:var(--muted);display:block;margin-bottom:4px;">Last N Days</label>
+              <input id="cmDays" class="input" type="number" placeholder="leave blank = no limit" min="1" style="width:100%;" />
+            </div>
+          </div>
+
+          <div>
+            <label style="font-size:.78rem;color:var(--muted);display:block;margin-bottom:4px;">Force Source Language</label>
+            <select id="cmLang" class="input" style="width:100%;">
+              <option value="">Auto-detect per message</option>
+              <option value="fa">🇮🇷 Farsi</option>
+              <option value="ru">🇷🇺 Russian</option>
+              <option value="zh-cn">🇨🇳 Chinese (Simplified)</option>
+              <option value="zh-tw">🇹🇼 Chinese (Traditional)</option>
+              <option value="ko">🇰🇵 Korean</option>
+              <option value="ar">🇸🇦 Arabic</option>
+              <option value="uk">🇺🇦 Ukrainian</option>
+              <option value="de">🇩🇪 German</option>
+              <option value="fr">🇫🇷 French</option>
+              <option value="es">🇪🇸 Spanish</option>
+              <option value="en">🇬🇧 English</option>
+            </select>
+          </div>
+
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+            <div>
+              <label style="font-size:.78rem;color:var(--muted);display:block;margin-bottom:4px;">Max Video Size (MB)</label>
+              <input id="cmMaxVideo" class="input" type="number" value="50" min="0" style="width:100%;" />
+              <div style="font-size:.72rem;color:var(--muted);margin-top:3px;">0 = skip all videos</div>
+            </div>
+            <div>
+              <label style="font-size:.78rem;color:var(--muted);display:block;margin-bottom:4px;">Min Free Disk (GB)</label>
+              <input id="cmMinSpace" class="input" type="number" value="1.0" min="0.1" step="0.1" style="width:100%;" />
+            </div>
+          </div>
+
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:.84rem;">
+            <input type="checkbox" id="cmSkipEnglish" />
+            <span>Skip translation if message is already English</span>
+          </label>
+
+          <button class="btn btn-primary" id="cmStartBtn" onclick="cmStartScan()" style="width:100%;font-size:.88rem;padding:10px;">
+            ▶ Start Scan
+          </button>
+        </div>
+      </div>
+
+      <!-- ── Job Console ── -->
+      <div style="display:flex;flex-direction:column;gap:16px;">
+
+        <!-- Active job log -->
+        <div class="panel" id="cmActivePanel" style="display:none;">
+          <div class="panel-header" style="display:flex;align-items:center;justify-content:space-between;">
+            <h2>⏳ Running: <span id="cmActiveChannel" style="color:var(--accent);font-family:var(--mono);"></span></h2>
+            <div style="display:flex;gap:8px;align-items:center;">
+              <span id="cmStatusBadge" class="status-badge status-running" style="background:rgba(88,166,255,.12);color:var(--accent);border:1px solid rgba(88,166,255,.3);">Running</span>
+              <button id="cmDownloadBtn" class="btn btn-secondary" onclick="cmDownloadJob()" style="display:none;">⬇ Download ZIP</button>
+            </div>
+          </div>
+          <div class="panel-body" style="padding:0;">
+            <pre id="cmLogBox" style="background:#0d1117;color:#a5d6a7;font-family:var(--mono);font-size:.76rem;padding:16px;min-height:260px;max-height:460px;overflow-y:auto;margin:0;border-radius:0 0 8px 8px;white-space:pre-wrap;word-break:break-word;"></pre>
+          </div>
+        </div>
+
+        <!-- Job history -->
+        <div class="panel" id="cmHistoryPanel">
+          <div class="panel-header"><h2>📋 Job History</h2><button class="btn btn-secondary" onclick="cmLoadJobs()" style="font-size:.75rem;padding:4px 10px;">↺ Refresh</button></div>
+          <div class="panel-body" style="padding:0;">
+            <table>
+              <thead><tr>
+                <th>Channel</th><th>Started</th><th>Status</th><th>Actions</th>
+              </tr></thead>
+              <tbody id="cmJobsTable"><tr><td colspan="4" style="text-align:center;color:var(--muted);padding:24px;">No jobs yet</td></tr></tbody>
+            </table>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
   <!-- ── Reports Tab ── -->
   <div class="tab-panel" id="panel-reports">
     <div class="report-hero">
@@ -791,6 +900,7 @@
     if (tab === 'webcheck') document.querySelector('#panel-webcheck iframe').src = '/webcheck/';
     if (tab === 'reports') { loadReportPreview(); if (isAdmin) loadSubscribers(); }
     if (tab === 'settings') loadSettings();
+    if (tab === 'channelmonitor') cmInit();
   }
 
   // ── Stats ──────────────────────────────────────────────────────────────────
@@ -2568,6 +2678,177 @@
     await fetch(`/api/dns/investigations/${id}`, {method:'DELETE'});
     toast('Deleted');
     showDNSHistory();
+  }
+
+  // ── Channel Monitor ────────────────────────────────────────────────────────
+  let _cmActiveJobId = null;
+  let _cmPollTimer   = null;
+  let _cmLogOffset   = 0;
+
+  async function cmInit() {
+    // Check credentials
+    try {
+      const creds = await (await fetch('/api/channel-monitor/credentials')).json();
+      document.getElementById('cmCredBanner').style.display = creds.configured ? 'none' : 'block';
+      document.getElementById('cmStartBtn').disabled = !creds.configured;
+    } catch(e) {}
+    cmLoadJobs();
+  }
+
+  async function cmStartScan() {
+    const channel = document.getElementById('cmChannel').value.trim().replace(/^@/, '');
+    if (!channel) { toast('Channel name is required', 'error'); return; }
+
+    const body = {
+      channel,
+      limit:        parseInt(document.getElementById('cmLimit').value) || 200,
+      days:         document.getElementById('cmDays').value ? parseInt(document.getElementById('cmDays').value) : null,
+      lang:         document.getElementById('cmLang').value || null,
+      max_video_mb: parseInt(document.getElementById('cmMaxVideo').value) || 50,
+      min_space_gb: parseFloat(document.getElementById('cmMinSpace').value) || 1.0,
+      skip_english: document.getElementById('cmSkipEnglish').checked,
+    };
+
+    document.getElementById('cmStartBtn').disabled = true;
+    document.getElementById('cmStartBtn').textContent = '⏳ Starting…';
+
+    try {
+      const res  = await fetch('/api/channel-monitor/start', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)});
+      const data = await res.json();
+      if (!res.ok || !data.ok) { toast(data.error || 'Failed to start', 'error'); return; }
+      _cmActiveJobId = data.job_id;
+      _cmLogOffset   = 0;
+      cmShowActivePanel(channel);
+      cmPollLog();
+      cmLoadJobs();
+      toast('Scan started!');
+    } catch(e) {
+      toast('Network error: ' + e.message, 'error');
+    } finally {
+      document.getElementById('cmStartBtn').disabled = false;
+      document.getElementById('cmStartBtn').textContent = '▶ Start Scan';
+    }
+  }
+
+  function cmShowActivePanel(channel) {
+    const panel = document.getElementById('cmActivePanel');
+    panel.style.display = 'block';
+    document.getElementById('cmActiveChannel').textContent = '@' + channel;
+    document.getElementById('cmLogBox').textContent = '';
+    document.getElementById('cmDownloadBtn').style.display = 'none';
+    document.getElementById('cmStatusBadge').textContent = 'Running';
+    document.getElementById('cmStatusBadge').style.background = 'rgba(88,166,255,.12)';
+    document.getElementById('cmStatusBadge').style.color = 'var(--accent)';
+    document.getElementById('cmStatusBadge').style.border = '1px solid rgba(88,166,255,.3)';
+  }
+
+  function cmPollLog() {
+    if (_cmPollTimer) clearInterval(_cmPollTimer);
+    _cmPollTimer = setInterval(async () => {
+      if (!_cmActiveJobId) return;
+      try {
+        const data = await (await fetch(`/api/channel-monitor/jobs/${_cmActiveJobId}/log?since=${_cmLogOffset}`)).json();
+        if (data.log && data.log.length) {
+          const box = document.getElementById('cmLogBox');
+          box.textContent += data.log.join('\n') + '\n';
+          box.scrollTop = box.scrollHeight;
+          _cmLogOffset = data.total;
+        }
+        if (data.status === 'completed' || data.status === 'error') {
+          clearInterval(_cmPollTimer);
+          _cmPollTimer = null;
+          cmFinishJob(data.status);
+          cmLoadJobs();
+        }
+      } catch(e) {}
+    }, 1500);
+  }
+
+  function cmFinishJob(status) {
+    const badge = document.getElementById('cmStatusBadge');
+    const dlBtn = document.getElementById('cmDownloadBtn');
+    if (status === 'completed') {
+      badge.textContent = '✓ Completed';
+      badge.style.background = 'rgba(63,185,80,.12)';
+      badge.style.color = 'var(--green)';
+      badge.style.border = '1px solid rgba(63,185,80,.3)';
+      dlBtn.style.display = 'inline-block';
+    } else {
+      badge.textContent = '✗ Error';
+      badge.style.background = 'rgba(248,81,73,.1)';
+      badge.style.color = 'var(--red)';
+      badge.style.border = '1px solid rgba(248,81,73,.3)';
+      dlBtn.style.display = 'inline-block'; // still let them download partial results
+    }
+  }
+
+  function cmDownloadJob() {
+    if (!_cmActiveJobId) return;
+    window.location.href = `/api/channel-monitor/jobs/${_cmActiveJobId}/download`;
+  }
+
+  async function cmLoadJobs() {
+    try {
+      const jobs = await (await fetch('/api/channel-monitor/jobs')).json();
+      const tbody = document.getElementById('cmJobsTable');
+      if (!jobs.length) {
+        tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:var(--muted);padding:24px;">No jobs yet</td></tr>';
+        return;
+      }
+      tbody.innerHTML = jobs.map(j => {
+        const ts = j.started_at ? j.started_at.replace('T',' ').slice(0,16) : '—';
+        const statusHtml = j.status === 'completed'
+          ? '<span class="status-badge status-completed">✓ Completed</span>'
+          : j.status === 'running'
+          ? '<span class="status-badge" style="background:rgba(88,166,255,.12);color:var(--accent);border:1px solid rgba(88,166,255,.3);">⏳ Running</span>'
+          : '<span class="status-badge" style="background:rgba(248,81,73,.1);color:var(--red);border:1px solid rgba(248,81,73,.3);">✗ Error</span>';
+        const dlBtn = (j.status === 'completed' || j.status === 'error')
+          ? `<button class="btn btn-secondary" onclick="cmDownloadJobById('${j.id}')" style="font-size:.72rem;padding:3px 9px;">⬇ ZIP</button>`
+          : '';
+        const viewBtn = `<button class="btn btn-secondary" onclick="cmViewJob('${j.id}')" style="font-size:.72rem;padding:3px 9px;">📋 Log</button>`;
+        const delBtn  = j.status !== 'running'
+          ? `<button class="btn" onclick="cmDeleteJob('${j.id}')" style="font-size:.72rem;padding:3px 9px;background:rgba(248,81,73,.1);color:var(--red);border:1px solid rgba(248,81,73,.3);">🗑</button>`
+          : '';
+        return `<tr>
+          <td><span style="font-family:var(--mono);color:var(--accent);">@${j.channel}</span></td>
+          <td class="time-cell">${ts}</td>
+          <td>${statusHtml}</td>
+          <td style="display:flex;gap:6px;">${viewBtn}${dlBtn}${delBtn}</td>
+        </tr>`;
+      }).join('');
+    } catch(e) {}
+  }
+
+  async function cmViewJob(jobId) {
+    try {
+      const data = await (await fetch(`/api/channel-monitor/jobs/${jobId}`)).json();
+      _cmActiveJobId = jobId;
+      _cmLogOffset   = data.log.length;
+      const panel = document.getElementById('cmActivePanel');
+      panel.style.display = 'block';
+      document.getElementById('cmActiveChannel').textContent = '@' + data.channel;
+      document.getElementById('cmLogBox').textContent = data.log.join('\n');
+      const box = document.getElementById('cmLogBox');
+      box.scrollTop = box.scrollHeight;
+      cmFinishJob(data.status);
+      if (data.status === 'running') cmPollLog();
+    } catch(e) { toast('Could not load job', 'error'); }
+  }
+
+  function cmDownloadJobById(jobId) {
+    window.location.href = `/api/channel-monitor/jobs/${jobId}/download`;
+  }
+
+  async function cmDeleteJob(jobId) {
+    if (!confirm('Delete this job and its output files?')) return;
+    await fetch(`/api/channel-monitor/jobs/${jobId}`, {method:'DELETE'});
+    if (_cmActiveJobId === jobId) {
+      document.getElementById('cmActivePanel').style.display = 'none';
+      _cmActiveJobId = null;
+      if (_cmPollTimer) { clearInterval(_cmPollTimer); _cmPollTimer = null; }
+    }
+    cmLoadJobs();
+    toast('Job deleted');
   }
 
 </script>
