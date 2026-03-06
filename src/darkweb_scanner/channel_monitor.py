@@ -231,24 +231,24 @@ def format_entities(text: str, entities) -> str:
 
     tags = []
     for ent in entities:
-        s, l = ent.offset, ent.length
-        seg_esc = html.escape(text[s:s+l])
+        s, length = ent.offset, ent.length
+        seg_esc = html.escape(text[s:s+length])
         if isinstance(ent, MessageEntityBold):
-            tags.append((s, s+l, "<b>", "</b>"))
+            tags.append((s, s+length, "<b>", "</b>"))
         elif isinstance(ent, MessageEntityItalic):
-            tags.append((s, s+l, "<i>", "</i>"))
+            tags.append((s, s+length, "<i>", "</i>"))
         elif isinstance(ent, MessageEntityCode):
-            tags.append((s, s+l, "<code>", "</code>"))
+            tags.append((s, s+length, "<code>", "</code>"))
         elif isinstance(ent, MessageEntityPre):
-            tags.append((s, s+l, "<pre>", "</pre>"))
+            tags.append((s, s+length, "<pre>", "</pre>"))
         elif isinstance(ent, MessageEntityTextUrl):
-            tags.append((s, s+l, f'<a href="{ent.url}" target="_blank">', "</a>"))
+            tags.append((s, s+length, f'<a href="{ent.url}" target="_blank">', "</a>"))
         elif isinstance(ent, MessageEntityUrl):
-            tags.append((s, s+l, f'<a href="{seg_esc}" target="_blank">', "</a>"))
+            tags.append((s, s+length, f'<a href="{seg_esc}" target="_blank">', "</a>"))
         elif isinstance(ent, MessageEntityMention):
-            tags.append((s, s+l, '<span class="mention">', "</span>"))
+            tags.append((s, s+length, '<span class="mention">', "</span>"))
         elif isinstance(ent, MessageEntityHashtag):
-            tags.append((s, s+l, '<span class="hashtag">', "</span>"))
+            tags.append((s, s+length, '<span class="hashtag">', "</span>"))
 
     output = html.escape(text)
     for s, e, open_t, close_t in sorted(tags, key=lambda x: x[0], reverse=True):
