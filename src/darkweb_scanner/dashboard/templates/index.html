@@ -80,7 +80,7 @@
     .stat-card .val { font-size: 1.9rem; font-weight: 700; color: var(--accent); }
 
     /* ── Panel ── */
-    .panel { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; margin-bottom: 20px; overflow: hidden; }
+    .panel { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; margin-bottom: 20px; overflow: visible; }
     .panel-header { padding: 13px 18px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
     .panel-header h2 { font-size: 0.88rem; font-weight: 600; }
     .panel-body { padding: 18px; }
@@ -235,6 +235,13 @@
     /* ── Seeds / channels ── */
     .seed-item { display: flex; align-items: center; justify-content: space-between; padding: 9px 0; border-bottom: 1px solid var(--border); font-family: var(--mono); font-size: 0.79rem; color: var(--accent); }
     .seed-item:last-child { border-bottom: none; }
+    .seeds-tab-btn { background: none; border: none; border-bottom: 2px solid transparent; color: var(--muted); padding: 8px 18px; font-size: .82rem; cursor: pointer; font-family: var(--mono); transition: color .15s, border-color .15s; }
+    .seeds-tab-btn:hover { color: var(--text); }
+    .seeds-tab-btn.active { color: var(--cyan); border-bottom-color: var(--cyan); }
+    .seeds-sub-panel > .panel { border-top-left-radius: 0; border-top-right-radius: 0; }
+    .gen-kw-item { display:inline-flex;align-items:center;gap:6px;background:var(--surface2);border:1px solid var(--border);border-radius:4px;padding:3px 8px;margin:3px;font-family:var(--mono);font-size:.78rem;cursor:pointer;transition:background .15s; }
+    .gen-kw-item.selected { background:rgba(88,210,180,.12);border-color:var(--cyan);color:var(--cyan); }
+    .gen-kw-item input[type=checkbox] { accent-color:var(--cyan); }
 
     /* ── User badges ── */
     .badge-admin { background: rgba(248,81,73,.12); color: var(--red); border: 1px solid rgba(248,81,73,.25); border-radius: 4px; padding: 2px 7px; font-size: 0.7rem; font-weight: 600; }
@@ -376,21 +383,75 @@
 
   <!-- ── Keywords Tab ── -->
   <div class="tab-panel" id="panel-keywords">
-    <div class="panel">
-      <div class="panel-header"><h2>Manage Keywords</h2></div>
+    <!-- ── Keyword Generator ── -->
+    <div class="panel" style="margin-bottom:0;border-bottom-left-radius:0;border-bottom-right-radius:0">
+      <div class="panel-header" style="cursor:pointer;user-select:none" onclick="toggleGenerator()">
+        <h2>🤖 Keyword Generator</h2>
+        <span style="color:var(--muted);font-size:.79rem">Rule-based · Zero API cost · Click to expand</span>
+        <span id="generatorChevron" style="margin-left:auto;color:var(--accent);font-size:1rem">▼</span>
+      </div>
+      <div class="panel-body" id="generatorPanel" style="display:none">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px">
+          <div class="form-group">
+            <label>Target Name</label>
+            <input type="text" id="genName" placeholder="e.g. Philippine Health Insurance Corp" style="width:100%"/>
+          </div>
+          <div class="form-group">
+            <label>Domain</label>
+            <input type="text" id="genDomain" placeholder="e.g. philhealth.gov.ph" style="width:100%"/>
+          </div>
+          <div class="form-group">
+            <label>Industry <span style="color:var(--muted);font-size:.72rem">(bank, healthcare, government, telco, ecommerce, bpo, education)</span></label>
+            <input type="text" id="genIndustry" placeholder="e.g. healthcare" style="width:100%"/>
+          </div>
+          <div class="form-group">
+            <label>Additional Context <span style="color:var(--muted);font-size:.72rem">quoted phrases extracted automatically</span></label>
+            <input type="text" id="genContext" placeholder="e.g. member data breach 2024" style="width:100%"/>
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+          <button class="btn btn-primary" onclick="generateKeywords()" id="genBtn">⚡ Generate Keywords</button>
+          <select id="genProjectSelect" style="width:220px;background:#1a1f2e;border:1px solid #58a6ff;color:#e6edf3;padding:6px 10px;border-radius:4px;font-size:.82rem">
+            <option value="">+ Add to Project (optional)</option>
+          </select>
+        </div>
+        <div id="genResults" style="margin-top:18px"></div>
+      </div>
+    </div>
+
+    <!-- ── Manage Keywords ── -->
+    <div class="panel" style="border-top-left-radius:0;border-top-right-radius:0">
+      <div class="panel-header">
+        <h2>Manage Keywords</h2>
+        <div style="margin-left:auto;display:flex;gap:8px">
+          <label class="btn btn-secondary" style="cursor:pointer;font-size:.78rem;padding:5px 12px">
+            📥 Import CSV
+            <input type="file" accept=".csv" onchange="importKeywords(this)" style="display:none"/>
+          </label>
+          <button class="btn btn-secondary" style="font-size:.78rem" onclick="exportKeywords()">📤 Export CSV</button>
+        </div>
+      </div>
       <div class="panel-body">
-        <div class="form-row">
-          <div class="form-group"><label>Keyword</label><input type="text" id="newKeyword" style="width:260px" placeholder="e.g. credential dump"/></div>
+        <div class="form-row" style="gap:10px;align-items:flex-end;margin-bottom:8px;flex-wrap:wrap">
+          <div class="form-group"><label>Keyword</label><input type="text" id="newKeyword" style="width:240px" placeholder="e.g. credential dump"/></div>
           <div class="form-group">
             <label>Category</label>
-            <select id="newCategory" style="width:170px">
+            <select id="newCategory" style="width:160px">
               <option value="custom">custom</option>
               <option value="threat_intel">threat_intel</option>
               <option value="brand_monitoring">brand_monitoring</option>
+              <option value="credentials">credentials</option>
               <option value="infrastructure">infrastructure</option>
             </select>
           </div>
           <button class="btn btn-primary" onclick="addKeyword()">+ Add</button>
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:.82rem;color:var(--muted);margin-left:8px;align-self:flex-end;padding-bottom:6px">
+            <input type="checkbox" id="kwProjectScope" onchange="toggleKwProjectScope()" style="accent-color:var(--cyan)"/>
+            Project Specific
+          </label>
+          <select id="kwProjectSelect" style="width:200px;display:none;background:var(--surface);border:1px solid var(--border);color:var(--text);padding:4px 8px;border-radius:4px;font-size:.82rem;align-self:flex-end">
+            <option value="">Loading projects…</option>
+          </select>
         </div>
         <div style="margin:14px 0 4px">
           <input type="text" id="keywordSearch" placeholder="🔍 Search keywords…" oninput="filterKeywords()"
@@ -404,25 +465,86 @@
 
   <!-- ── Seeds Tab ── -->
   <div class="tab-panel" id="panel-seeds">
-    <div class="panel">
-      <div class="panel-header"><h2>🧅 Dark Web Seeds</h2><span style="color:var(--muted);font-size:.79rem">.onion URLs to crawl</span></div>
-      <div class="panel-body">
-        <div class="form-row">
-          <div class="form-group"><label>Seed URL</label><input type="text" id="newSeed" style="width:400px" placeholder="http://example.onion"/></div>
-          <button class="btn btn-primary" onclick="addSeed()">+ Add Seed</button>
+    <!-- Sub-nav -->
+    <div style="display:flex;gap:0;padding:16px 20px 0;border-bottom:1px solid var(--border);background:var(--surface)">
+      <button class="seeds-tab-btn active" onclick="switchSeedsTab('onion',this)">&#x1F9C5; Onion Seeds</button>
+      <button class="seeds-tab-btn" onclick="switchSeedsTab('clearnet',this)">&#x1F310; Clearnet Seeds</button>
+      <button class="seeds-tab-btn" onclick="switchSeedsTab('paste',this)">&#x1F4CB; Paste Sources</button>
+      <button class="seeds-tab-btn" onclick="switchSeedsTab('telegram',this)">&#x1F4F1; Telegram</button>
+    </div>
+
+    <!-- Onion Seeds -->
+    <div id="seeds-panel-onion" class="seeds-sub-panel">
+      <div class="panel">
+        <div class="panel-header"><h2>Onion Seeds</h2><span style="color:var(--muted);font-size:.79rem">.onion URLs for the dark web crawler</span></div>
+        <div class="panel-body">
+          <div class="form-row" style="align-items:flex-end">
+            <div class="form-group" style="flex:1"><label>Single URL</label><input type="text" id="newSeed" placeholder="http://example.onion" style="width:100%"/></div>
+            <button class="btn btn-primary" onclick="addSeed()">+ Add</button>
+          </div>
+          <div class="form-group" style="margin-top:12px">
+            <label style="color:var(--muted);font-size:.78rem">Bulk paste — one URL per line</label>
+            <textarea id="bulkOnionSeeds" rows="4" placeholder="http://site1.onion&#10;http://site2.onion"
+              style="width:100%;background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:8px 10px;font-family:var(--mono);font-size:.8rem;resize:vertical"></textarea>
+            <button class="btn btn-secondary" style="margin-top:6px" onclick="bulkAddSeeds('onion')">+ Add All</button>
+          </div>
+          <div id="seedsList" style="margin-top:14px"><div class="empty"><div class="icon">&#x1F331;</div><p>Loading...</p></div></div>
         </div>
-        <div id="seedsList"><div class="empty"><div class="icon">🌱</div><p>Loading…</p></div></div>
       </div>
     </div>
-    <div class="panel">
-      <div class="panel-header"><h2>📱 Telegram Channels</h2><span style="color:var(--muted);font-size:.79rem">Public channels to scrape</span></div>
-      <div class="panel-body">
-        <div class="form-row">
-          <div class="form-group"><label>Channel (without @)</label><input type="text" id="newChannel" style="width:260px" placeholder="channelname"/></div>
-          <button class="btn btn-primary" onclick="addChannel()">+ Add Channel</button>
+
+    <!-- Clearnet Seeds -->
+    <div id="seeds-panel-clearnet" class="seeds-sub-panel" style="display:none">
+      <div class="panel">
+        <div class="panel-header"><h2>Clearnet Seeds</h2><span style="color:var(--muted);font-size:.79rem">Regular websites to crawl (breach forums, mirrors, leak sites)</span></div>
+        <div class="panel-body">
+          <div class="form-row" style="align-items:flex-end">
+            <div class="form-group" style="flex:1"><label>Single URL</label><input type="text" id="newClearnetSeed" placeholder="https://example.com" style="width:100%"/></div>
+            <button class="btn btn-primary" onclick="addClearnetSeed()">+ Add</button>
+          </div>
+          <div class="form-group" style="margin-top:12px">
+            <label style="color:var(--muted);font-size:.78rem">Bulk paste — one URL per line</label>
+            <textarea id="bulkClearnetSeeds" rows="4" placeholder="https://breachforums.st&#10;https://leakbase.io"
+              style="width:100%;background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:8px 10px;font-family:var(--mono);font-size:.8rem;resize:vertical"></textarea>
+            <button class="btn btn-secondary" style="margin-top:6px" onclick="bulkAddSeeds('clearnet')">+ Add All</button>
+          </div>
+          <div id="clearnetSeedsList" style="margin-top:14px"><div class="empty"><div class="icon">&#x1F310;</div><p>Loading...</p></div></div>
         </div>
-        <div id="channelsList"><div class="empty"><div class="icon">📱</div><p>Loading…</p></div></div>
-        <div class="info-banner">Run <code>make telegram-scan</code> on the server to scrape channels. First-time setup: <code>make telegram-auth</code></div>
+      </div>
+    </div>
+
+    <!-- Paste Sources -->
+    <div id="seeds-panel-paste" class="seeds-sub-panel" style="display:none">
+      <div class="panel">
+        <div class="panel-header"><h2>Paste Sources</h2><span style="color:var(--muted);font-size:.79rem">Paste sites monitored for credential dumps and leaks</span></div>
+        <div class="panel-body">
+          <div class="form-row" style="align-items:flex-end">
+            <div class="form-group" style="flex:1"><label>Single URL</label><input type="text" id="newPasteSource" placeholder="https://pastebin.com" style="width:100%"/></div>
+            <button class="btn btn-primary" onclick="addPasteSource()">+ Add</button>
+          </div>
+          <div class="form-group" style="margin-top:12px">
+            <label style="color:var(--muted);font-size:.78rem">Bulk paste — one URL per line</label>
+            <textarea id="bulkPasteSources" rows="4" placeholder="https://pastebin.com&#10;https://rentry.co&#10;https://controlc.com"
+              style="width:100%;background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:8px 10px;font-family:var(--mono);font-size:.8rem;resize:vertical"></textarea>
+            <button class="btn btn-secondary" style="margin-top:6px" onclick="bulkAddSeeds('paste')">+ Add All</button>
+          </div>
+          <div id="pasteSourcesList" style="margin-top:14px"><div class="empty"><div class="icon">&#x1F4CB;</div><p>Loading...</p></div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Telegram -->
+    <div id="seeds-panel-telegram" class="seeds-sub-panel" style="display:none">
+      <div class="panel">
+        <div class="panel-header"><h2>Telegram Channels</h2><span style="color:var(--muted);font-size:.79rem">Public channels to scrape</span></div>
+        <div class="panel-body">
+          <div class="form-row">
+            <div class="form-group"><label>Channel (without @)</label><input type="text" id="newChannel" style="width:260px" placeholder="channelname"/></div>
+            <button class="btn btn-primary" onclick="addChannel()">+ Add Channel</button>
+          </div>
+          <div id="channelsList"><div class="empty"><div class="icon">&#x1F4F1;</div><p>Loading...</p></div></div>
+          <div class="info-banner">Run <code>make telegram-scan</code> on the server to scrape channels. First-time setup: <code>make telegram-auth</code></div>
+        </div>
       </div>
     </div>
   </div>
@@ -931,7 +1053,7 @@
     document.querySelectorAll('.nav-tab').forEach(b => b.classList.remove('active'));
     document.getElementById('panel-' + tab).classList.add('active');
     btn.classList.add('active');
-    if (tab === 'keywords') loadKeywords();
+    if (tab === 'keywords') { loadKeywords(); _populateGenProjectDropdown(); }
     if (tab === 'seeds') { loadSeeds(); loadChannels(); }
     if (tab === 'users' && isAdmin) loadUsers();
     if (tab === 'investigations') loadInvestigations();
@@ -1163,10 +1285,18 @@
     const kw = document.getElementById('newKeyword').value.trim();
     const cat = document.getElementById('newCategory').value;
     if (!kw) { toast('Enter a keyword first', 'error'); return; }
-    const res = await fetch('/api/keywords', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({keyword:kw,category:cat}) });
-    const data = await res.json();
-    if (data.ok) { document.getElementById('newKeyword').value=''; toast('Keyword added!'); loadKeywords(); }
-    else toast(data.error||'Error', 'error');
+    const projectId = document.getElementById('genProjectSelect')?.value || _getKwProjectId();
+    if (projectId) {
+      const res = await fetch(`/api/projects/${projectId}/keywords`, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({keyword:kw,category:cat}) });
+      const data = await res.json();
+      if (data.ok) { document.getElementById('newKeyword').value=''; toast(`Keyword added to project!`); }
+      else toast(data.error||'Error', 'error');
+    } else {
+      const res = await fetch('/api/keywords', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({keyword:kw,category:cat}) });
+      const data = await res.json();
+      if (data.ok) { document.getElementById('newKeyword').value=''; toast('Keyword added!'); loadKeywords(); }
+      else toast(data.error||'Error', 'error');
+    }
   }
 
   async function deleteKeyword(kw, cat) {
@@ -1174,6 +1304,33 @@
     const data = await res.json();
     if (data.ok) { toast('Removed'); loadKeywords(); }
     else toast(data.error||'Error','error');
+  }
+
+  // ── Project scope helpers ──────────────────────────────────────────────────
+  function _getKwProjectId() {
+    const cb = document.getElementById('kwProjectScope');
+    const sel = document.getElementById('kwProjectSelect');
+    return (cb && cb.checked && sel && sel.value) ? sel.value : null;
+  }
+
+  function toggleKwProjectScope() {
+    const cb = document.getElementById('kwProjectScope');
+    const sel = document.getElementById('kwProjectSelect');
+    sel.style.display = cb.checked ? '' : 'none';
+    if (cb.checked) _populateKwProjectDropdown();
+  }
+
+  async function _populateKwProjectDropdown() {
+    const sel = document.getElementById('kwProjectSelect');
+    try {
+      const data = await (await fetch('/api/projects')).json();
+      const projects = data.projects || [];
+      if (!projects.length) {
+        sel.innerHTML = '<option value="">No projects yet</option>';
+        return;
+      }
+      sel.innerHTML = projects.map(p => `<option value="${p.id}">${esc(p.name)}</option>`).join('');
+    } catch(e) { sel.innerHTML = '<option value="">Error loading projects</option>'; }
   }
 
   // ── Seeds ──────────────────────────────────────────────────────────────────
@@ -1204,6 +1361,218 @@
     const data = await res.json();
     if (data.ok) { toast('Removed'); loadSeeds(); }
     else toast(data.error||'Error','error');
+  }
+
+  // ── Seeds sub-tab switching ────────────────────────────────────────────────
+  function switchSeedsTab(tab, btn) {
+    document.querySelectorAll('.seeds-sub-panel').forEach(p => p.style.display = 'none');
+    document.querySelectorAll('.seeds-tab-btn').forEach(b => b.classList.remove('active'));
+    document.getElementById('seeds-panel-' + tab).style.display = '';
+    btn.classList.add('active');
+    if (tab === 'clearnet') loadClearnetSeeds();
+    if (tab === 'paste') loadPasteSources();
+    if (tab === 'telegram') loadChannels();
+  }
+
+  // ── Clearnet Seeds ─────────────────────────────────────────────────────────
+  async function loadClearnetSeeds() {
+    const el = document.getElementById('clearnetSeedsList');
+    try {
+      const data = await (await fetch('/api/seeds/clearnet')).json();
+      if (!data.seeds?.length) { el.innerHTML = '<div class="empty"><div class="icon">&#x1F310;</div><p>No clearnet seeds yet.</p></div>'; return; }
+      el.innerHTML = data.seeds.map(s => `
+        <div class="seed-item">
+          <span>${esc(s)}</span>
+          <button class="btn btn-danger" onclick="deleteClearnetSeed('${esc(s).replace(/'/g,"\\'")}')">Remove</button>
+        </div>`).join('');
+    } catch(e) { el.innerHTML = '<div class="empty" style="color:var(--red)">Error.</div>'; }
+  }
+
+  async function addClearnetSeed() {
+    const url = document.getElementById('newClearnetSeed').value.trim();
+    if (!url) { toast('Enter a URL', 'error'); return; }
+    const res = await fetch('/api/seeds/clearnet', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({url}) });
+    const data = await res.json();
+    if (data.ok) { document.getElementById('newClearnetSeed').value=''; toast('Clearnet seed added!'); loadClearnetSeeds(); }
+    else toast(data.error||'Error','error');
+  }
+
+  async function deleteClearnetSeed(url) {
+    const res = await fetch('/api/seeds/clearnet', { method:'DELETE', headers:{'Content-Type':'application/json'}, body:JSON.stringify({url}) });
+    const data = await res.json();
+    if (data.ok) { toast('Removed'); loadClearnetSeeds(); }
+    else toast(data.error||'Error','error');
+  }
+
+  // ── Paste Sources ──────────────────────────────────────────────────────────
+  async function loadPasteSources() {
+    const el = document.getElementById('pasteSourcesList');
+    try {
+      const data = await (await fetch('/api/seeds/paste')).json();
+      if (!data.sources?.length) { el.innerHTML = '<div class="empty"><div class="icon">&#x1F4CB;</div><p>No paste sources yet.</p></div>'; return; }
+      el.innerHTML = data.sources.map(s => `
+        <div class="seed-item">
+          <span>${esc(s)}</span>
+          <button class="btn btn-danger" onclick="deletePasteSource('${esc(s).replace(/'/g,"\\'")}')">Remove</button>
+        </div>`).join('');
+    } catch(e) { el.innerHTML = '<div class="empty" style="color:var(--red)">Error.</div>'; }
+  }
+
+  async function addPasteSource() {
+    const url = document.getElementById('newPasteSource').value.trim();
+    if (!url) { toast('Enter a URL', 'error'); return; }
+    const res = await fetch('/api/seeds/paste', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({url}) });
+    const data = await res.json();
+    if (data.ok) { document.getElementById('newPasteSource').value=''; toast('Paste source added!'); loadPasteSources(); }
+    else toast(data.error||'Error','error');
+  }
+
+  async function deletePasteSource(url) {
+    const res = await fetch('/api/seeds/paste', { method:'DELETE', headers:{'Content-Type':'application/json'}, body:JSON.stringify({url}) });
+    const data = await res.json();
+    if (data.ok) { toast('Removed'); loadPasteSources(); }
+    else toast(data.error||'Error','error');
+  }
+
+  // ── Bulk seed add ──────────────────────────────────────────────────────────
+  async function bulkAddSeeds(type) {
+    const textareaId = type === 'onion' ? 'bulkOnionSeeds' : type === 'clearnet' ? 'bulkClearnetSeeds' : 'bulkPasteSources';
+    const endpoint = type === 'onion' ? '/api/seeds' : type === 'clearnet' ? '/api/seeds/clearnet' : '/api/seeds/paste';
+    const raw = document.getElementById(textareaId).value.trim();
+    if (!raw) { toast('Paste some URLs first', 'error'); return; }
+    const urls = raw.split('\n').map(l => l.trim()).filter(l => l && l.startsWith('http'));
+    if (!urls.length) { toast('No valid URLs found (must start with http)', 'error'); return; }
+    const res = await fetch(endpoint, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({urls}) });
+    const data = await res.json();
+    if (data.ok) {
+      document.getElementById(textareaId).value = '';
+      toast(`Added ${data.added} URL${data.added !== 1 ? 's' : ''}!`);
+      if (type === 'onion') loadSeeds();
+      else if (type === 'clearnet') loadClearnetSeeds();
+      else loadPasteSources();
+    } else toast(data.error||'Error','error');
+  }
+
+  // ── Keyword export ─────────────────────────────────────────────────────────
+  function exportKeywords() {
+    window.location.href = '/api/keywords/export';
+  }
+
+  // ── Keyword import ─────────────────────────────────────────────────────────
+  async function importKeywords(input) {
+    const file = input.files[0];
+    if (!file) return;
+    const form = new FormData();
+    form.append('file', file);
+    const res = await fetch('/api/keywords/import', { method:'POST', body: form });
+    const data = await res.json();
+    input.value = '';
+    if (data.ok) { toast(`Imported ${data.added} keyword${data.added !== 1 ? 's' : ''}!`); loadKeywords(); }
+    else toast(data.error||'Import failed','error');
+  }
+
+  // ── Keyword generator ──────────────────────────────────────────────────────
+  function toggleGenerator() {
+    const panel = document.getElementById('generatorPanel');
+    const chevron = document.getElementById('generatorChevron');
+    const open = panel.style.display === 'none';
+    panel.style.display = open ? '' : 'none';
+    chevron.textContent = open ? '▲' : '▼';
+  }
+
+  async function _populateGenProjectDropdown() {
+    try {
+      const pd = await (await fetch('/api/projects')).json();
+      const sel = document.getElementById('genProjectSelect');
+      if (!sel) return;
+      const projects = Array.isArray(pd) ? pd : (pd.projects || []);
+      sel.innerHTML = '<option value="">+ Add to Project (optional)</option>' +
+        projects.map(p => `<option value="${p.id}">${esc(p.name)}</option>`).join('');
+    } catch(e) {}
+  }
+
+  async function generateKeywords() {
+    await _populateGenProjectDropdown();
+    const name = document.getElementById('genName').value.trim();
+    const domain = document.getElementById('genDomain').value.trim();
+    const industry = document.getElementById('genIndustry').value.trim();
+    const context = document.getElementById('genContext').value.trim();
+    if (!name && !domain) { toast('Enter at least a name or domain', 'error'); return; }
+
+    const btn = document.getElementById('genBtn');
+    btn.textContent = '⏳ Generating…';
+    btn.disabled = true;
+
+    try {
+      const res = await fetch('/api/keywords/generate', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({name, domain, industry, context})
+      });
+      const data = await res.json();
+      if (!data.ok) { toast(data.error||'Error','error'); return; }
+
+      const results = data.keywords;
+      const catColors = {brand_monitoring:'var(--cyan)',credentials:'var(--red)',infrastructure:'var(--accent)',threat_intel:'#f0a',custom:'var(--muted)'};
+      let total = 0;
+      let html = '<div style="margin-bottom:12px;display:flex;align-items:center;gap:12px"><span style="color:var(--muted);font-size:.82rem">Click to select/deselect · </span><button class="btn btn-secondary" style="font-size:.75rem;padding:4px 10px" onclick="selectAllGenKw(true)">Select All</button><button class="btn btn-secondary" style="font-size:.75rem;padding:4px 10px" onclick="selectAllGenKw(false)">None</button><button class="btn btn-primary" style="font-size:.75rem;padding:4px 10px;margin-left:auto" onclick="addSelectedGenKws()">+ Add Selected to Keywords</button></div>';
+
+      for (const [cat, kws] of Object.entries(results)) {
+        total += kws.length;
+        html += `<div style="margin-bottom:14px">
+          <div style="font-size:.72rem;color:${catColors[cat]||'var(--muted)'};font-family:var(--mono);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">${esc(cat)} (${kws.length})</div>
+          <div>`;
+        for (const kw of kws) {
+          html += `<span class="gen-kw-item selected" onclick="toggleGenKw(this)" data-kw="${esc(kw)}" data-cat="${esc(cat)}"><input type="checkbox" checked onclick="event.stopPropagation()"> ${esc(kw)}</span>`;
+        }
+        html += '</div></div>';
+      }
+      html += `<div style="color:var(--muted);font-size:.78rem;margin-top:8px">Generated ${total} keywords across ${Object.keys(results).length} categories</div>`;
+      document.getElementById('genResults').innerHTML = html;
+      // sync checkboxes inside spans
+      document.querySelectorAll('.gen-kw-item input[type=checkbox]').forEach(cb => {
+        cb.addEventListener('change', function() {
+          this.closest('.gen-kw-item').classList.toggle('selected', this.checked);
+        });
+      });
+    } catch(e) { toast('Error generating keywords','error'); }
+    finally { btn.textContent = '⚡ Generate Keywords'; btn.disabled = false; }
+  }
+
+  function toggleGenKw(el) {
+    el.classList.toggle('selected');
+    el.querySelector('input[type=checkbox]').checked = el.classList.contains('selected');
+  }
+
+  function selectAllGenKw(val) {
+    document.querySelectorAll('.gen-kw-item').forEach(el => {
+      el.classList.toggle('selected', val);
+      el.querySelector('input[type=checkbox]').checked = val;
+    });
+  }
+
+  async function addSelectedGenKws() {
+    const items = [...document.querySelectorAll('.gen-kw-item.selected')];
+    if (!items.length) { toast('No keywords selected','error'); return; }
+    const keywords = items.map(el => ({ keyword: el.dataset.kw, category: el.dataset.cat }));
+    const projectId = _getKwProjectId();
+    if (projectId) {
+      // Add to project one by one (project keywords API doesn't have bulk endpoint)
+      let added = 0;
+      for (const kw of keywords) {
+        const res = await fetch(`/api/projects/${projectId}/keywords`, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(kw) });
+        const data = await res.json();
+        if (data.ok) added++;
+      }
+      toast(`Added ${added} keyword${added!==1?'s':''} to project!`);
+    } else {
+      const res = await fetch('/api/keywords/bulk', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({keywords})
+      });
+      const data = await res.json();
+      if (data.ok) { toast(`Added ${data.added} keyword${data.added!==1?'s':''}!`); loadKeywords(); }
+      else toast(data.error||'Error adding keywords','error');
+    }
   }
 
   // ── Telegram Channels ──────────────────────────────────────────────────────

@@ -25,6 +25,8 @@ SEEDS_FILE = DATA_DIR / "seeds.txt"
 SEEDS_DEFAULT = CONFIG_DIR / "seeds.txt"
 CRAWL_FLAG = DATA_DIR / "crawl.start"
 STOP_FLAG  = DATA_DIR / "crawl.stop"
+CLEARNET_SEEDS_FILE = DATA_DIR / "clearnet_seeds.txt"
+PASTE_SOURCES_FILE  = DATA_DIR / "paste_sources.txt"
 
 
 def _ensure_data_dir():
@@ -180,18 +182,24 @@ def api_seeds_get():
 def api_seeds_add():
     try:
         body = request.get_json()
-        url = (body.get("url") or "").strip()
-        if not url:
-            return jsonify({"error": "url required"}), 400
-        if not url.startswith("http"):
-            return jsonify({"error": "URL must start with http"}), 400
+        # Support both single url and bulk urls array
+        urls = body.get("urls") or ([body.get("url")] if body.get("url") else [])
+        urls = [u.strip() for u in urls if u and u.strip()]
+        if not urls:
+            return jsonify({"error": "url(s) required"}), 400
+        invalid = [u for u in urls if not u.startswith("http")]
+        if invalid and len(invalid) == len(urls):
+            return jsonify({"error": "URLs must start with http"}), 400
 
         _ensure_data_dir()
         existing = _load_seeds()
-        if url not in existing:
-            existing.append(url)
-            SEEDS_FILE.write_text("\n".join(existing) + "\n")
-        return jsonify({"ok": True})
+        added = 0
+        for url in urls:
+            if url.startswith("http") and url not in existing:
+                existing.append(url)
+                added += 1
+        SEEDS_FILE.write_text("\n".join(existing) + "\n")
+        return jsonify({"ok": True, "added": added})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -211,6 +219,298 @@ def api_seeds_delete():
         return jsonify({"ok": True})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+
+# ── Clearnet Seeds API ─────────────────────────────────────────────────────────
+
+def _load_clearnet_seeds() -> list[str]:
+    if not CLEARNET_SEEDS_FILE.exists():
+        return []
+    return [l.strip() for l in CLEARNET_SEEDS_FILE.read_text().splitlines()
+            if l.strip() and not l.strip().startswith("#")]
+
+def _save_clearnet_seeds(seeds: list[str]):
+    _ensure_data_dir()
+    CLEARNET_SEEDS_FILE.write_text("\n".join(seeds) + "\n")
+
+def _load_paste_sources() -> list[str]:
+    if not PASTE_SOURCES_FILE.exists():
+        return []
+    return [l.strip() for l in PASTE_SOURCES_FILE.read_text().splitlines()
+            if l.strip() and not l.strip().startswith("#")]
+
+def _save_paste_sources(sources: list[str]):
+    _ensure_data_dir()
+    PASTE_SOURCES_FILE.write_text("\n".join(sources) + "\n")
+
+
+@dashboard_bp.route("/api/seeds/clearnet", methods=["GET"])
+@require_login
+def api_clearnet_seeds_get():
+    return jsonify({"seeds": _load_clearnet_seeds()})
+
+
+@dashboard_bp.route("/api/seeds/clearnet", methods=["POST"])
+@require_login
+def api_clearnet_seeds_add():
+    body = request.get_json() or {}
+    urls = body.get("urls") or ([body.get("url")] if body.get("url") else [])
+    urls = [u.strip() for u in urls if u and u.strip()]
+    if not urls:
+        return jsonify({"error": "url(s) required"}), 400
+    existing = _load_clearnet_seeds()
+    added = 0
+    for url in urls:
+        if url not in existing:
+            existing.append(url)
+            added += 1
+    _save_clearnet_seeds(existing)
+    return jsonify({"ok": True, "added": added})
+
+
+@dashboard_bp.route("/api/seeds/clearnet", methods=["DELETE"])
+@require_login
+def api_clearnet_seeds_delete():
+    body = request.get_json() or {}
+    url = (body.get("url") or "").strip()
+    if not url:
+        return jsonify({"error": "url required"}), 400
+    seeds = [s for s in _load_clearnet_seeds() if s != url]
+    _save_clearnet_seeds(seeds)
+    return jsonify({"ok": True})
+
+
+# ── Paste Sources API ──────────────────────────────────────────────────────────
+
+
+@dashboard_bp.route("/api/seeds/paste", methods=["GET"])
+@require_login
+def api_paste_sources_get():
+    return jsonify({"sources": _load_paste_sources()})
+
+
+@dashboard_bp.route("/api/seeds/paste", methods=["POST"])
+@require_login
+def api_paste_sources_add():
+    body = request.get_json() or {}
+    urls = body.get("urls") or ([body.get("url")] if body.get("url") else [])
+    urls = [u.strip() for u in urls if u and u.strip()]
+    if not urls:
+        return jsonify({"error": "url(s) required"}), 400
+    existing = _load_paste_sources()
+    added = 0
+    for url in urls:
+        if url not in existing:
+            existing.append(url)
+            added += 1
+    _save_paste_sources(existing)
+    return jsonify({"ok": True, "added": added})
+
+
+@dashboard_bp.route("/api/seeds/paste", methods=["DELETE"])
+@require_login
+def api_paste_sources_delete():
+    body = request.get_json() or {}
+    url = (body.get("url") or "").strip()
+    if not url:
+        return jsonify({"error": "url required"}), 400
+    sources = [s for s in _load_paste_sources() if s != url]
+    _save_paste_sources(sources)
+    return jsonify({"ok": True})
+
+
+# ── Keyword bulk import/export ─────────────────────────────────────────────────
+
+
+@dashboard_bp.route("/api/keywords/bulk", methods=["POST"])
+@require_login
+def api_keywords_bulk_add():
+    """Add multiple keywords in a single atomic write."""
+    import yaml
+    body = request.get_json() or {}
+    items = body.get("keywords", [])  # [{keyword, category}, ...]
+    if not items:
+        return jsonify({"error": "keywords array required"}), 400
+    _ensure_data_dir()
+    cats = _load_keywords()
+    added = 0
+    for item in items:
+        kw = (item.get("keyword") or "").strip()
+        cat = (item.get("category") or "custom").strip()
+        if not kw:
+            continue
+        cats.setdefault(cat, [])
+        if kw not in cats[cat]:
+            cats[cat].append(kw)
+            added += 1
+    KEYWORDS_FILE.write_text(
+        yaml.dump({"keywords": cats}, default_flow_style=False, allow_unicode=True)
+    )
+    return jsonify({"ok": True, "added": added})
+
+
+@dashboard_bp.route("/api/keywords/export", methods=["GET"])
+@require_login
+def api_keywords_export():
+    import csv, io
+    cats = _load_keywords()
+    buf = io.StringIO()
+    writer = csv.writer(buf)
+    writer.writerow(["keyword", "category"])
+    for cat, kws in cats.items():
+        for kw in (kws or []):
+            writer.writerow([kw, cat])
+    output = buf.getvalue()
+    return Response(
+        output,
+        mimetype="text/csv",
+        headers={"Content-Disposition": "attachment; filename=keywords.csv"}
+    )
+
+
+@dashboard_bp.route("/api/keywords/import", methods=["POST"])
+@require_login
+def api_keywords_import():
+    import csv, io, yaml
+    if "file" not in request.files:
+        return jsonify({"error": "No file uploaded"}), 400
+    f = request.files["file"]
+    content = f.read().decode("utf-8", errors="ignore")
+    reader = csv.DictReader(io.StringIO(content))
+    _ensure_data_dir()
+    cats = _load_keywords()
+    added = 0
+    errors = []
+    for i, row in enumerate(reader, 1):
+        kw = (row.get("keyword") or row.get("Keyword") or "").strip()
+        cat = (row.get("category") or row.get("Category") or "custom").strip()
+        if not kw:
+            continue
+        cats.setdefault(cat, [])
+        if kw not in cats[cat]:
+            cats[cat].append(kw)
+            added += 1
+    KEYWORDS_FILE.write_text(
+        yaml.dump({"keywords": cats}, default_flow_style=False, allow_unicode=True)
+    )
+    return jsonify({"ok": True, "added": added})
+
+
+# ── Keyword generator ──────────────────────────────────────────────────────────
+
+
+@dashboard_bp.route("/api/keywords/generate", methods=["POST"])
+@require_login
+def api_keywords_generate():
+    """Rule-based keyword generator — zero API cost."""
+    body = request.get_json() or {}
+    name = (body.get("name") or "").strip()
+    domain = (body.get("domain") or "").strip().lower().lstrip("www.").lstrip("https://").lstrip("http://").split("/")[0]
+    industry = (body.get("industry") or "").strip()
+    context = (body.get("context") or "").strip()
+
+    if not name and not domain:
+        return jsonify({"error": "Provide at least a name or domain"}), 400
+
+    results = {
+        "brand_monitoring": set(),
+        "credentials": set(),
+        "infrastructure": set(),
+        "threat_intel": set(),
+        "custom": set(),
+    }
+
+    # ── Brand / name variants ──
+    if name:
+        name_lower = name.lower()
+        name_nospace = name_lower.replace(" ", "")
+        name_dash = name_lower.replace(" ", "-")
+        name_underscore = name_lower.replace(" ", "_")
+        # Base variants
+        for v in [name_lower, name_nospace, name_dash, name_underscore]:
+            results["brand_monitoring"].add(v)
+        # Abbreviation (first letters of each word)
+        words = name_lower.split()
+        if len(words) > 1:
+            abbrev = "".join(w[0] for w in words)
+            results["brand_monitoring"].add(abbrev)
+        # Common typos — swap adjacent chars in short names
+        if len(name_nospace) <= 12:
+            for i in range(len(name_nospace)-1):
+                typo = name_nospace[:i] + name_nospace[i+1] + name_nospace[i] + name_nospace[i+2:]
+                results["brand_monitoring"].add(typo)
+
+    # ── Domain variants ──
+    if domain:
+        bare = domain.split(".")[0]  # e.g. "philhealth" from "philhealth.gov.ph"
+        tld = ".".join(domain.split(".")[1:]) if "." in domain else ""
+
+        results["brand_monitoring"].update([domain, bare])
+        if tld:
+            results["brand_monitoring"].add(f"@{domain}")
+            results["brand_monitoring"].add(f"@{bare}")
+
+        # Common subdomain variants
+        for sub in ["mail", "vpn", "remote", "webmail", "portal", "admin", "intranet", "api", "dev", "staging"]:
+            results["infrastructure"].add(f"{sub}.{domain}")
+
+        # Credential patterns
+        for suffix in ["password", "passwords", "pass", "credentials", "creds", "dump", "leak", "combo", "db", "database"]:
+            results["credentials"].add(f"{bare} {suffix}")
+            results["credentials"].add(f"{domain} {suffix}")
+            results["credentials"].add(f"{bare}_{suffix}")
+
+        # Email patterns
+        results["credentials"].add(f"@{domain}")
+        results["credentials"].add(f"@{bare}")
+
+        # Threat intel patterns
+        for suffix in ["breach", "hacked", "ransomware", "attacked", "compromised", "data", "exposed", "stolen"]:
+            results["threat_intel"].add(f"{bare} {suffix}")
+            results["threat_intel"].add(f"{domain} {suffix}")
+
+        # Paste/leak site patterns
+        for suffix in ["pastebin", "leaked", "dump", "fullz"]:
+            results["threat_intel"].add(f"{bare} {suffix}")
+
+    # ── Industry-specific terms ──
+    industry_keywords = {
+        "bank": ["swift", "iban", "routing number", "wire transfer", "core banking", "atm skimmer"],
+        "healthcare": ["patient records", "ehr", "medical records", "hipaa", "phi"],
+        "government": [".gov.ph", "gsis", "philsys", "umid", "tin number"],
+        "telco": ["sim swap", "imsi", "subscriber data", "cdr"],
+        "insurance": ["policy data", "claims data", "insured"],
+        "ecommerce": ["customer database", "order dump", "payment cards", "cvv"],
+        "bpo": ["bpo credentials", "agent credentials", "call center"],
+        "education": ["student records", "enrollment data", "lrn"],
+    }
+    if industry:
+        industry_lower = industry.lower()
+        for key, terms in industry_keywords.items():
+            if key in industry_lower:
+                results["custom"].update(terms)
+
+    # ── Context extraction — pull meaningful words/phrases ──
+    if context:
+        import re as _re
+        # Extract quoted phrases
+        quoted = _re.findall(r'"([^"]+)"', context)
+        results["custom"].update(q.lower() for q in quoted if len(q) > 3)
+        # Extract capitalised proper nouns (likely org/product names)
+        proper = _re.findall(r'\b[A-Z][A-Za-z]{3,}\b', context)
+        results["custom"].update(p.lower() for p in proper if p.lower() not in (name or "").lower())
+        # Extract domain-like patterns
+        domains_found = _re.findall(r'\b[\w-]+\.\w{2,6}\b', context)
+        results["infrastructure"].update(d.lower() for d in domains_found)
+
+    # Clean up — remove empty strings, sort each category
+    final = {}
+    for cat, kws in results.items():
+        cleaned = sorted(kw.strip() for kw in kws if kw and len(kw.strip()) > 2)
+        if cleaned:
+            final[cat] = cleaned
+
+    return jsonify({"ok": True, "keywords": final})
 
 
 # ── Crawl control API ──────────────────────────────────────────────────────────
