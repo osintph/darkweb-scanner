@@ -226,8 +226,8 @@ def api_seeds_delete():
 def _load_clearnet_seeds() -> list[str]:
     if not CLEARNET_SEEDS_FILE.exists():
         return []
-    return [l.strip() for l in CLEARNET_SEEDS_FILE.read_text().splitlines()
-            if l.strip() and not l.strip().startswith("#")]
+    return [line.strip() for line in CLEARNET_SEEDS_FILE.read_text().splitlines()
+            if line.strip() and not line.strip().startswith("#")]
 
 def _save_clearnet_seeds(seeds: list[str]):
     _ensure_data_dir()
@@ -236,8 +236,8 @@ def _save_clearnet_seeds(seeds: list[str]):
 def _load_paste_sources() -> list[str]:
     if not PASTE_SOURCES_FILE.exists():
         return []
-    return [l.strip() for l in PASTE_SOURCES_FILE.read_text().splitlines()
-            if l.strip() and not l.strip().startswith("#")]
+    return [line.strip() for line in PASTE_SOURCES_FILE.read_text().splitlines()
+            if line.strip() and not line.strip().startswith("#")]
 
 def _save_paste_sources(sources: list[str]):
     _ensure_data_dir()
@@ -380,7 +380,6 @@ def api_keywords_import():
     _ensure_data_dir()
     cats = _load_keywords()
     added = 0
-    errors = []
     for i, row in enumerate(reader, 1):
         kw = (row.get("keyword") or row.get("Keyword") or "").strip()
         cat = (row.get("category") or row.get("Category") or "custom").strip()
