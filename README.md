@@ -298,3 +298,6 @@ Pull requests are welcome. If you're a Philippine or Southeast Asian security re
 Issues and feature requests: https://github.com/osintph/darkweb-scanner/issues
 
 OSINT PH: https://www.osintph.info
+
+### v0.9.1
+- Project dropdown in Keyword Generator now populates correctly on tab load

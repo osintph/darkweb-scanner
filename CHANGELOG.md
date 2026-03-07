@@ -140,3 +140,13 @@ The format follows **Keep a Changelog**. This project adheres to **Semantic Vers
 - CLI with `scan`, `stats`, `hits`, `check-tor` commands
 - GitHub Actions CI (lint, test, Docker build)
 - Automated release workflow with GHCR publishing
+
+## [v0.9.1] - 2026-03-07
+### Fixed
+- genProjectSelect dropdown not populating with projects on Keywords tab load
+- API returns plain array but code was reading `pd.projects` — fixed to `Array.isArray(pd)`
+- `.panel` CSS `overflow:hidden` was clipping the dropdown — changed to `visible`
+- Flask template cache required `docker compose restart` to pick up changes
+
+### Changed
+- `_populateGenProjectDropdown()` extracted as standalone function, called on tab switch
