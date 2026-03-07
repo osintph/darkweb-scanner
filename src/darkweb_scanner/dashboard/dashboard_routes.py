@@ -970,12 +970,16 @@ def api_ip_investigations_delete(inv_id):
 def api_ransomware_groups():
     from ..ransomware_data import RANSOMWARE_GROUPS
     storage = get_storage()
-    # Cross-reference each group's keywords against existing hits
+    # Merge static + custom entries
+    custom = storage.get_custom_intel("ransomware")
+    static_slugs = {g["slug"] for g in RANSOMWARE_GROUPS}
+    all_groups = list(RANSOMWARE_GROUPS) + [g for g in custom if g["slug"] not in static_slugs]
     enriched = []
-    for group in RANSOMWARE_GROUPS:
+    for group in all_groups:
         hit_count = 0
         recent_hits = []
-        for kw in group.get("keywords", []):
+        keywords = group.get("keywords", [])
+        for kw in keywords:
             hits = storage.get_hits_by_keyword(kw, limit=5)
             hit_count += len(hits)
             for h in hits:
@@ -985,14 +989,70 @@ def api_ransomware_groups():
                     "found_at": h.found_at.isoformat() if h.found_at else None,
                     "context": (h.context or "")[:200],
                 })
-        enriched.append({**group, "hit_count": hit_count, "recent_hits": recent_hits[:5]})
-    # Sort: active + SEA targeting + most hits first
+        last_seen = storage.get_last_hit_date(keywords)
+        is_custom = group.get("slug") not in static_slugs
+        enriched.append({
+            **group,
+            "hit_count": hit_count,
+            "recent_hits": recent_hits[:10],
+            "last_seen": last_seen,
+            "is_custom": is_custom,
+        })
     enriched.sort(key=lambda g: (
         g["status"] != "active",
         not g["targeting_sea"],
         -g["hit_count"],
     ))
     return jsonify(enriched)
+
+
+@dashboard_bp.route("/api/ransomware/groups", methods=["POST"])
+@require_admin
+def api_ransomware_groups_add():
+    from ..ransomware_data import RANSOMWARE_GROUPS
+    storage = get_storage()
+    body = request.get_json() or {}
+    required = ["name", "slug", "origin", "status", "risk_level", "description"]
+    for field in required:
+        if not body.get(field):
+            return jsonify({"error": f"'{field}' is required"}), 400
+    # Prevent slug collision with static data
+    static_slugs = {g["slug"] for g in RANSOMWARE_GROUPS}
+    if body["slug"] in static_slugs:
+        return jsonify({"error": "Slug already exists in static data"}), 409
+    entry = {
+        "name": body["name"],
+        "slug": body["slug"],
+        "status": body["status"],
+        "origin": body["origin"],
+        "first_seen": body.get("first_seen", ""),
+        "targeting_sea": bool(body.get("targeting_sea", False)),
+        "risk_level": body["risk_level"],
+        "description": body["description"],
+        "ttps": [t.strip() for t in body.get("ttps", "").split(",") if t.strip()],
+        "keywords": [k.strip() for k in body.get("keywords", "").split(",") if k.strip()],
+        "onion_seeds": [u.strip() for u in body.get("onion_seeds", "").split("\n") if u.strip()],
+        "sea_victims": [v.strip() for v in body.get("sea_victims", "").split(",") if v.strip()],
+    }
+    username = session.get("username", "admin")
+    ok = storage.add_custom_intel("ransomware", entry["slug"], entry, created_by=username)
+    if not ok:
+        return jsonify({"error": "Slug already exists"}), 409
+    return jsonify({"ok": True})
+
+
+@dashboard_bp.route("/api/ransomware/groups/<slug>", methods=["DELETE"])
+@require_admin
+def api_ransomware_groups_delete(slug):
+    from ..ransomware_data import RANSOMWARE_GROUPS
+    static_slugs = {g["slug"] for g in RANSOMWARE_GROUPS}
+    if slug in static_slugs:
+        return jsonify({"error": "Cannot delete built-in entries"}), 403
+    storage = get_storage()
+    ok = storage.delete_custom_intel(slug)
+    if not ok:
+        return jsonify({"error": "Not found"}), 404
+    return jsonify({"ok": True})
 
 
 @dashboard_bp.route("/api/ransomware/add-seeds", methods=["POST"])
@@ -1040,12 +1100,16 @@ def api_ransomware_add_keywords():
 def api_threat_actors():
     from ..threat_actors import THREAT_ACTORS
     storage = get_storage()
+    custom = storage.get_custom_intel("threat-actor")
+    static_slugs = {a["slug"] for a in THREAT_ACTORS}
+    all_actors = list(THREAT_ACTORS) + [a for a in custom if a["slug"] not in static_slugs]
     enriched = []
-    for actor in THREAT_ACTORS:
+    for actor in all_actors:
         hit_count = 0
         recent_hits = []
-        for kw in actor.get("keywords", []):
-            hits = storage.get_hits_by_keyword(kw, limit=3)
+        keywords = actor.get("keywords", [])
+        for kw in keywords:
+            hits = storage.get_hits_by_keyword(kw, limit=5)
             hit_count += len(hits)
             for h in hits:
                 recent_hits.append({
@@ -1054,13 +1118,93 @@ def api_threat_actors():
                     "found_at": h.found_at.isoformat() if h.found_at else None,
                     "context": (h.context or "")[:200],
                 })
-        enriched.append({**actor, "hit_count": hit_count, "recent_hits": recent_hits[:3]})
+        last_seen = storage.get_last_hit_date(keywords)
+        is_custom = actor.get("slug") not in static_slugs
+        enriched.append({
+            **actor,
+            "hit_count": hit_count,
+            "recent_hits": recent_hits[:10],
+            "last_seen": last_seen,
+            "is_custom": is_custom,
+        })
     enriched.sort(key=lambda a: (
         a["risk_level"] not in ("critical", "high"),
         not a["targeting_sea"],
         -a["hit_count"],
     ))
     return jsonify(enriched)
+
+
+@dashboard_bp.route("/api/threat-actors", methods=["POST"])
+@require_admin
+def api_threat_actors_add():
+    from ..threat_actors import THREAT_ACTORS
+    storage = get_storage()
+    body = request.get_json() or {}
+    required = ["name", "slug", "origin", "type", "status", "risk_level", "description"]
+    for field in required:
+        if not body.get(field):
+            return jsonify({"error": f"'{field}' is required"}), 400
+    static_slugs = {a["slug"] for a in THREAT_ACTORS}
+    if body["slug"] in static_slugs:
+        return jsonify({"error": "Slug already exists in static data"}), 409
+    entry = {
+        "name": body["name"],
+        "slug": body["slug"],
+        "type": body["type"],
+        "status": body["status"],
+        "origin": body["origin"],
+        "first_seen": body.get("first_seen", ""),
+        "targeting_sea": bool(body.get("targeting_sea", False)),
+        "risk_level": body["risk_level"],
+        "description": body["description"],
+        "aliases": [a.strip() for a in body.get("aliases", "").split(",") if a.strip()],
+        "sectors": [s.strip() for s in body.get("sectors", "").split(",") if s.strip()],
+        "countries_targeted": [c.strip() for c in body.get("countries_targeted", "").split(",") if c.strip()],
+        "ttps": [t.strip() for t in body.get("ttps", "").split(",") if t.strip()],
+        "known_malware": [m.strip() for m in body.get("known_malware", "").split(",") if m.strip()],
+        "keywords": [k.strip() for k in body.get("keywords", "").split(",") if k.strip()],
+    }
+    username = session.get("username", "admin")
+    ok = storage.add_custom_intel("threat-actor", entry["slug"], entry, created_by=username)
+    if not ok:
+        return jsonify({"error": "Slug already exists"}), 409
+    return jsonify({"ok": True})
+
+
+@dashboard_bp.route("/api/threat-actors/<slug>", methods=["DELETE"])
+@require_admin
+def api_threat_actors_delete(slug):
+    from ..threat_actors import THREAT_ACTORS
+    static_slugs = {a["slug"] for a in THREAT_ACTORS}
+    if slug in static_slugs:
+        return jsonify({"error": "Cannot delete built-in entries"}), 403
+    storage = get_storage()
+    ok = storage.delete_custom_intel(slug)
+    if not ok:
+        return jsonify({"error": "Not found"}), 404
+    return jsonify({"ok": True})
+
+
+@dashboard_bp.route("/api/threat-actors/add-keywords", methods=["POST"])
+@require_admin
+def api_threat_actors_add_keywords():
+    """Add all threat actor names as keywords."""
+    import yaml
+    from ..threat_actors import THREAT_ACTORS
+    _ensure_data_dir()
+    cats = _load_keywords()
+    cats.setdefault("threat-actors", [])
+    added = 0
+    for actor in THREAT_ACTORS:
+        for kw in actor.get("keywords", []):
+            if kw not in cats["threat-actors"]:
+                cats["threat-actors"].append(kw)
+                added += 1
+    KEYWORDS_FILE.write_text(
+        yaml.dump({"keywords": cats}, default_flow_style=False, allow_unicode=True)
+    )
+    return jsonify({"ok": True, "added": added})
 
 
 # ── Digest / Mailing List API ──────────────────────────────────────────────────

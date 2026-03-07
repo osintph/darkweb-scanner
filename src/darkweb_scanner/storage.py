@@ -268,6 +268,24 @@ class PasteHit(Base):
         Index("ix_paste_hits_pattern", "matched_pattern"),
     )
 
+# ── Custom Intel Models ─────────────────────────────────────────────────────────
+
+class CustomIntel(Base):
+    __tablename__ = "custom_intel"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    intel_type = Column(String(50), nullable=False)   # "ransomware" or "threat-actor"
+    slug = Column(String(200), nullable=False, unique=True)
+    data = Column(Text, nullable=False)               # JSON blob
+    created_by = Column(String(200), nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    __table_args__ = (
+        Index("ix_custom_intel_type", "intel_type"),
+        Index("ix_custom_intel_slug", "slug"),
+    )
+
+
 class Storage:
     def __init__(self, database_url: Optional[str] = None):
         self.database_url = database_url or os.getenv(
@@ -1182,3 +1200,52 @@ class Storage:
                 session.commit()
 
 
+    # --- Custom Intel ---
+
+    def get_custom_intel(self, intel_type: str) -> list:
+        import json
+        with self.get_session() as session:
+            records = (
+                session.query(CustomIntel)
+                .filter(CustomIntel.intel_type == intel_type)
+                .order_by(CustomIntel.created_at.desc())
+                .all()
+            )
+            return [json.loads(r.data) for r in records]
+
+    def add_custom_intel(self, intel_type: str, slug: str, data: dict, created_by: str = None) -> bool:
+        import json
+        with self.get_session() as session:
+            existing = session.query(CustomIntel).filter(CustomIntel.slug == slug).first()
+            if existing:
+                return False
+            record = CustomIntel(
+                intel_type=intel_type,
+                slug=slug,
+                data=json.dumps(data),
+                created_by=created_by,
+            )
+            session.add(record)
+            session.commit()
+            return True
+
+    def delete_custom_intel(self, slug: str) -> bool:
+        with self.get_session() as session:
+            record = session.query(CustomIntel).filter(CustomIntel.slug == slug).first()
+            if not record:
+                return False
+            session.delete(record)
+            session.commit()
+            return True
+
+    def get_last_hit_date(self, keywords: list[str]) -> str | None:
+        """Return ISO timestamp of the most recent keyword hit across given keywords."""
+        if not keywords:
+            return None
+        with self.get_session() as session:
+            result = (
+                session.query(func.max(KeywordHitRecord.found_at))
+                .filter(KeywordHitRecord.keyword.in_(keywords))
+                .scalar()
+            )
+            return result.isoformat() if result else None

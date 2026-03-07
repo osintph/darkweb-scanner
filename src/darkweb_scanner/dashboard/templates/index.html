@@ -139,6 +139,42 @@
     .intel-filter-btn.active { border-color: var(--accent); color: var(--accent); background: rgba(88,166,255,.08); }
     .intel-search { flex: 1; max-width: 280px; padding: 6px 12px; background: var(--surface); border: 1px solid var(--border); color: var(--text); border-radius: 6px; font-size: 0.82rem; font-family: var(--mono); }
     .intel-search:focus { outline: none; border-color: var(--accent); }
+    /* ── Intel Detail Modal ── */
+    .intel-modal-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,.75); z-index:1000; align-items:center; justify-content:center; padding:20px; }
+    .intel-modal-overlay.open { display:flex; }
+    .intel-modal { background:var(--surface); border:1px solid var(--border); border-radius:12px; width:100%; max-width:780px; max-height:90vh; overflow-y:auto; position:relative; }
+    .intel-modal-header { padding:24px 24px 0; border-bottom:1px solid var(--border); padding-bottom:16px; position:sticky; top:0; background:var(--surface); z-index:1; }
+    .intel-modal-title { font-size:1.3rem; font-weight:700; margin-bottom:4px; }
+    .intel-modal-sub { font-size:.78rem; color:var(--muted); }
+    .intel-modal-close { position:absolute; top:16px; right:16px; background:none; border:none; color:var(--muted); font-size:1.4rem; cursor:pointer; line-height:1; padding:4px 8px; border-radius:4px; }
+    .intel-modal-close:hover { background:var(--surface2); color:var(--text); }
+    .intel-modal-body { padding:20px 24px 24px; }
+    .intel-modal-section { margin-bottom:20px; }
+    .intel-modal-section-title { font-size:.72rem; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.08em; margin-bottom:10px; }
+    .intel-modal-desc { font-size:.85rem; color:var(--text); line-height:1.65; }
+    .intel-modal-hits-table { width:100%; border-collapse:collapse; font-size:.75rem; }
+    .intel-modal-hits-table th { text-align:left; padding:6px 8px; color:var(--muted); font-weight:600; border-bottom:1px solid var(--border); }
+    .intel-modal-hits-table td { padding:6px 8px; border-bottom:1px solid rgba(48,54,61,.5); vertical-align:top; }
+    .intel-modal-hits-table tr:last-child td { border-bottom:none; }
+    .intel-modal-hits-table .hit-url { color:var(--accent); font-family:var(--mono); word-break:break-all; }
+    .intel-modal-hits-table .hit-context { color:var(--muted); font-style:italic; }
+    /* ── Last seen badge ── */
+    .last-seen-badge { font-size:.68rem; padding:2px 7px; border-radius:20px; font-weight:600; }
+    .last-seen-fresh { background:rgba(63,185,80,.12); color:var(--green); border:1px solid rgba(63,185,80,.25); }
+    .last-seen-recent { background:rgba(240,136,62,.12); color:var(--orange); border:1px solid rgba(240,136,62,.25); }
+    .last-seen-old { background:rgba(139,148,158,.1); color:var(--muted); border:1px solid var(--border); }
+    /* ── Add Intel Form Modal ── */
+    .add-intel-modal { max-width:640px; }
+    .add-intel-form .form-row { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:12px; }
+    .add-intel-form .form-row.full { grid-template-columns:1fr; }
+    .add-intel-form label { display:block; font-size:.75rem; color:var(--muted); margin-bottom:4px; }
+    .add-intel-form input, .add-intel-form select, .add-intel-form textarea {
+      width:100%; background:var(--bg); border:1px solid var(--border); color:var(--text);
+      border-radius:6px; padding:8px 10px; font-size:.82rem; font-family:var(--mono);
+    }
+    .add-intel-form textarea { resize:vertical; min-height:80px; font-family:var(--font-sans, 'Segoe UI', sans-serif); }
+    .add-intel-form input:focus, .add-intel-form select:focus, .add-intel-form textarea:focus { outline:none; border-color:var(--accent); }
+    .add-intel-form .hint { font-size:.68rem; color:var(--muted); margin-top:3px; }
     /* Digest subscriber list */
     .subscriber-row { display: flex; align-items: center; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 0.83rem; }
     .subscriber-row:last-child { border-bottom: none; }
@@ -500,10 +536,14 @@
       <button class="intel-filter-btn active" onclick="filterRwRisk('all', this)">All</button>
       <button class="intel-filter-btn" onclick="filterRwRisk('critical', this)">🔴 Critical</button>
       <button class="intel-filter-btn" onclick="filterRwRisk('high', this)">🟠 High</button>
+      <button class="intel-filter-btn" onclick="filterRwRisk('disrupted', this)">⚫ Disrupted</button>
       <button class="intel-filter-btn" onclick="filterRwRisk('sea', this)">🌏 SEA Active</button>
       <button class="intel-filter-btn" onclick="filterRwRisk('hits', this)">⚡ Has Hits</button>
-      <button class="btn btn-secondary" style="margin-left:auto" onclick="addRansomwareSeeds()">+ Add .onion Seeds</button>
-      <button class="btn btn-secondary" onclick="addRansomwareKeywords()">+ Add Keywords</button>
+      <div style="margin-left:auto;display:flex;gap:8px;flex-wrap:wrap">
+        {% if is_admin %}<button class="btn btn-secondary" onclick="openAddIntelModal('ransomware')">+ Add Group</button>{% endif %}
+        <button class="btn btn-secondary" onclick="addRansomwareSeeds()">+ Add .onion Seeds</button>
+        <button class="btn btn-secondary" onclick="addRansomwareKeywords()">+ Add Keywords</button>
+      </div>
     </div>
     <div class="intel-grid" id="ransomwareGrid">
       <div class="empty"><div class="icon">☠️</div><p>Loading ransomware intelligence…</p></div>
@@ -520,6 +560,10 @@
       <button class="intel-filter-btn" onclick="filterTaType('hacktivist', this)">✊ Hacktivist</button>
       <button class="intel-filter-btn" onclick="filterTaType('sea', this)">🌏 SEA Active</button>
       <button class="intel-filter-btn" onclick="filterTaType('hits', this)">⚡ Has Hits</button>
+      <div style="margin-left:auto;display:flex;gap:8px;flex-wrap:wrap">
+        {% if is_admin %}<button class="btn btn-secondary" onclick="openAddIntelModal('threat-actor')">+ Add Actor</button>{% endif %}
+        <button class="btn btn-secondary" onclick="addThreatActorKeywords()">+ Add Keywords</button>
+      </div>
     </div>
     <div class="intel-grid" id="threatActorsGrid">
       <div class="empty"><div class="icon">🕵️</div><p>Loading threat actor profiles…</p></div>
@@ -2244,52 +2288,42 @@
       if (q && !g.name.toLowerCase().includes(q) && !g.description.toLowerCase().includes(q)) return false;
       if (rwRiskFilter === 'critical') return g.risk_level === 'critical';
       if (rwRiskFilter === 'high') return g.risk_level === 'high';
+      if (rwRiskFilter === 'disrupted') return g.status === 'disrupted';
       if (rwRiskFilter === 'sea') return g.targeting_sea;
       if (rwRiskFilter === 'hits') return g.hit_count > 0;
       return true;
     });
     const grid = document.getElementById('ransomwareGrid');
     if (!data.length) { grid.innerHTML = '<div class="empty"><div class="icon">🔍</div><p>No groups match filter.</p></div>'; return; }
-    grid.innerHTML = data.map(g => `
-      <div class="intel-card risk-${g.risk_level}">
+    grid.innerHTML = data.map((g, i) => {
+      _intelCache['rw_'+i] = g;
+      return `
+      <div class="intel-card risk-${g.risk_level}" onclick="openIntelDetail('rw_${i}')" style="cursor:pointer">
         <div class="intel-card-header">
-          <div>
-            <div class="intel-card-name">${esc(g.name)}</div>
+          <div style="flex:1;min-width:0">
+            <div class="intel-card-name">${esc(g.name)}${g.is_custom ? ' <span style="font-size:.6rem;color:var(--accent);font-weight:400">[custom]</span>' : ''}</div>
             <div class="intel-card-origin">🌍 ${esc(g.origin)} · First seen ${esc(g.first_seen)}</div>
+          </div>
+          <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;margin-left:8px">
+            ${lastSeenBadge(g.last_seen)}
+            ${g.is_custom ? `<button class="btn btn-secondary" style="font-size:.65rem;padding:2px 7px;color:var(--red);border-color:rgba(248,81,73,.3)" onclick="event.stopPropagation();deleteIntel('ransomware','${g.slug}')">Delete</button>` : ''}
           </div>
         </div>
         <div class="intel-badges">
           <span class="intel-badge badge-${g.risk_level}">${g.risk_level.toUpperCase()}</span>
           <span class="intel-badge badge-${g.status}">${g.status.toUpperCase()}</span>
           ${g.targeting_sea ? '<span class="intel-badge badge-sea">🌏 SEA</span>' : ''}
-          ${g.sea_victims?.length ? `<span class="intel-badge badge-high">⚠ ${g.sea_victims.length} PH/SEA victim${g.sea_victims.length > 1 ? 's' : ''}</span>` : ''}
+          ${g.sea_victims?.length ? `<span class="intel-badge badge-high">⚠ ${g.sea_victims.length} victim${g.sea_victims.length > 1 ? 's' : ''}</span>` : ''}
         </div>
-        <div class="intel-desc">${esc(g.description)}</div>
-        <div class="intel-ttps">${(g.ttps||[]).map(t => `<span class="ttp-tag">${esc(t)}</span>`).join('')}</div>
-        ${g.sea_victims?.length ? `<div style="font-size:.73rem;color:var(--red);margin-bottom:8px">⚠ Known victims: ${g.sea_victims.map(v => esc(v)).join(', ')}</div>` : ''}
+        <div class="intel-desc">${esc(g.description.length > 160 ? g.description.slice(0,160)+'…' : g.description)}</div>
+        <div class="intel-ttps">${(g.ttps||[]).slice(0,4).map(t => `<span class="ttp-tag">${esc(t)}</span>`).join('')}${(g.ttps||[]).length > 4 ? `<span class="ttp-tag" style="color:var(--accent)">+${g.ttps.length-4} more</span>` : ''}</div>
         <div class="intel-hits">
           <span class="intel-hit-count ${g.hit_count > 0 ? 'has-hits' : ''}">${g.hit_count}</span>
-          <span>keyword hits in database</span>
-          ${g.recent_hits?.length ? `<button class="btn btn-secondary" style="margin-left:auto;font-size:.7rem;padding:3px 8px" onclick="showRwHits(${JSON.stringify(g.name).replace(/"/g,'&quot;')}, this)">View hits</button>` : ''}
+          <span>keyword hits</span>
+          <span style="margin-left:auto;font-size:.7rem;color:var(--accent)">Click to expand →</span>
         </div>
-        ${g.recent_hits?.length ? `<div class="rw-hits" style="display:none;margin-top:8px;background:var(--bg);border:1px solid var(--border);border-radius:5px;padding:8px;max-height:160px;overflow-y:auto">
-          ${g.recent_hits.map(h => `<div style="font-size:.72rem;padding:4px 0;border-bottom:1px solid var(--border)">
-            <span style="color:var(--accent);font-family:var(--mono)">${esc(h.keyword)}</span>
-            <span style="color:var(--muted);margin:0 6px">·</span>
-            <span style="color:var(--muted)">${h.found_at ? new Date(h.found_at+'Z').toLocaleDateString() : '—'}</span>
-            <div style="color:var(--muted);font-size:.68rem;margin-top:2px;font-family:var(--mono);word-break:break-all">${esc(h.url)}</div>
-          </div>`).join('')}
-        </div>` : ''}
-      </div>
-    `).join('');
-  }
-
-  function showRwHits(name, btn) {
-    const card = btn.closest('.intel-card');
-    const hits = card.querySelector('.rw-hits');
-    const open = hits.style.display !== 'none';
-    hits.style.display = open ? 'none' : 'block';
-    btn.textContent = open ? 'View hits' : 'Hide hits';
+      </div>`;
+    }).join('');
   }
 
   async function addRansomwareSeeds() {
@@ -2307,6 +2341,306 @@
     if (d.ok) toast(`Added ${d.added} new ransomware keywords`);
     else toast(d.error || 'Error', 'error');
   }
+
+  async function addThreatActorKeywords() {
+    if (!confirm('Add all threat actor names as keywords to the scanner?')) return;
+    const res = await fetch('/api/threat-actors/add-keywords', { method: 'POST' });
+    const d = await res.json();
+    if (d.ok) toast(`Added ${d.added} new threat actor keywords`);
+    else toast(d.error || 'Error', 'error');
+  }
+
+  // ── Last Seen Badge ────────────────────────────────────────────────────────
+  function lastSeenBadge(isoDate) {
+    if (!isoDate) return '<span class="last-seen-badge last-seen-old">No hits</span>';
+    const days = Math.floor((Date.now() - new Date(isoDate + (isoDate.includes('T') ? '' : 'T00:00:00Z'))) / 86400000);
+    if (days <= 7) return `<span class="last-seen-badge last-seen-fresh">🟢 ${days === 0 ? 'Today' : days + 'd ago'}</span>`;
+    if (days <= 30) return `<span class="last-seen-badge last-seen-recent">🟡 ${days}d ago</span>`;
+    return `<span class="last-seen-badge last-seen-old">⚫ ${days}d ago</span>`;
+  }
+
+  // ── Intel Detail Modal ─────────────────────────────────────────────────────
+  const _intelCache = {};
+
+  function openIntelDetail(cacheKey) {
+    const d = _intelCache[cacheKey];
+    if (!d) return;
+    const isRw = !d.type; // ransomware groups don't have 'type' field
+    document.getElementById('modalTitle').innerHTML = esc(d.name) + (d.is_custom ? ' <span style="font-size:.65rem;color:var(--accent)">[custom]</span>' : '');
+    const typeIcon = { 'nation-state': '🏴', 'cybercriminal': '💰', 'hacktivist': '✊' };
+    document.getElementById('modalSub').textContent = isRw
+      ? `🌍 ${d.origin} · First seen ${d.first_seen || '?'}`
+      : `🌍 ${d.origin} · ${typeIcon[d.type] || '👤'} ${d.type} · Since ${d.first_seen || '?'}`;
+    // Badges
+    const badgeHtml = [
+      `<span class="intel-badge badge-${d.risk_level}">${d.risk_level.toUpperCase()}</span>`,
+      `<span class="intel-badge badge-${d.status === 'active' ? 'active' : 'disrupted'}">${d.status.toUpperCase()}</span>`,
+      d.targeting_sea ? '<span class="intel-badge badge-sea">🌏 SEA</span>' : '',
+      d.type ? `<span class="intel-badge badge-type">${esc(d.type)}</span>` : '',
+    ].filter(Boolean).join('');
+    document.getElementById('modalBadges').innerHTML = `<div class="intel-badges" style="margin:0">${badgeHtml}</div>`;
+
+    let html = '';
+
+    // Description
+    html += `<div class="intel-modal-section">
+      <div class="intel-modal-section-title">Description</div>
+      <div class="intel-modal-desc">${esc(d.description)}</div>
+    </div>`;
+
+    // Aliases (threat actors)
+    if (d.aliases?.length) {
+      html += `<div class="intel-modal-section">
+        <div class="intel-modal-section-title">Also Known As</div>
+        <div style="display:flex;flex-wrap:wrap;gap:6px">${d.aliases.map(a => `<span class="intel-badge badge-type" style="font-size:.72rem">${esc(a)}</span>`).join('')}</div>
+      </div>`;
+    }
+
+    // Sectors + Countries
+    const metaRows = [];
+    if (d.sectors?.length) metaRows.push(`<div><span style="color:var(--muted);font-size:.72rem">🎯 Sectors: </span><span style="font-size:.78rem">${d.sectors.map(s => esc(s)).join(', ')}</span></div>`);
+    if (d.countries_targeted?.length) metaRows.push(`<div><span style="color:var(--muted);font-size:.72rem">🌏 Countries: </span><span style="font-size:.78rem">${d.countries_targeted.map(c => esc(c)).join(', ')}</span></div>`);
+    if (metaRows.length) html += `<div class="intel-modal-section"><div class="intel-modal-section-title">Targeting</div>${metaRows.join('')}</div>`;
+
+    // TTPs
+    if (d.ttps?.length) {
+      html += `<div class="intel-modal-section">
+        <div class="intel-modal-section-title">TTPs — Tactics, Techniques & Procedures</div>
+        <div class="intel-ttps">${d.ttps.map(t => `<span class="ttp-tag" style="font-size:.72rem">${esc(t)}</span>`).join('')}</div>
+      </div>`;
+    }
+
+    // Known malware
+    if (d.known_malware?.length) {
+      html += `<div class="intel-modal-section">
+        <div class="intel-modal-section-title">🦠 Known Malware / Tools</div>
+        <div style="display:flex;flex-wrap:wrap;gap:6px">${d.known_malware.map(m => `<span class="intel-badge" style="background:rgba(188,140,255,.1);color:var(--purple);border:1px solid rgba(188,140,255,.25);font-size:.72rem">${esc(m)}</span>`).join('')}</div>
+      </div>`;
+    }
+
+    // SEA Victims (ransomware)
+    if (d.sea_victims?.length) {
+      html += `<div class="intel-modal-section">
+        <div class="intel-modal-section-title">⚠ Known PH/SEA Victims</div>
+        <div style="display:flex;flex-wrap:wrap;gap:6px">${d.sea_victims.map(v => `<span style="font-size:.78rem;color:var(--red);background:rgba(248,81,73,.08);border:1px solid rgba(248,81,73,.2);padding:3px 8px;border-radius:4px">${esc(v)}</span>`).join('')}</div>
+      </div>`;
+    }
+
+    // Keywords
+    if (d.keywords?.length) {
+      html += `<div class="intel-modal-section">
+        <div class="intel-modal-section-title">🔍 Tracked Keywords</div>
+        <div style="display:flex;flex-wrap:wrap;gap:5px">${d.keywords.map(k => `<span class="ttp-tag" style="font-family:var(--mono);font-size:.72rem">${esc(k)}</span>`).join('')}</div>
+      </div>`;
+    }
+
+    // Hits
+    html += `<div class="intel-modal-section">
+      <div class="intel-modal-section-title">
+        📡 Database Hits
+        <span style="margin-left:8px;font-size:.8rem;font-weight:400;color:${d.hit_count > 0 ? 'var(--red)' : 'var(--muted)'}">${d.hit_count} total · ${lastSeenBadge(d.last_seen)}</span>
+      </div>`;
+    if (d.recent_hits?.length) {
+      html += `<table class="intel-modal-hits-table">
+        <thead><tr><th>Keyword</th><th>Date</th><th>URL</th></tr></thead>
+        <tbody>${d.recent_hits.map(h => `
+          <tr>
+            <td><span style="color:var(--accent);font-family:var(--mono);font-size:.72rem">${esc(h.keyword)}</span></td>
+            <td style="white-space:nowrap;color:var(--muted)">${h.found_at ? new Date(h.found_at+'Z').toLocaleDateString() : '—'}</td>
+            <td class="hit-url">${esc(h.url)}</td>
+          </tr>
+          ${h.context ? `<tr><td colspan="3" class="hit-context" style="padding-top:0;padding-bottom:8px">${esc(h.context)}</td></tr>` : ''}
+        `).join('')}</tbody>
+      </table>`;
+    } else {
+      html += `<div style="font-size:.8rem;color:var(--muted);padding:8px 0">No hits recorded yet for this group's keywords.</div>`;
+    }
+    html += `</div>`;
+
+    document.getElementById('modalBody').innerHTML = html;
+    document.getElementById('intelDetailOverlay').classList.add('open');
+    document.body.style.overflow = 'hidden';
+  }
+
+  function closeIntelModal(e) {
+    if (e.target === document.getElementById('intelDetailOverlay')) closeIntelModalDirect();
+  }
+  function closeIntelModalDirect() {
+    document.getElementById('intelDetailOverlay').classList.remove('open');
+    document.body.style.overflow = '';
+  }
+
+  // ── Delete Custom Intel ────────────────────────────────────────────────────
+  async function deleteIntel(type, slug) {
+    if (!confirm(`Delete this custom entry? This cannot be undone.`)) return;
+    const url = type === 'ransomware' ? `/api/ransomware/groups/${slug}` : `/api/threat-actors/${slug}`;
+    const res = await fetch(url, { method: 'DELETE' });
+    const d = await res.json();
+    if (d.ok) {
+      toast('Entry deleted');
+      if (type === 'ransomware') loadRansomware();
+      else loadThreatActors();
+    } else {
+      toast(d.error || 'Error', 'error');
+    }
+  }
+
+  // ── Add Intel Modal ────────────────────────────────────────────────────────
+  let _addIntelType = null;
+
+  function openAddIntelModal(type) {
+    _addIntelType = type;
+    const isRw = type === 'ransomware';
+    document.getElementById('addIntelTitle').textContent = isRw ? '☠️ Add Ransomware Group' : '🕵️ Add Threat Actor';
+    const form = document.getElementById('addIntelForm');
+    const commonFields = `
+      <div class="form-row">
+        <div><label>Name *</label><input type="text" id="ai_name" placeholder="e.g. BlackSuit"/></div>
+        <div><label>Slug * <span class="hint">URL-safe ID</span></label><input type="text" id="ai_slug" placeholder="e.g. blacksuit"/></div>
+      </div>
+      <div class="form-row">
+        <div><label>Origin / Country</label><input type="text" id="ai_origin" placeholder="e.g. Russia"/></div>
+        <div><label>First Seen (year)</label><input type="text" id="ai_first_seen" placeholder="e.g. 2023"/></div>
+      </div>
+      <div class="form-row">
+        <div><label>Status</label>
+          <select id="ai_status">
+            <option value="active">Active</option>
+            <option value="disrupted">Disrupted</option>
+            <option value="inactive">Inactive</option>
+          </select>
+        </div>
+        <div><label>Risk Level</label>
+          <select id="ai_risk_level">
+            <option value="critical">Critical</option>
+            <option value="high">High</option>
+            <option value="medium">Medium</option>
+            <option value="low">Low</option>
+          </select>
+        </div>
+      </div>`;
+
+    const rwFields = `
+      <div class="form-row">
+        <div style="display:flex;align-items:center;gap:8px;padding-top:20px">
+          <input type="checkbox" id="ai_targeting_sea" style="width:auto"/>
+          <label for="ai_targeting_sea" style="margin:0">Targeting SEA region</label>
+        </div>
+      </div>
+      <div class="form-row full">
+        <div><label>Description *</label><textarea id="ai_description" rows="3" placeholder="Describe the group operations, targets, and history…"></textarea></div>
+      </div>
+      <div class="form-row full">
+        <div><label>TTPs <span class="hint">comma-separated</span></label><input type="text" id="ai_ttps" placeholder="e.g. RaaS, double extortion, phishing"/></div>
+      </div>
+      <div class="form-row full">
+        <div><label>Known Victims in SEA/PH <span class="hint">comma-separated</span></label><input type="text" id="ai_sea_victims" placeholder="e.g. PhilHealth, BSP"/></div>
+      </div>
+      <div class="form-row full">
+        <div><label>.onion Seeds <span class="hint">one per line</span></label><textarea id="ai_onion_seeds" rows="2" placeholder="http://example.onion"></textarea></div>
+      </div>
+      <div class="form-row full">
+        <div><label>Keywords to track <span class="hint">comma-separated</span></label><input type="text" id="ai_keywords" placeholder="e.g. blacksuit, black suit ransomware"/></div>
+      </div>`;
+
+    const taFields = `
+      <div class="form-row">
+        <div><label>Type</label>
+          <select id="ai_type">
+            <option value="nation-state">Nation-State</option>
+            <option value="cybercriminal">Cybercriminal</option>
+            <option value="hacktivist">Hacktivist</option>
+            <option value="unknown">Unknown</option>
+          </select>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;padding-top:20px">
+          <input type="checkbox" id="ai_targeting_sea" style="width:auto"/>
+          <label for="ai_targeting_sea" style="margin:0">Targeting SEA region</label>
+        </div>
+      </div>
+      <div class="form-row full">
+        <div><label>Description *</label><textarea id="ai_description" rows="3" placeholder="Describe the actor mission, targets, and known activity…"></textarea></div>
+      </div>
+      <div class="form-row full">
+        <div><label>Aliases <span class="hint">comma-separated</span></label><input type="text" id="ai_aliases" placeholder="e.g. APT99, SHADOW BEAR"/></div>
+      </div>
+      <div class="form-row full">
+        <div><label>Sectors Targeted <span class="hint">comma-separated</span></label><input type="text" id="ai_sectors" placeholder="e.g. government, finance, telecoms"/></div>
+      </div>
+      <div class="form-row full">
+        <div><label>Countries Targeted <span class="hint">comma-separated</span></label><input type="text" id="ai_countries_targeted" placeholder="e.g. Philippines, Indonesia, Vietnam"/></div>
+      </div>
+      <div class="form-row full">
+        <div><label>TTPs <span class="hint">comma-separated</span></label><input type="text" id="ai_ttps" placeholder="e.g. spear phishing, living-off-the-land"/></div>
+      </div>
+      <div class="form-row full">
+        <div><label>Known Malware / Tools <span class="hint">comma-separated</span></label><input type="text" id="ai_known_malware" placeholder="e.g. PlugX, Cobalt Strike"/></div>
+      </div>
+      <div class="form-row full">
+        <div><label>Keywords to track <span class="hint">comma-separated</span></label><input type="text" id="ai_keywords" placeholder="e.g. apt99, shadow bear"/></div>
+      </div>`;
+
+    form.innerHTML = commonFields + (isRw ? rwFields : taFields);
+
+    // Auto-generate slug from name
+    document.getElementById('ai_name').addEventListener('input', function() {
+      const slug = document.getElementById('ai_slug');
+      if (!slug._touched) slug.value = this.value.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+    });
+    document.getElementById('ai_slug').addEventListener('input', function() { this._touched = true; });
+
+    document.getElementById('addIntelOverlay').classList.add('open');
+    document.body.style.overflow = 'hidden';
+  }
+
+  async function submitAddIntel() {
+    const isRw = _addIntelType === 'ransomware';
+    const get = id => document.getElementById(id)?.value?.trim() || '';
+    const checked = id => document.getElementById(id)?.checked || false;
+    const body = {
+      name: get('ai_name'), slug: get('ai_slug'), origin: get('ai_origin'),
+      first_seen: get('ai_first_seen'), status: get('ai_status'),
+      risk_level: get('ai_risk_level'), description: get('ai_description'),
+      targeting_sea: checked('ai_targeting_sea'),
+      ttps: get('ai_ttps'), keywords: get('ai_keywords'),
+    };
+    if (isRw) {
+      body.sea_victims = get('ai_sea_victims');
+      body.onion_seeds = get('ai_onion_seeds');
+    } else {
+      body.type = get('ai_type');
+      body.aliases = get('ai_aliases');
+      body.sectors = get('ai_sectors');
+      body.countries_targeted = get('ai_countries_targeted');
+      body.known_malware = get('ai_known_malware');
+    }
+    if (!body.name || !body.slug || !body.description) {
+      toast('Name, slug, and description are required', 'error'); return;
+    }
+    const url = isRw ? '/api/ransomware/groups' : '/api/threat-actors';
+    const res = await fetch(url, { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(body) });
+    const d = await res.json();
+    if (d.ok) {
+      toast(`${isRw ? 'Ransomware group' : 'Threat actor'} added`);
+      closeAddIntelModalDirect();
+      if (isRw) loadRansomware(); else loadThreatActors();
+    } else {
+      toast(d.error || 'Error adding entry', 'error');
+    }
+  }
+
+  function closeAddIntelModal(e) {
+    if (e.target === document.getElementById('addIntelOverlay')) closeAddIntelModalDirect();
+  }
+  function closeAddIntelModalDirect() {
+    document.getElementById('addIntelOverlay').classList.remove('open');
+    document.body.style.overflow = '';
+  }
+
+  // Escape key closes any open modal
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') { closeIntelModalDirect(); closeAddIntelModalDirect(); }
+  });
 
   // ── Threat Actors ─────────────────────────────────────────────────────────
   let taData = [];
@@ -2346,13 +2680,18 @@
     const grid = document.getElementById('threatActorsGrid');
     if (!data.length) { grid.innerHTML = '<div class="empty"><div class="icon">🔍</div><p>No actors match filter.</p></div>'; return; }
     const typeIcon = { 'nation-state': '🏴', 'cybercriminal': '💰', 'hacktivist': '✊' };
-    const riskColors = { critical: 'var(--red)', high: 'var(--orange)', medium: 'var(--yellow)' };
-    grid.innerHTML = data.map(a => `
-      <div class="intel-card risk-${a.risk_level}">
+    grid.innerHTML = data.map((a, i) => {
+      _intelCache['ta_'+i] = a;
+      return `
+      <div class="intel-card risk-${a.risk_level}" onclick="openIntelDetail('ta_${i}')" style="cursor:pointer">
         <div class="intel-card-header">
-          <div>
-            <div class="intel-card-name">${esc(a.name)}</div>
+          <div style="flex:1;min-width:0">
+            <div class="intel-card-name">${esc(a.name)}${a.is_custom ? ' <span style="font-size:.6rem;color:var(--accent);font-weight:400">[custom]</span>' : ''}</div>
             <div class="intel-card-origin">🌍 ${esc(a.origin)} · ${typeIcon[a.type] || '👤'} ${esc(a.type)} · Since ${esc(a.first_seen)}</div>
+          </div>
+          <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;margin-left:8px">
+            ${lastSeenBadge(a.last_seen)}
+            ${a.is_custom ? `<button class="btn btn-secondary" style="font-size:.65rem;padding:2px 7px;color:var(--red);border-color:rgba(248,81,73,.3)" onclick="event.stopPropagation();deleteIntel('threat-actor','${a.slug}')">Delete</button>` : ''}
           </div>
         </div>
         <div class="intel-badges">
@@ -2361,24 +2700,16 @@
           <span class="intel-badge badge-${a.status === 'active' ? 'active' : 'disrupted'}">${a.status.toUpperCase()}</span>
           ${a.targeting_sea ? '<span class="intel-badge badge-sea">🌏 SEA</span>' : ''}
         </div>
-        ${a.aliases?.length ? `<div style="font-size:.71rem;color:var(--muted);margin-bottom:6px">Also known as: ${a.aliases.map(al => esc(al)).join(', ')}</div>` : ''}
-        <div class="intel-desc">${esc(a.description)}</div>
-        ${a.sectors?.length ? `<div style="font-size:.72rem;color:var(--muted);margin-bottom:6px">🎯 Sectors: ${a.sectors.map(s => esc(s)).join(', ')}</div>` : ''}
-        <div class="intel-ttps">${(a.ttps||[]).map(t => `<span class="ttp-tag">${esc(t)}</span>`).join('')}</div>
-        ${a.known_malware?.length ? `<div style="font-size:.71rem;color:var(--purple);margin:6px 0">🦠 Malware: ${a.known_malware.map(m => esc(m)).join(', ')}</div>` : ''}
+        ${a.aliases?.length ? `<div style="font-size:.71rem;color:var(--muted);margin-bottom:6px">Also known as: ${a.aliases.slice(0,3).map(al => esc(al)).join(', ')}${a.aliases.length > 3 ? ' +' + (a.aliases.length-3) + ' more' : ''}</div>` : ''}
+        <div class="intel-desc">${esc(a.description.length > 160 ? a.description.slice(0,160)+'…' : a.description)}</div>
+        <div class="intel-ttps">${(a.ttps||[]).slice(0,4).map(t => `<span class="ttp-tag">${esc(t)}</span>`).join('')}${(a.ttps||[]).length > 4 ? `<span class="ttp-tag" style="color:var(--accent)">+${a.ttps.length-4} more</span>` : ''}</div>
         <div class="intel-hits">
           <span class="intel-hit-count ${a.hit_count > 0 ? 'has-hits' : ''}">${a.hit_count}</span>
-          <span>keyword hits in database</span>
+          <span>keyword hits</span>
+          <span style="margin-left:auto;font-size:.7rem;color:var(--accent)">Click to expand →</span>
         </div>
-        ${a.recent_hits?.length ? `<div style="margin-top:8px;background:var(--bg);border:1px solid var(--border);border-radius:5px;padding:8px;max-height:120px;overflow-y:auto">
-          ${a.recent_hits.map(h => `<div style="font-size:.72rem;padding:3px 0;border-bottom:1px solid var(--border)">
-            <span style="color:var(--accent);font-family:var(--mono)">${esc(h.keyword)}</span>
-            <span style="color:var(--muted);margin:0 6px">·</span>
-            <span style="color:var(--muted)">${h.found_at ? new Date(h.found_at+'Z').toLocaleDateString() : '—'}</span>
-          </div>`).join('')}
-        </div>` : ''}
-      </div>
-    `).join('');
+      </div>`;
+    }).join('');
   }
 
   // ── Digest / Mailing List ─────────────────────────────────────────────────
@@ -2852,5 +3183,38 @@
   }
 
 </script>
+
+<!-- ── Intel Detail Modal ── -->
+<div class="intel-modal-overlay" id="intelDetailOverlay" onclick="closeIntelModal(event)">
+  <div class="intel-modal" id="intelDetailModal">
+    <div class="intel-modal-header">
+      <button class="intel-modal-close" onclick="closeIntelModalDirect()">✕</button>
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:8px">
+        <div class="intel-modal-title" id="modalTitle"></div>
+        <div id="modalBadges"></div>
+      </div>
+      <div class="intel-modal-sub" id="modalSub"></div>
+    </div>
+    <div class="intel-modal-body" id="modalBody"></div>
+  </div>
+</div>
+
+<!-- ── Add Intel Form Modal ── -->
+<div class="intel-modal-overlay" id="addIntelOverlay" onclick="closeAddIntelModal(event)">
+  <div class="intel-modal add-intel-modal">
+    <div class="intel-modal-header">
+      <button class="intel-modal-close" onclick="closeAddIntelModalDirect()">✕</button>
+      <div class="intel-modal-title" id="addIntelTitle">Add Entry</div>
+      <div class="intel-modal-sub">Custom entries are stored in the database and merged with built-in intelligence.</div>
+    </div>
+    <div class="intel-modal-body">
+      <div class="add-intel-form" id="addIntelForm"></div>
+      <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:20px;padding-top:16px;border-top:1px solid var(--border)">
+        <button class="btn btn-secondary" onclick="closeAddIntelModalDirect()">Cancel</button>
+        <button class="btn btn-primary" onclick="submitAddIntel()">Add Entry</button>
+      </div>
+    </div>
+  </div>
+</div>
 </body>
 </html>
