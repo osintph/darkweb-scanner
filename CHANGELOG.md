@@ -5,7 +5,48 @@ The format follows **Keep a Changelog**. This project adheres to **Semantic Vers
 
 ## [Unreleased]
 
-## [0.7.0] - 2026-03-06
+## [1.0.0] - 2026-03-09
+
+### Added
+- **Active subdomain brute-force** (`dns_crawler.py`)
+  - 100-entry built-in wordlist covering common prefixes: `www`, `api`, `mail`, `vpn`, `dev`, `staging`, `admin`, `portal`, `git`, `ci`, `monitor`, `db`, and more
+  - Runs in parallel (50 workers) via `ThreadPoolExecutor` — a 100-entry scan typically completes in under 5 seconds
+  - Brute-forced subdomains are merged with passive results and deduplicated before resolution
+  - Runs automatically as Phase 2b of every `run_dns_recon()` call — no config needed
+  - Results tagged with `source: bruteforce` to distinguish them from passive discovery
+- **TCP port scanner** (`dns_crawler.py`)
+  - `scan_ports()` — scans a single host across a configurable port list using non-blocking TCP connect
+  - `scan_ports_multi()` — fans out to all resolved IPs in parallel (capped at 10 hosts)
+  - 30 common ports covered: FTP, SSH, Telnet, SMTP, DNS, HTTP, HTTPS, SMB, MySQL, MSSQL, PostgreSQL, Redis, MongoDB, RDP, VNC, Elasticsearch, Kubernetes API, Prometheus, and more
+  - Per-port timeout configurable (`PORT_SCAN_TIMEOUT`, default 1.5s); full scan of 30 ports against one host takes ~2–3 seconds
+  - Returns `open`, `closed`, or `filtered` per port
+- **HTTP/HTTPS directory enumeration** (`dns_crawler.py`)
+  - `enumerate_directories()` — probes a target host for 70 common paths using real HTTP GET requests
+  - Auto-detects HTTPS vs HTTP availability before scanning
+  - Skips 404 and 410 responses; surfaces all other status codes (200, 301, 302, 401, 403, 500, etc.)
+  - Returns path, full URL, status code, content-length, and redirect destination per result
+  - Runs against the root domain and first two resolved IPs
+  - `run_port_and_dir_scan()` — orchestrates port scan + dir enum for all IPs from a DNS investigation
+- **Two new API endpoints** (`dashboard_routes.py`)
+  - `POST /api/dns/investigations/<id>/scan` — triggers port scan + directory enumeration in a background thread; merges results back into the investigation's stored JSON
+  - `GET /api/dns/investigations/<id>/scan/status` — poll for scan completion; returns `ready` flag plus full `port_scan` and `dir_enum` data when done
+- **Redesigned DNS tab UI** (`index.html`)
+  - Six view tabs: **Graph**, **Subdomains**, **Ports**, **Directories**, **Email Security**, **DNS Records**
+  - **Graph view** — interactive SVG canvas node graph; root domain at center, subdomains in concentric rings by depth, IP nodes branching off; drag nodes, pan, scroll-to-zoom; brute-forced nodes shown in purple, passive in blue
+  - **Subdomains view** — unified table merging passive, brute-forced, and crt.sh results with per-row source badges; zone transfer records shown inline if a transfer succeeded
+  - **Ports view** — per-IP port heatmap grid (green = open, yellow = filtered, grey = closed/unknown); scan triggered on demand via "🔌 Scan Ports & Dirs" button with live polling
+  - **Directories view** — table of all non-404 HTTP responses with status code color-coding (green = 200, blue = redirects, yellow = 401/403, red = 500); empty state prompts user to trigger scan
+  - **Email Security view** — 0–100 score card calculated from SPF/DMARC/DKIM presence and policy strength; per-record pass/warn/fail cards; full TXT record dump
+  - **DNS Records view** — all record types in a clean table with inline PTR lookups and geolocation
+  - Stat strip at top of result showing subdomain count, resolved count, brute-forced count, crt.sh cert count, IP count, zone transfer status, SPF, and DMARC at a glance
+  - Progress indicator during recon shows which phase is running (DNS → crt.sh → HackerTarget → brute-force → zone transfer → geolocation)
+
+### Changed
+- `dns_crawler.py` — `run_dns_recon()` now includes Phase 2b (active brute-force) automatically; `subdomains_bruteforce` key added to result dict
+- `dashboard_routes.py` — two new scan endpoints added before the Projects API section
+- `index.html` — DNS tab panel HTML, CSS, and all JavaScript replaced with new multi-view implementation; old `renderDNSResult` / `dnsSection` / `toggleDNSSection` functions replaced by modular view builders
+
+
 
 ### Added
 - **Channel Monitor tab** — on-demand Telegram channel scraping directly from the dashboard UI

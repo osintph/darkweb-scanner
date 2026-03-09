@@ -207,6 +207,110 @@
     .dns-summary-label { font-size:.72rem; color:var(--muted); margin-top:2px; }
     .dns-running { display:flex; align-items:center; gap:10px; padding:20px; color:var(--muted); font-size:.85rem; }
     .dns-spinner { width:18px; height:18px; border:2px solid var(--border); border-top-color:var(--accent); border-radius:50%; animation:spin 1s linear infinite; }
+
+
+    /* ── DNSDumpster-style Infrastructure Panel ── */
+    .infra-overview { display:grid; grid-template-columns:1.2fr 1fr 1fr; gap:12px; padding:16px 20px; border-bottom:1px solid var(--border); align-items:start; }
+    .infra-card { background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:14px 16px; }
+    .infra-card-map { min-height:220px; }
+    .infra-card-title { font-size:.75rem; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.06em; margin-bottom:10px; }
+    .world-map-wrap { position:relative; width:100%; }
+    .world-map-wrap svg { width:100%; height:auto; display:block; }
+    .map-dot { fill:var(--accent); opacity:.85; filter:drop-shadow(0 0 4px var(--accent)); }
+    .asn-bar-row { display:flex; align-items:center; gap:8px; margin-bottom:6px; }
+    .asn-bar-label { font-size:.72rem; color:var(--text); width:110px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; flex-shrink:0; }
+    .asn-bar-track { flex:1; background:var(--surface2); border-radius:3px; height:7px; overflow:hidden; }
+    .asn-bar-fill { height:100%; background:var(--accent); border-radius:3px; transition:width .4s; }
+    .asn-bar-count { font-size:.7rem; color:var(--muted); width:20px; text-align:right; flex-shrink:0; }
+    .svc-donut-wrap { display:flex; align-items:center; gap:14px; }
+    .svc-donut { flex-shrink:0; }
+    .svc-list { flex:1; }
+    .svc-row { display:flex; align-items:center; justify-content:space-between; padding:3px 0; border-bottom:1px solid var(--border); font-size:.74rem; }
+    .svc-row:last-child { border-bottom:none; }
+    .svc-name { color:var(--text); font-family:var(--mono); }
+    .svc-cnt { font-weight:700; color:var(--accent); }
+    .infra-a-records { padding:0 20px 16px; }
+    .infra-a-tbl { width:100%; border-collapse:collapse; font-size:.77rem; }
+    .infra-a-tbl th { text-align:left; padding:7px 10px; color:var(--muted); font-size:.68rem; font-weight:600; text-transform:uppercase; letter-spacing:.05em; border-bottom:1px solid var(--border); background:var(--surface2); }
+    .infra-a-tbl td { padding:8px 10px; border-bottom:1px solid var(--border); vertical-align:top; }
+    .infra-a-tbl tr:hover td { background:rgba(88,166,255,.04); }
+    .infra-a-tbl tr:last-child td { border-bottom:none; }
+    .svc-badge { display:inline-block; background:rgba(88,166,255,.1); color:var(--accent); border:1px solid rgba(88,166,255,.2); border-radius:3px; padding:1px 5px; font-size:.65rem; font-weight:600; margin:1px 2px 1px 0; }
+    .graph-divider { margin:0 20px 10px; border:none; border-top:1px solid var(--border); }
+    /* ── Scilla-style Infrastructure Recon ── */
+    .dns-view-btn { background:var(--surface2); border:1px solid var(--border); color:var(--muted); padding:5px 12px; border-radius:5px; cursor:pointer; font-size:.76rem; font-family:var(--font); transition:all .15s; white-space:nowrap; }
+    .dns-view-btn:hover { color:var(--text); border-color:var(--accent); }
+    .dns-view-btn.active { background:rgba(88,166,255,.12); color:var(--accent); border-color:var(--accent); font-weight:600; }
+    .dns-view-panel { display:none; padding:18px 20px; }
+    .dns-view-panel.active { display:block; }
+
+    /* Stat strip */
+    .dns-stat-strip { display:flex; gap:10px; flex-wrap:wrap; padding:14px 20px; border-bottom:1px solid var(--border); background:var(--surface); align-items:center; }
+    .dns-stat-chip { background:var(--surface2); border:1px solid var(--border); border-radius:7px; padding:9px 14px; text-align:center; min-width:88px; }
+    .dns-stat-chip .sv { font-size:1.4rem; font-weight:800; color:var(--accent); line-height:1; }
+    .dns-stat-chip .sl { font-size:.67rem; color:var(--muted); text-transform:uppercase; letter-spacing:.05em; margin-top:2px; }
+    .dns-stat-chip.sdanger .sv { color:var(--red); }
+    .dns-stat-chip.sok .sv { color:var(--green); }
+    .dns-stat-chip.swarn .sv { color:var(--yellow); }
+
+    /* Graph canvas */
+    #dnsGraphCanvas { width:100%; border-radius:8px; background:var(--bg); border:1px solid var(--border); cursor:grab; display:block; }
+    #dnsGraphCanvas:active { cursor:grabbing; }
+    .dns-graph-wrap { position:relative; }
+
+    /* Port heatmap */
+    .port-heatmap { display:grid; grid-template-columns:repeat(auto-fill,minmax(72px,1fr)); gap:6px; }
+    .port-cell { background:var(--surface2); border:1px solid var(--border); border-radius:5px; padding:7px 4px; text-align:center; }
+    .port-cell.open  { background:rgba(63,185,80,.15); border-color:rgba(63,185,80,.45); color:var(--green); }
+    .port-cell.filtered { background:rgba(210,153,34,.1); border-color:rgba(210,153,34,.3); color:var(--yellow); }
+    .port-cell.closed { opacity:.3; }
+    .port-cell .pn { font-size:.76rem; font-weight:700; font-family:var(--mono); }
+    .port-cell .ps { font-size:.62rem; color:var(--muted); margin-top:1px; }
+    .port-cell.open .ps { color:var(--green); opacity:.9; }
+
+    /* Directory enum table */
+    .dir-table { width:100%; border-collapse:collapse; font-size:.78rem; }
+    .dir-table th { text-align:left; padding:7px 10px; color:var(--muted); font-size:.69rem; font-weight:600; text-transform:uppercase; letter-spacing:.05em; border-bottom:1px solid var(--border); background:var(--surface2); }
+    .dir-table td { padding:8px 10px; border-bottom:1px solid var(--border); vertical-align:middle; }
+    .dir-table tr:hover td { background:rgba(88,166,255,.04); }
+    .dir-table tr:last-child td { border-bottom:none; }
+    .status-200 { color:var(--green); font-weight:700; }
+    .status-301,.status-302,.status-307,.status-308 { color:var(--accent); font-weight:700; }
+    .status-401,.status-403 { color:var(--yellow); font-weight:700; }
+    .status-500 { color:var(--red); font-weight:700; }
+
+    /* Risk chips */
+    .rc { display:inline-flex; align-items:center; border-radius:4px; padding:2px 7px; font-size:.7rem; font-weight:700; }
+    .rc-crit { background:rgba(248,81,73,.15); color:var(--red); border:1px solid rgba(248,81,73,.3); }
+    .rc-warn { background:rgba(210,153,34,.12); color:var(--yellow); border:1px solid rgba(210,153,34,.3); }
+    .rc-ok   { background:rgba(63,185,80,.1); color:var(--green); border:1px solid rgba(63,185,80,.25); }
+    .rc-info { background:rgba(88,166,255,.1); color:var(--accent); border:1px solid rgba(88,166,255,.25); }
+
+    /* Infra collapsible sections */
+    .is { background:var(--surface); border:1px solid var(--border); border-radius:8px; margin-bottom:12px; overflow:hidden; }
+    .is-hdr { display:flex; align-items:center; justify-content:space-between; padding:10px 14px; background:var(--surface2); border-bottom:1px solid var(--border); cursor:pointer; user-select:none; }
+    .is-title { font-size:.84rem; font-weight:700; color:var(--text); display:flex; align-items:center; gap:8px; }
+    .is-body { padding:12px 14px; }
+
+    /* Subdomain tree */
+    .sub-tbl { width:100%; border-collapse:collapse; font-size:.78rem; }
+    .sub-tbl th { text-align:left; padding:7px 10px; color:var(--muted); font-size:.69rem; font-weight:600; text-transform:uppercase; letter-spacing:.05em; border-bottom:1px solid var(--border); background:var(--surface2); }
+    .sub-tbl td { padding:8px 10px; border-bottom:1px solid var(--border); vertical-align:middle; }
+    .sub-tbl tr:hover td { background:rgba(88,166,255,.04); }
+    .sub-tbl tr:last-child td { border-bottom:none; }
+    .sub-src { font-size:.65rem; padding:1px 5px; border-radius:3px; font-weight:600; }
+    .sub-src-passive { background:rgba(88,166,255,.12); color:var(--accent); }
+    .sub-src-brute   { background:rgba(188,140,255,.12); color:var(--purple); }
+    .sub-src-cert    { background:rgba(63,185,80,.1); color:var(--green); }
+
+    /* Email security */
+    .esec-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(210px,1fr)); gap:12px; margin-bottom:16px; }
+    .esec-card { background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:14px 16px; }
+    .esec-card.fail { border-color:rgba(248,81,73,.4); background:rgba(248,81,73,.04); }
+    .esec-card.pass { border-color:rgba(63,185,80,.3); background:rgba(63,185,80,.04); }
+    .esec-card.warn { border-color:rgba(210,153,34,.3); background:rgba(210,153,34,.04); }
+    .esec-title { font-size:.8rem; font-weight:700; margin-bottom:6px; }
+    .esec-val { font-family:var(--mono); font-size:.71rem; color:var(--muted); word-break:break-all; line-height:1.5; }
     @keyframes spin { to { transform:rotate(360deg); } }
     .kw-pills { display: flex; flex-wrap: wrap; gap: 8px; padding: 14px 18px; }
     .kw-pill { background: var(--surface2); border: 1px solid var(--border); border-radius: 20px; padding: 4px 12px; font-size: 0.79rem; display: flex; align-items: center; gap: 7px; cursor: pointer; transition: border-color .15s; }
@@ -817,15 +921,31 @@
     </div>
   </div>
 
-  <!-- ── DNS Crawler Tab ── -->
+  <!-- ── DNS / Infrastructure Recon Tab ── -->
   <div class="tab-panel" id="panel-dns">
-    <div class="dns-input-bar">
-      <input class="dns-input" id="dnsInput" placeholder="example.com" onkeydown="if(event.key==='Enter')startDNS()"/>
+    <div style="background:var(--surface);border-bottom:1px solid var(--border);padding:14px 20px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+      <div style="display:flex;align-items:center;gap:8px;flex:1;min-width:260px;max-width:480px;background:var(--bg);border:1px solid var(--border);border-radius:7px;padding:0 12px;">
+        <span style="color:var(--muted)">🌐</span>
+        <input class="dns-input" id="dnsInput" placeholder="example.com" style="background:transparent;border:none;flex:1;padding:9px 0;" onkeydown="if(event.key==='Enter')startDNS()"/>
+      </div>
       <button class="btn btn-primary" onclick="startDNS()" id="dnsBtn">🔍 Investigate</button>
-      <button class="btn btn-secondary" onclick="showDNSHistory()" id="dnsHistoryBtn">📋 History</button>
+      <button class="btn btn-secondary" onclick="showDNSHistory()">📋 History</button>
+      <div id="dnsViewToggles" style="display:none;margin-left:auto;display:none;gap:6px;align-items:center;flex-wrap:wrap;">
+        <span style="font-size:.75rem;color:var(--muted)">View:</span>
+        <button class="dns-view-btn active" onclick="dnsSetView('graph',this)">🕸 Graph</button>
+        <button class="dns-view-btn" onclick="dnsSetView('subdomains',this)">🔎 Subdomains</button>
+        <button class="dns-view-btn" onclick="dnsSetView('ports',this)">🔌 Ports</button>
+        <button class="dns-view-btn" onclick="dnsSetView('dirs',this)">📂 Directories</button>
+        <button class="dns-view-btn" onclick="dnsSetView('email',this)">📧 Email Sec</button>
+        <button class="dns-view-btn" onclick="dnsSetView('records',this)">📋 DNS Records</button>
+      </div>
     </div>
-    <div id="dnsContent">
-      <div class="empty"><div class="icon">🌐</div><p>Enter a domain to start DNS reconnaissance</p></div>
+    <div id="dnsContent" style="padding:0;">
+      <div class="empty" style="padding:60px 0;">
+        <div class="icon">🌐</div>
+        <p>Enter a domain to start Infrastructure Recon</p>
+        <p style="color:var(--muted);font-size:.8rem;margin-top:8px">DNS · Subdomains · Brute-force · Port Scan · Dir Enum · crt.sh · Geolocation</p>
+      </div>
     </div>
   </div>
 
@@ -3141,28 +3261,36 @@
   // ── DNS Crawler ───────────────────────────────────────────────────────────
   let dnsPolling = null;
 
-  async function loadDNSInvestigations() {
-    showDNSHistory();
-  }
+
+  // ── DNS / Infrastructure Recon ──────────────────────────────────────────────
+  let _dnsCurrent = null;
+  let _dnsView = 'graph';
+  let _graphNodes = [], _graphEdges = [];
+  let _gDrag = null, _gDragOff = {x:0,y:0}, _gPan = {x:0,y:0}, _gPanStart = null, _gScale = 1, _gHover = null;
+
+  async function loadDNSInvestigations() { showDNSHistory(); }
 
   async function showDNSHistory() {
+    _dnsCurrent = null;
+    document.getElementById('dnsViewToggles').style.display = 'none';
     const el = document.getElementById('dnsContent');
-    el.innerHTML = '<div class="dns-running"><div class="dns-spinner"></div> Loading history…</div>';
+    el.innerHTML = '<div class="dns-running" style="padding:20px"><div class="dns-spinner"></div> Loading…</div>';
     try {
       const data = await (await fetch('/api/dns/investigations')).json();
       if (!data.length) {
-        el.innerHTML = '<div class="empty"><div class="icon">🌐</div><p>No DNS investigations yet. Enter a domain above.</p></div>';
+        el.innerHTML = '<div class="empty" style="padding:60px 0"><div class="icon">🌐</div><p>No investigations yet. Enter a domain above.</p></div>';
         return;
       }
-      el.innerHTML = '<div class="dns-history">' + data.map(r => `
-        <div class="dns-history-row" onclick="loadDNSResult(${r.id})">
-          <div class="dns-history-domain">${esc(r.domain)}</div>
-          ${r.zone_transfer_success ? '<span class="dns-badge-fail">⚠ ZONE TRANSFER</span>' : ''}
-          <span class="dns-history-meta">${r.subdomain_count ?? '?'} subdomains</span>
-          <span class="dns-history-meta">${r.has_spf ? '✓ SPF' : '<span style="color:var(--red)">✗ SPF</span>'}</span>
-          <span class="dns-history-meta">${r.has_dmarc ? '✓ DMARC' : '<span style="color:var(--red)">✗ DMARC</span>'}</span>
-          <span class="dns-history-meta" style="color:var(--muted)">${fmtTime(r.created_at)}</span>
-          <span class="dns-badge-${r.status === 'complete' ? 'ok' : r.status === 'running' ? 'warn' : 'fail'}">${r.status.toUpperCase()}</span>
+      el.innerHTML = '<div style="padding:14px 20px">' + data.map(r => `
+        <div onclick="loadDNSResult(${r.id})" style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:12px 16px;margin-bottom:8px;cursor:pointer;display:flex;align-items:center;gap:12px;transition:border-color .15s;" onmouseover="this.style.borderColor='var(--accent)'" onmouseout="this.style.borderColor='var(--border)'">
+          <div style="flex:1">
+            <div style="font-weight:700;font-family:var(--mono);font-size:.9rem">${esc(r.domain)}</div>
+            <div style="font-size:.73rem;color:var(--muted);margin-top:3px">${fmtTime(r.created_at)} &nbsp;·&nbsp; ${r.subdomain_count ?? '?'} subdomains &nbsp;·&nbsp; ${r.resolved_count ?? '?'} resolved</div>
+          </div>
+          ${r.zone_transfer_success ? '<span class="rc rc-crit">⚠ ZONE XFR</span>' : ''}
+          <span class="rc ${r.has_spf?'rc-ok':'rc-warn'}">${r.has_spf?'✓ SPF':'✗ SPF'}</span>
+          <span class="rc ${r.has_dmarc?'rc-ok':'rc-warn'}">${r.has_dmarc?'✓ DMARC':'✗ DMARC'}</span>
+          <span class="dns-badge-${r.status==='complete'?'ok':r.status==='running'?'warn':'fail'}" style="font-size:.72rem;font-weight:700">${r.status.toUpperCase()}</span>
           <button class="btn btn-secondary" style="font-size:.7rem;padding:3px 8px;color:var(--red)" onclick="event.stopPropagation();deleteDNS(${r.id})">✕</button>
         </div>`).join('') + '</div>';
     } catch(e) {
@@ -3176,197 +3304,668 @@
     const btn = document.getElementById('dnsBtn');
     btn.disabled = true; btn.textContent = '⏳ Starting…';
     try {
-      const res = await fetch('/api/dns/investigate', {
-        method: 'POST', headers: {'Content-Type':'application/json'},
-        body: JSON.stringify({domain})
-      });
+      const res = await fetch('/api/dns/investigate', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({domain})});
       const d = await res.json();
-      if (d.ok) {
-        toast(`DNS recon started for ${domain}`);
-        pollDNS(d.id);
-      } else {
-        toast(d.error || 'Error', 'error');
-      }
-    } catch(e) {
-      toast('Network error', 'error');
-    } finally {
-      btn.disabled = false; btn.textContent = '🔍 Investigate';
-    }
+      if (d.ok) { toast(`DNS recon started for ${domain}`); pollDNS(d.id); }
+      else toast(d.error || 'Error', 'error');
+    } catch(e) { toast('Network error', 'error'); }
+    finally { btn.disabled = false; btn.textContent = '🔍 Investigate'; }
   }
 
   function pollDNS(id) {
     if (dnsPolling) clearInterval(dnsPolling);
+    document.getElementById('dnsViewToggles').style.display = 'none';
     const el = document.getElementById('dnsContent');
-    el.innerHTML = `<div class="dns-running"><div class="dns-spinner"></div> Running DNS recon — querying records, crt.sh, zone transfer, geolocation…</div>`;
+    const steps = ['🔍 Querying DNS records (A, MX, NS, TXT, SOA…)','📜 Fetching certificate transparency logs (crt.sh)…','🗺 HackerTarget passive subdomain lookup…','💥 Active subdomain brute-force (wordlist)…','🔄 Attempting zone transfer on all nameservers…','📍 Resolving & geolocating IPs…','✅ Finalising results…'];
+    let si = 0;
+    el.innerHTML = `<div style="padding:40px 20px;text-align:center">
+      <div class="dns-spinner" style="width:36px;height:36px;border-width:3px;margin:0 auto 16px"></div>
+      <div style="font-weight:600;font-size:1rem;margin-bottom:6px">Running Infrastructure Recon…</div>
+      <div id="dnsStep" style="font-size:.8rem;color:var(--muted);font-family:var(--mono)">${steps[0]}</div>
+    </div>`;
+    const stepTimer = setInterval(() => {
+      const el2 = document.getElementById('dnsStep');
+      if (el2 && si < steps.length - 1) el2.textContent = steps[++si];
+    }, 2200);
     dnsPolling = setInterval(async () => {
       try {
         const data = await (await fetch(`/api/dns/investigations/${id}`)).json();
         if (data.status === 'complete') {
-          clearInterval(dnsPolling);
-          renderDNSResult(data);
+          clearInterval(dnsPolling); clearInterval(stepTimer);
+          try {
+            renderDNSResult(data);
+          } catch(renderErr) {
+            console.error('renderDNSResult failed:', renderErr);
+            el.innerHTML = '<div class="empty" style="padding:60px 0"><div class="icon">⚠️</div><p>Render error: ' + renderErr.message + '</p><pre style="font-size:.7rem;color:var(--muted);text-align:left;padding:10px">' + renderErr.stack + '</pre></div>';
+          }
         } else if (data.status === 'error') {
-          clearInterval(dnsPolling);
-          el.innerHTML = `<div class="empty"><div class="icon">⚠️</div><p>Recon failed: ${esc(data.error || 'unknown error')}</p></div>`;
+          clearInterval(dnsPolling); clearInterval(stepTimer);
+          el.innerHTML = `<div class="empty" style="padding:60px 0"><div class="icon">⚠️</div><p>Recon failed: ${esc(data.error||'unknown error')}</p></div>`;
         }
-      } catch(e) { clearInterval(dnsPolling); }
+      } catch(e) { console.error('Poll error:', e); clearInterval(dnsPolling); clearInterval(stepTimer); }
     }, 2500);
   }
 
   async function loadDNSResult(id) {
     const el = document.getElementById('dnsContent');
-    el.innerHTML = '<div class="dns-running"><div class="dns-spinner"></div> Loading…</div>';
+    el.innerHTML = '<div class="dns-running" style="padding:20px"><div class="dns-spinner"></div> Loading…</div>';
     try {
       const data = await (await fetch(`/api/dns/investigations/${id}`)).json();
       if (data.status === 'running') { pollDNS(id); return; }
       renderDNSResult(data);
-    } catch(e) {
-      el.innerHTML = '<div class="empty"><div class="icon">⚠️</div><p>Failed to load result.</p></div>';
-    }
+    } catch(e) { el.innerHTML = '<div class="empty"><div class="icon">⚠️</div><p>Failed to load.</p></div>'; }
   }
 
   function renderDNSResult(data) {
+    _dnsCurrent = data;
+    _dnsView = 'graph';
+    _gScale = 1; _gPan = {x:0,y:0};
+
     const el = document.getElementById('dnsContent');
+    const toggles = document.getElementById('dnsViewToggles');
+    toggles.style.display = 'flex';
+    document.querySelectorAll('.dns-view-btn').forEach(b => b.classList.remove('active'));
+    toggles.querySelectorAll('.dns-view-btn')[0].classList.add('active');
+
     const r = data.result || {};
     const dns = r.dns_records || {};
     const zt = r.zone_transfer || {};
     const email = r.email_security || {};
     const resolved = r.subdomains_resolved || [];
     const passive = r.subdomains_passive || [];
+    const bruteforce = r.subdomains_bruteforce || [];
     const ipGeo = r.ip_geo || {};
     const ptr = r.ptr_records || {};
     const ztSuccess = Object.values(zt).some(v => v && v.success);
+    const mainIPs = (dns.A||[]).concat(dns.AAAA||[]);
+    const portScan = r.port_scan || {};
+    const dirEnum = r.dir_enum || {};
+    const services = r.services || {};
+    const hasScanData = Object.keys(portScan).length > 0;
 
-    let html = `<div class="dns-detail">`;
+    // All unique subdomains with source tags
+    const allSubMap = {};
+    for (const s of resolved) allSubMap[s.subdomain] = {...s, sources: new Set(['passive'])};
+    for (const s of bruteforce) {
+      if (allSubMap[s.subdomain]) allSubMap[s.subdomain].sources.add('brute');
+      else allSubMap[s.subdomain] = {...s, sources: new Set(['brute'])};
+    }
+    for (const c of passive) {
+      if (allSubMap[c.subdomain]) allSubMap[c.subdomain].sources.add('cert');
+    }
+    const allSubs = Object.values(allSubMap);
 
-    // ── Back button ──
-    html += `<div style="margin-bottom:14px;display:flex;align-items:center;gap:10px">
-      <button class="btn btn-secondary" onclick="showDNSHistory()">← History</button>
-      <span style="font-family:var(--mono);font-size:1rem;font-weight:700">${esc(data.domain)}</span>
-      <span style="font-size:.75rem;color:var(--muted)">${fmtTime(data.created_at)}</span>
-      <button class="btn btn-primary" style="margin-left:auto" onclick="exportDNSpdf(${data.id}, '${esc(data.domain)}')">⬇ Export PDF</button>
+    let html = '<div id="dnsResultWrap">';
+
+    // ── Stat strip ──
+    html += `<div class="dns-stat-strip">
+      <div class="dns-stat-chip"><div class="sv">${allSubs.length}</div><div class="sl">Subdomains</div></div>
+      <div class="dns-stat-chip"><div class="sv">${resolved.length}</div><div class="sl">Resolved</div></div>
+      <div class="dns-stat-chip"><div class="sv">${bruteforce.length}</div><div class="sl">Brute-forced</div></div>
+      <div class="dns-stat-chip"><div class="sv">${passive.length}</div><div class="sl">crt.sh Certs</div></div>
+      <div class="dns-stat-chip"><div class="sv">${mainIPs.length}</div><div class="sl">IPs</div></div>
+      <div class="dns-stat-chip ${ztSuccess?'sdanger':'sok'}"><div class="sv">${ztSuccess?'⚠':'✓'}</div><div class="sl">Zone XFR</div></div>
+      <div class="dns-stat-chip ${email.spf_valid?'sok':'sdanger'}"><div class="sv">${email.spf_valid?'✓':'✗'}</div><div class="sl">SPF</div></div>
+      <div class="dns-stat-chip ${email.dmarc_valid?'sok':'sdanger'}"><div class="sv">${email.dmarc_valid?'✓':'✗'}</div><div class="sl">DMARC</div></div>
+      <div style="margin-left:auto;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+        <code style="font-size:.9rem;font-weight:700;color:var(--accent)">${esc(data.domain)}</code>
+        <span style="font-size:.73rem;color:var(--muted)">${fmtTime(data.created_at)}</span>
+        <button class="btn btn-secondary" style="font-size:.75rem;padding:4px 10px" id="portScanBtn" onclick="triggerPortScan(${data.id})">${hasScanData ? '↺ Re-Scan Ports/Dirs' : '🔌 Scan Ports & Dirs'}</button>
+        <button class="btn btn-primary" style="font-size:.75rem;padding:4px 10px" onclick="exportDNSpdf(${data.id},'${esc(data.domain)}')">⬇ PDF</button>
+        <button class="btn btn-secondary" style="font-size:.75rem;padding:4px 10px" onclick="showDNSHistory()">← Back</button>
+      </div>
     </div>`;
 
-    // ── Summary cards ──
-    const mainIPs = (dns.A || []).concat(dns.AAAA || []);
-    html += `<div class="dns-summary-cards">
-      <div class="dns-summary-card"><div class="dns-summary-num">${data.subdomain_count ?? 0}</div><div class="dns-summary-label">Subdomains Found</div></div>
-      <div class="dns-summary-card"><div class="dns-summary-num">${data.resolved_count ?? 0}</div><div class="dns-summary-label">Resolved</div></div>
-      <div class="dns-summary-card"><div class="dns-summary-num">${mainIPs.length}</div><div class="dns-summary-label">IP Addresses</div></div>
-      <div class="dns-summary-card"><div class="dns-summary-num ${ztSuccess ? 'dns-badge-fail' : ''}">${ztSuccess ? '⚠ YES' : 'No'}</div><div class="dns-summary-label">Zone Transfer</div></div>
-      <div class="dns-summary-card"><div class="dns-summary-num ${email.spf_valid ? 'dns-badge-ok' : 'dns-badge-fail'}">${email.spf_valid ? '✓' : '✗'}</div><div class="dns-summary-label">SPF</div></div>
-      <div class="dns-summary-card"><div class="dns-summary-num ${email.dmarc_valid ? 'dns-badge-ok' : 'dns-badge-fail'}">${email.dmarc_valid ? '✓' : '✗'}</div><div class="dns-summary-label">DMARC</div></div>
-    </div>`;
-
-    // ── Zone transfer warning ──
+    // ── Zone transfer alert ──
     if (ztSuccess) {
-      const ns = Object.entries(zt).filter(([,v]) => v.success).map(([k]) => k).join(', ');
-      html += `<div class="dns-zt-success">⚠ ZONE TRANSFER SUCCEEDED on ${esc(ns)} — full zone data exposed. This is a critical misconfiguration.</div><br/>`;
+      const ns = Object.entries(zt).filter(([,v])=>v.success).map(([k])=>k).join(', ');
+      html += `<div style="margin:10px 20px;padding:10px 14px;background:rgba(248,81,73,.1);border:1px solid rgba(248,81,73,.35);border-radius:7px;color:var(--red);font-size:.82rem;font-weight:600">
+        🚨 CRITICAL: Zone transfer succeeded on <code>${esc(ns)}</code> — full DNS zone exposed to unauthenticated requests.
+      </div>`;
     }
 
-    // ── Email security issues ──
-    const issues = email.issues || [];
-    if (issues.length) {
-      html += dnsSection('⚠ Email Security Issues', issues.map(i =>
-        `<div style="padding:5px 0;color:var(--yellow);font-size:.82rem">• ${esc(i)}</div>`
-      ).join(''));
+    // ── View panels ──
+    html += buildAllViews(data.domain, dns, allSubs, resolved, passive, bruteforce, ptr, ipGeo, zt, ztSuccess, email, portScan, dirEnum, mainIPs, services);
+    html += '</div>';
+    el.innerHTML = html;
+    requestAnimationFrame(() => drawGraph(data.domain, dns, resolved, bruteforce, ipGeo));
+  }
+
+  function buildAllViews(domain, dns, allSubs, resolved, passive, bruteforce, ptr, ipGeo, zt, ztSuccess, email, portScan, dirEnum, mainIPs, services) {
+    let h = '';
+    h += `<div id="dv-graph" class="dns-view-panel active">${buildInfraPanel(domain, dns, resolved, bruteforce, ipGeo, services, mainIPs)}${buildGraphPanel(domain, dns, resolved, bruteforce, ipGeo)}</div>`;
+    h += `<div id="dv-subdomains" class="dns-view-panel">${buildSubdomainsPanel(allSubs, resolved, passive, bruteforce, zt, ztSuccess)}</div>`;
+    h += `<div id="dv-ports" class="dns-view-panel">${buildPortsPanel(portScan, mainIPs, domain)}</div>`;
+    h += `<div id="dv-dirs" class="dns-view-panel">${buildDirsPanel(dirEnum, domain)}</div>`;
+    h += `<div id="dv-email" class="dns-view-panel">${buildEmailPanel(email, dns)}</div>`;
+    h += `<div id="dv-records" class="dns-view-panel">${buildRecordsPanel(dns, ptr, ipGeo, zt, ztSuccess)}</div>`;
+    return h;
+  }
+
+
+  // ── DNSDumpster-style Infrastructure Panel ──────────────────────────────────
+  function buildInfraPanel(domain, dns, resolved, bruteforce, ipGeo, services, mainIPs) {
+
+    // ── Aggregate geo data ──
+    const allGeo = [];
+    for (const sub of resolved) {
+      for (const g of (sub.geo || [])) { if (g && g.countryCode) allGeo.push(g); }
+    }
+    for (const [ip, g] of Object.entries(ipGeo||{})) { if (g && g.countryCode) allGeo.push(g); }
+
+    // Country counts
+    const countryCounts = {};
+    const countryNames = {};
+    for (const g of allGeo) {
+      countryCounts[g.countryCode] = (countryCounts[g.countryCode]||0) + 1;
+      countryNames[g.countryCode] = g.country;
     }
 
-    // ── DNS Records ──
-    const recTypes = ['A','AAAA','MX','NS','TXT','CNAME','SOA','CAA'];
-    let recRows = '';
-    for (const type of recTypes) {
-      if (!dns[type]) continue;
-      for (const val of dns[type]) {
-        const geo = (type === 'A' || type === 'AAAA') ? ipGeo[val] : null;
-        const geoStr = geo ? ` <span style="color:var(--muted);font-size:.7rem">(${geo.city || ''} ${geo.country || ''} · ${geo.org || ''})</span>` : '';
-        const ptrStr = ptr[val] ? ` <span style="color:var(--muted);font-size:.7rem">→ ${esc(ptr[val])}</span>` : '';
-        recRows += `<tr><td><span class="badge badge-active" style="font-size:.65rem">${type}</span></td><td style="font-family:var(--mono)">${esc(val)}${ptrStr}${geoStr}</td></tr>`;
+    // ASN / org counts
+    const orgCounts = {};
+    for (const g of allGeo) {
+      const org = g.org || g.isp || '';
+      if (org) orgCounts[org] = (orgCounts[org]||0) + 1;
+    }
+    const topOrgs = Object.entries(orgCounts).sort((a,b)=>b[1]-a[1]).slice(0,6);
+    const maxOrg = topOrgs[0]?.[1] || 1;
+
+    // Service / server counts
+    const svcCounts = {};
+    for (const [host, s] of Object.entries(services||{})) {
+      const srv = s.server || 'unknown';
+      if (srv && srv !== 'unknown') svcCounts[srv] = (svcCounts[srv]||0) + 1;
+    }
+    const topSvcs = Object.entries(svcCounts).sort((a,b)=>b[1]-a[1]).slice(0,6);
+    const totalSvcs = topSvcs.reduce((s,[,v])=>s+v, 0) || 1;
+
+    // ── SVG world map (simplified Robinson projection dot map) ──
+    // Country centroids [countryCode, cx%, cy%] — enough for common countries
+    const centroids = {
+      'US':[23,24],'CA':[20,18],'GB':[46,20],'DE':[49,20],'FR':[47,22],
+      'NL':[48,19],'SE':[51,16],'NO':[50,15],'FI':[53,15],'RU':[62,17],
+      'CN':[74,23],'JP':[82,23],'KR':[80,24],'SG':[76,33],'HK':[77,27],
+      'AU':[79,38],'IN':[69,27],'PH':[80,30],'ID':[78,34],'MY':[77,32],
+      'TH':[75,30],'VN':[77,29],'BD':[71,28],'PK':[66,25],'IR':[61,24],
+      'TR':[55,23],'SA':[59,27],'AE':[62,27],'IL':[55,25],'EG':[54,26],
+      'ZA':[52,38],'NG':[49,30],'KE':[56,33],'BR':[30,36],'AR':[28,39],
+      'MX':[19,27],'CO':[25,33],'CL':[27,38],'PE':[25,35],'VE':[28,31],
+      'PL':[51,19],'UA':[54,19],'RO':[53,21],'CZ':[50,19],'AT':[50,20],
+      'CH':[48,21],'ES':[45,23],'PT':[44,23],'IT':[50,22],'GR':[52,23],
+      'BG':[53,21],'HR':[50,21],'HU':[51,20],'SK':[51,19],'BE':[48,19],
+      'DK':[49,18],'IE':[44,19],'LT':[52,17],'LV':[52,17],'EE':[53,16],
+    };
+
+    const activeCountries = Object.keys(countryCounts).filter(c => centroids[c]);
+    const maxCount = Math.max(...Object.values(countryCounts), 1);
+
+    const dots = activeCountries.map(cc => {
+      const [cx, cy] = centroids[cc];
+      // viewBox is 0 0 100 70 so centroid values map directly to SVG units
+      const r = Math.max(2.5, Math.min(5.5, 2.5 + (countryCounts[cc]/maxCount)*3));
+      return `<circle cx="${cx}" cy="${cy}" r="${r}" fill="#58a6ff" opacity="${0.6+countryCounts[cc]/maxCount*0.4}" style="filter:drop-shadow(0 0 3px #58a6ff)">
+        <title>${countryNames[cc]||cc}: ${countryCounts[cc]} IP(s)</title>
+      </circle>`;
+    }).join('');
+
+    const flagRow = activeCountries.slice(0,8).map(cc =>
+      cc.split('').map(c=>String.fromCodePoint(c.charCodeAt(0)+127397)).join('')
+    ).join(' ');
+
+    // ── ASN bars ──
+    const asnBars = topOrgs.map(([org, cnt]) => `
+      <div class="asn-bar-row">
+        <div class="asn-bar-label" title="${esc(org)}">${esc(org.replace(/^AS\d+\s*/,'').slice(0,22))}</div>
+        <div class="asn-bar-track"><div class="asn-bar-fill" style="width:${Math.round(cnt/maxOrg*100)}%"></div></div>
+        <div class="asn-bar-count">${cnt}</div>
+      </div>`).join('');
+
+    // ── Services donut SVG ──
+    const svcColors = ['#58a6ff','#3fb950','#bc8cff','#f85149','#d29922','#8b949e'];
+    let donutSvg = '';
+    if (topSvcs.length) {
+      const R=36, r=22, cx=42, cy=42;
+      let startAngle = -Math.PI/2;
+      const slices = topSvcs.map(([name,cnt],i) => {
+        const angle = (cnt/totalSvcs)*Math.PI*2;
+        const x1=cx+R*Math.cos(startAngle), y1=cy+R*Math.sin(startAngle);
+        startAngle += angle;
+        const x2=cx+R*Math.cos(startAngle), y2=cy+R*Math.sin(startAngle);
+        const xi1=cx+r*Math.cos(startAngle-angle), yi1=cy+r*Math.sin(startAngle-angle);
+        const xi2=cx+r*Math.cos(startAngle), yi2=cy+r*Math.sin(startAngle);
+        const large = angle > Math.PI ? 1 : 0;
+        return `<path d="M${x1.toFixed(1)},${y1.toFixed(1)} A${R},${R} 0 ${large},1 ${x2.toFixed(1)},${y2.toFixed(1)} L${xi2.toFixed(1)},${yi2.toFixed(1)} A${r},${r} 0 ${large},0 ${xi1.toFixed(1)},${yi1.toFixed(1)} Z" fill="${svcColors[i%svcColors.length]}"><title>${name}: ${cnt}</title></path>`;
+      });
+      donutSvg = `<svg width="84" height="84" class="svc-donut"><g>${slices.join('')}</g></svg>`;
+    }
+
+    const svcRows = topSvcs.map(([name,cnt],i) =>
+      `<div class="svc-row"><span class="svc-name" style="color:${svcColors[i%svcColors.length]}">${esc(name)}</span><span class="svc-cnt">${cnt}</span></div>`
+    ).join('');
+
+    // ── A Records table ──
+    const aRecords = dns.A || [];
+    const subsByIP = {};
+    for (const sub of resolved) {
+      for (const ip of (sub.ips||[])) {
+        if (!subsByIP[ip]) subsByIP[ip] = [];
+        subsByIP[ip].push(sub.subdomain);
       }
     }
-    if (recRows) {
-      html += dnsSection('📋 DNS Records',
-        `<table class="dns-record-table"><thead><tr><th>Type</th><th>Value</th></tr></thead><tbody>${recRows}</tbody></table>`
-      );
-    }
 
-    // ── Email security detail ──
-    let emailRows = '';
-    if (email.spf) emailRows += `<tr><td>SPF</td><td style="font-family:var(--mono);font-size:.72rem">${esc(email.spf)}</td></tr>`;
-    if (email.dmarc) emailRows += `<tr><td>DMARC</td><td style="font-family:var(--mono);font-size:.72rem">${esc(email.dmarc)}</td></tr>`;
-    if (email.dkim_selectors_found?.length) {
-      emailRows += `<tr><td>DKIM</td><td>Selectors found: ${email.dkim_selectors_found.map(s => `<code>${esc(s)}</code>`).join(', ')}</td></tr>`;
-    }
-    if (emailRows) {
-      html += dnsSection('📧 Email Security',
-        `<table class="dns-record-table"><thead><tr><th>Record</th><th>Value</th></tr></thead><tbody>${emailRows}</tbody></table>`
-      );
-    }
+    // All unique hosts with their IPs
+    const hostRows = resolved.map(sub => {
+      const ips = sub.ips || [];
+      const geo = (sub.geo||[])[0] || {};
+      const svcData = services[sub.subdomain] || {};
+      const techBadges = [...new Set([
+        svcData.server && svcData.server !== 'unknown' ? svcData.server : '',
+        ...(svcData.tech||[])
+      ])].filter(Boolean).map(t => `<span class="svc-badge">${esc(t)}</span>`).join('');
+      const status = svcData.status_code ? `<span style="font-size:.68rem;color:var(--muted)">${svcData.status_code}</span>` : '';
+      const title = svcData.title ? `<div style="font-size:.67rem;color:var(--muted);margin-top:2px">${esc(svcData.title.slice(0,50))}</div>` : '';
+      const asn = geo.as || '';
+      const asnShort = asn.replace(/^AS\d+\s*/,'').slice(0,20);
+      const flag = geo.countryCode ? geo.countryCode.split('').map(c=>String.fromCodePoint(c.charCodeAt(0)+127397)).join('') : '';
+      return `<tr>
+        <td style="font-family:var(--mono);font-size:.76rem">${esc(sub.subdomain)}</td>
+        <td style="font-family:var(--mono);font-size:.74rem;color:var(--accent)">${ips.map(ip=>`<div>${esc(ip)}</div>`).join('')}</td>
+        <td style="font-size:.72rem">${flag} ${esc(geo.city||'')} ${esc(geo.countryCode||'')}<div style="font-size:.67rem;color:var(--muted)">${esc(asnShort)}</div></td>
+        <td>${techBadges}${title}${status}</td>
+      </tr>`;
+    }).join('');
 
-    // ── Zone transfer detail ──
+    return `
+    <div style="border-bottom:1px solid var(--border)">
+      <!-- Full-width map -->
+      <div style="padding:14px 16px 0">
+        <div class="infra-card-title">🌍 System Locations</div>
+        <div class="world-map-wrap">
+          <svg viewBox="0 0 100 45" style="width:100%;height:220px;display:block" xmlns="http://www.w3.org/2000/svg" style="background:#0d1117;border-radius:4px;border:1px solid #30363d">
+              <rect width="100" height="70" fill="#0d1117"/>
+              <line x1="25" y1="0" x2="25" y2="70" stroke="#30363d" stroke-width=".3"/>
+              <line x1="50" y1="0" x2="50" y2="70" stroke="#30363d" stroke-width=".3"/>
+              <line x1="75" y1="0" x2="75" y2="70" stroke="#30363d" stroke-width=".3"/>
+              <line x1="0" y1="23" x2="100" y2="23" stroke="#30363d" stroke-width=".3"/>
+              <line x1="0" y1="46" x2="100" y2="46" stroke="#30363d" stroke-width=".3"/>
+              ${dots}
+          </svg>
+          <div style="margin-top:6px;font-size:1rem;letter-spacing:2px">${flagRow}</div>
+        </div>
+      </div>
+      <!-- 2-col: Hosting + Services -->
+      <div class="infra-overview" style="grid-template-columns:1fr 1fr;padding-top:12px">
+        <div class="infra-card">
+          <div class="infra-card-title">🏢 Hosting / Networks</div>
+          ${topOrgs.length ? asnBars : '<div style="color:var(--muted);font-size:.8rem">No ASN data</div>'}
+        </div>
+        <div class="infra-card">
+          <div class="infra-card-title">⚙️ Services / Banners</div>
+          ${topSvcs.length
+            ? `<div class="svc-donut-wrap">${donutSvg}<div class="svc-list">${svcRows}</div></div>`
+            : '<div style="color:var(--muted);font-size:.8rem">No service data yet — run a new investigation to probe HTTP banners</div>'}
+        </div>
+      </div>
+      <div class="infra-a-records">
+        <div style="font-size:.78rem;font-weight:700;margin-bottom:8px;color:var(--text)">A Records — Subdomains from Dataset</div>
+        <table class="infra-a-tbl">
+          <thead><tr><th>Host</th><th>IP</th><th>ASN / Location</th><th>Services / Banners</th></tr></thead>
+          <tbody>${hostRows || '<tr><td colspan="4" style="color:var(--muted);text-align:center;padding:16px">No resolved subdomains</td></tr>'}</tbody>
+        </table>
+      </div>
+      <hr class="graph-divider">
+    </div>`;
+  }
+
+    // ── Graph View ──────────────────────────────────────────────────────────────
+  function buildGraphPanel(domain, dns, resolved, bruteforce, ipGeo) {
+    return `<div style="margin-bottom:10px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+        <span style="font-weight:600;font-size:.85rem">Subdomain Infrastructure Graph</span>
+        <span style="font-size:.75rem;color:var(--muted)">${resolved.length} resolved · ${bruteforce.length} brute-forced · Drag nodes · Scroll to zoom</span>
+        <button class="btn btn-secondary" style="font-size:.72rem;padding:3px 8px;margin-left:auto" onclick="if(_dnsCurrent)drawGraph(_dnsCurrent.domain,_dnsCurrent.result.dns_records||{},_dnsCurrent.result.subdomains_resolved||[],_dnsCurrent.result.subdomains_bruteforce||[],_dnsCurrent.result.ip_geo||{})">↺ Reset</button>
+      </div>
+      <canvas id="dnsGraphCanvas" height="500"></canvas>
+      <div style="display:flex;gap:16px;flex-wrap:wrap;padding:8px 0;font-size:.74rem;color:var(--muted)">
+        <span>🔴 Root domain</span><span>🔵 Passive subdomain</span><span>🟣 Brute-forced</span><span>🟢 IP address</span>
+      </div>`;
+  }
+
+  function drawGraph(domain, dns, resolved, bruteforce, ipGeo) {
+    const canvas = document.getElementById('dnsGraphCanvas');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    canvas.width = canvas.offsetWidth;
+    const W = canvas.width, H = canvas.height;
+    _gScale = 1; _gPan = {x:0,y:0};
+
+    const nodes = [], edges = [];
+    const cx = W/2, cy = H/2;
+    nodes.push({id:'root', label:domain, x:cx, y:cy, r:18, color:'#f85149', type:'root'});
+
+    // Place resolved (passive) nodes
+    const rings = [110, 185, 255, 315];
+    const allSubs = [...resolved.map(s=>({...s,src:'passive'})), ...bruteforce.filter(b=>!resolved.find(r=>r.subdomain===b.subdomain)).map(s=>({...s,src:'brute'}))];
+    const byLen = {};
+    for (const s of allSubs.slice(0,80)) {
+      const depth = (s.subdomain.replace('.'+domain,'').match(/\./g)||[]).length + 1;
+      if (!byLen[depth]) byLen[depth] = [];
+      byLen[depth].push(s);
+    }
+    const depths = Object.keys(byLen).map(Number).sort();
+    let nid = 0;
+    for (const depth of depths) {
+      const ring = byLen[depth];
+      const rr = rings[Math.min(depth-1, rings.length-1)];
+      ring.forEach((s,i) => {
+        const angle = (2*Math.PI*i/ring.length) - Math.PI/2;
+        const nx = cx + rr*Math.cos(angle) + (Math.random()-.5)*15;
+        const ny = cy + rr*Math.sin(angle) + (Math.random()-.5)*15;
+        const hasIP = s.ips && s.ips.length;
+        const nId = 'n'+nid++;
+        const color = s.src==='brute' ? '#bc8cff' : '#58a6ff';
+        nodes.push({id:nId, label:s.subdomain.replace('.'+domain,''), x:nx, y:ny, r:hasIP?9:6, color, type:'sub', sub:s.subdomain, ips:s.ips||[], src:s.src});
+        edges.push({from:'root', to:nId});
+        if (hasIP && nodes.length < 100) {
+          for (const ip of s.ips.slice(0,2)) {
+            const ex = nodes.find(n=>n.type==='ip'&&n.label===ip);
+            if (!ex) {
+              const ia = angle+(Math.random()-.5)*.6;
+              const ir = rr+32;
+              const ipId = 'ip'+ip.replace(/[.:]/g,'_');
+              nodes.push({id:ipId, label:ip, x:cx+ir*Math.cos(ia), y:cy+ir*Math.sin(ia), r:5, color:'#3fb950', type:'ip', geo:ipGeo[ip]||{}});
+              edges.push({from:nId, to:ipId});
+            } else {
+              edges.push({from:nId, to:ex.id});
+            }
+          }
+        }
+      });
+    }
+    _graphNodes = nodes; _graphEdges = edges;
+
+    function render() {
+      ctx.clearRect(0,0,W,H);
+      ctx.fillStyle = document.body.classList.contains('light') ? '#f6f8fa' : '#0d1117';
+      ctx.fillRect(0,0,W,H);
+      ctx.save();
+      ctx.translate(_gPan.x, _gPan.y);
+      ctx.scale(_gScale, _gScale);
+      for (const e of edges) {
+        const f = nodes.find(n=>n.id===e.from), t = nodes.find(n=>n.id===e.to);
+        if (!f||!t) continue;
+        ctx.beginPath(); ctx.moveTo(f.x,f.y); ctx.lineTo(t.x,t.y);
+        ctx.strokeStyle = t.type==='ip' ? 'rgba(63,185,80,.2)' : t.color+'33';
+        ctx.lineWidth = .8; ctx.stroke();
+      }
+      for (const n of nodes) {
+        const hov = _gHover===n.id;
+        ctx.beginPath(); ctx.arc(n.x,n.y,n.r+(hov?3:0),0,Math.PI*2);
+        ctx.fillStyle = n.color+(hov?'':'bb'); ctx.fill();
+        if (hov||n.type==='root') { ctx.strokeStyle=n.color; ctx.lineWidth=2; ctx.stroke(); }
+        if (n.type==='root'||hov||(n.type==='sub'&&n.r>=8)) {
+          ctx.fillStyle = document.body.classList.contains('light') ? '#1f2328' : '#e6edf3';
+          ctx.font = n.type==='root'?'bold 10px monospace':'9px monospace';
+          ctx.textAlign='center';
+          const lbl = n.label.length>20?n.label.slice(0,18)+'…':n.label;
+          ctx.fillText(lbl, n.x, n.y+n.r+11);
+        }
+      }
+      ctx.restore();
+      ctx.fillStyle='#8b949e'; ctx.font='10px sans-serif'; ctx.textAlign='left';
+      ctx.fillText(`${nodes.filter(n=>n.type!=='root'&&n.type!=='ip').length} subdomains · ${nodes.filter(n=>n.type==='ip').length} IPs`, 8, H-8);
+    }
+    render();
+
+    canvas.onmousedown = e => {
+      const rect=canvas.getBoundingClientRect();
+      const mx=(e.clientX-rect.left-_gPan.x)/_gScale, my=(e.clientY-rect.top-_gPan.y)/_gScale;
+      const hit=nodes.find(n=>Math.hypot(n.x-mx,n.y-my)<n.r+5);
+      if (hit&&hit.type!=='root') { _gDrag=hit; _gDragOff={x:mx-hit.x,y:my-hit.y}; }
+      else { _gPanStart={x:e.clientX-_gPan.x, y:e.clientY-_gPan.y}; }
+    };
+    canvas.onmousemove = e => {
+      const rect=canvas.getBoundingClientRect();
+      const mx=(e.clientX-rect.left-_gPan.x)/_gScale, my=(e.clientY-rect.top-_gPan.y)/_gScale;
+      if (_gDrag) { _gDrag.x=mx-_gDragOff.x; _gDrag.y=my-_gDragOff.y; render(); return; }
+      if (_gPanStart) { _gPan.x=e.clientX-_gPanStart.x; _gPan.y=e.clientY-_gPanStart.y; render(); return; }
+      const prev=_gHover, hit=nodes.find(n=>Math.hypot(n.x-mx,n.y-my)<n.r+5);
+      _gHover=hit?hit.id:null;
+      if (_gHover!==prev) render();
+      canvas.style.cursor=hit?'pointer':'grab';
+    };
+    canvas.onmouseup=()=>{ _gDrag=null; _gPanStart=null; };
+    canvas.onmouseleave=()=>{ _gDrag=null; _gPanStart=null; };
+    canvas.onwheel=e=>{ e.preventDefault(); _gScale=Math.max(.25,Math.min(4,_gScale*(e.deltaY>0?.88:1.12))); render(); };
+  }
+
+  // ── Subdomains View ─────────────────────────────────────────────────────────
+  function buildSubdomainsPanel(allSubs, resolved, passive, bruteforce, zt, ztSuccess) {
+    let h = `<div style="display:flex;gap:10px;margin-bottom:12px;flex-wrap:wrap">
+      <span class="rc rc-info">${allSubs.length} total subdomains</span>
+      <span class="rc rc-ok">${resolved.length} passive (crt.sh + HackerTarget)</span>
+      <span style="background:rgba(188,140,255,.1);color:var(--purple);border:1px solid rgba(188,140,255,.25)" class="rc">${bruteforce.length} active brute-forced</span>
+      <span class="rc rc-info">${passive.length} certificate SANs</span>
+    </div>`;
+    if (!allSubs.length) return h + '<div class="empty" style="padding:32px 0"><div class="icon">🔎</div><p>No subdomains found</p></div>';
+
+    h += `<table class="sub-tbl"><thead><tr><th>Subdomain</th><th>IP(s)</th><th>Location</th><th>Source</th></tr></thead><tbody>`;
+    for (const s of allSubs.sort((a,b)=>a.subdomain.localeCompare(b.subdomain))) {
+      const ips = (s.ips||[]).join(', ');
+      const srcs = [...(s.sources||new Set(['passive']))];
+      const srcBadges = srcs.map(src => {
+        if (src==='brute') return `<span class="sub-src sub-src-brute">brute-force</span>`;
+        if (src==='cert') return `<span class="sub-src sub-src-cert">crt.sh</span>`;
+        return `<span class="sub-src sub-src-passive">passive</span>`;
+      }).join(' ');
+      h += `<tr><td style="font-family:var(--mono);font-size:.79rem">${esc(s.subdomain)}</td>
+        <td style="font-family:var(--mono);font-size:.76rem;color:var(--accent)">${esc(ips)||'—'}</td>
+        <td style="font-size:.74rem;color:var(--muted)">${geoStr(s.geo)}</td>
+        <td>${srcBadges}</td></tr>`;
+    }
+    h += '</tbody></table>';
+
     if (ztSuccess) {
       for (const [ns, info] of Object.entries(zt)) {
         if (!info.success) continue;
-        const rows = (info.records || []).slice(0, 100).map(rec =>
-          `<tr><td>${esc(rec.name)}</td><td><span class="badge badge-active" style="font-size:.65rem">${esc(rec.type)}</span></td><td style="font-family:var(--mono);font-size:.72rem">${esc(rec.value)}</td></tr>`
+        const rows = (info.records||[]).slice(0,100).map(rec =>
+          `<tr><td style="font-family:var(--mono);font-size:.74rem">${esc(rec.name)}</td><td><span class="rc rc-info" style="font-size:.65rem">${esc(rec.type)}</span></td><td style="font-family:var(--mono);font-size:.72rem">${esc(rec.value)}</td></tr>`
         ).join('');
-        html += dnsSection(`🚨 Zone Transfer — ${esc(ns)} (${info.record_count} records)`,
-          `<table class="dns-record-table"><thead><tr><th>Name</th><th>Type</th><th>Value</th></tr></thead><tbody>${rows}</tbody></table>`
-        );
+        h += infraSec(`🚨 Zone Transfer — ${esc(ns)} (${info.record_count} records leaked)`,
+          `<p style="color:var(--red);font-size:.8rem;font-weight:600;margin-bottom:8px">Restrict AXFR to authorised nameservers immediately.</p>
+           <table class="sub-tbl"><thead><tr><th>Name</th><th>Type</th><th>Value</th></tr></thead><tbody>${rows}</tbody></table>`);
       }
     }
+    return h;
+  }
 
-    // ── Subdomains resolved ──
-    if (resolved.length) {
-      const subRows = resolved.map(s => {
-        const ips = s.ips.join(', ');
-        const geo = (s.geo || []).filter(g => g && g.country).map(g =>
-          `${g.city || ''} ${g.countryCode || ''}`).join(' / ');
-        return `<tr><td style="font-family:var(--mono)">${esc(s.subdomain)}</td><td style="font-family:var(--mono)">${esc(ips)}</td><td>${esc(geo)}</td></tr>`;
+  // ── Ports View ──────────────────────────────────────────────────────────────
+  function buildPortsPanel(portScan, mainIPs, domain) {
+    const hasData = Object.keys(portScan).length > 0;
+    if (!hasData) {
+      return `<div style="text-align:center;padding:40px 20px">
+        <div style="font-size:2rem;margin-bottom:12px">🔌</div>
+        <div style="font-weight:600;margin-bottom:6px">Port scan not yet run</div>
+        <div style="color:var(--muted);font-size:.83rem;margin-bottom:16px">Click the button below to actively scan all resolved IPs for open ports.</div>
+        <button class="btn btn-primary" onclick="triggerPortScan(${_dnsCurrent?.id})">🔌 Run Port Scan</button>
+        <div style="margin-top:10px;font-size:.75rem;color:var(--muted)">Scans ${mainIPs.length} IPs across 30 common ports</div>
+      </div>`;
+    }
+
+    let h = '';
+    for (const [ip, ports] of Object.entries(portScan)) {
+      const open = ports.filter(p=>p.status==='open');
+      const filtered = ports.filter(p=>p.status==='filtered');
+      h += `<div class="is" style="margin-bottom:12px">
+        <div class="is-hdr" onclick="toggleIS(this)">
+          <span class="is-title">
+            <code style="color:var(--accent)">${esc(ip)}</code>
+            <span class="rc rc-ok">${open.length} open</span>
+            ${filtered.length?`<span class="rc rc-warn">${filtered.length} filtered</span>`:''}
+          </span>
+          <span style="color:var(--muted);font-size:.8rem">▾</span>
+        </div>
+        <div class="is-body">
+          <div class="port-heatmap">
+            ${ports.map(p=>`<div class="port-cell ${p.status}" title="${p.service} (${p.status})">
+              <div class="pn">${p.port}</div>
+              <div class="ps">${p.service}</div>
+            </div>`).join('')}
+          </div>
+          ${open.length?`<div style="margin-top:10px"><span style="font-size:.77rem;font-weight:600;color:var(--green)">Open ports: </span><span style="font-family:var(--mono);font-size:.77rem">${open.map(p=>`${p.port}/${p.service}`).join(', ')}</span></div>`:''}
+        </div>
+      </div>`;
+    }
+    return h;
+  }
+
+  // ── Directories View ────────────────────────────────────────────────────────
+  function buildDirsPanel(dirEnum, domain) {
+    const hasData = Object.keys(dirEnum).length > 0 && Object.values(dirEnum).some(a=>a.length>0);
+    if (!hasData) {
+      return `<div style="text-align:center;padding:40px 20px">
+        <div style="font-size:2rem;margin-bottom:12px">📂</div>
+        <div style="font-weight:600;margin-bottom:6px">Directory enumeration not yet run</div>
+        <div style="color:var(--muted);font-size:.83rem;margin-bottom:16px">Probes ${domain} and its IPs for exposed paths using a 70-entry wordlist.</div>
+        <button class="btn btn-primary" onclick="triggerPortScan(${_dnsCurrent?.id})">📂 Run Dir Enum</button>
+      </div>`;
+    }
+    let h = '';
+    for (const [target, paths] of Object.entries(dirEnum)) {
+      if (!paths.length) continue;
+      const interesting = paths.filter(p=>[200,201,301,302,401,403,500].includes(p.status_code));
+      const rows = interesting.map(p => {
+        const sc = p.status_code;
+        const cls = sc===200?'status-200':sc>=300&&sc<400?`status-${sc}`:sc===401||sc===403?`status-${sc}`:'status-500';
+        return `<tr>
+          <td><span class="${cls}">${sc}</span></td>
+          <td style="font-family:var(--mono);font-size:.78rem">${esc(p.path)}</td>
+          <td style="font-size:.74rem;color:var(--muted)">${p.content_length ? p.content_length+' bytes' : '—'}</td>
+          <td style="font-size:.74rem;color:var(--accent);font-family:var(--mono)">${p.redirect_to?esc(p.redirect_to):'—'}</td>
+        </tr>`;
       }).join('');
-      html += dnsSection(`🔎 Resolved Subdomains (${resolved.length})`,
-        `<table class="dns-record-table"><thead><tr><th>Subdomain</th><th>IP(s)</th><th>Location</th></tr></thead><tbody>${subRows}</tbody></table>`
-      );
+      h += infraSec(`📂 ${esc(target)} — ${interesting.length} paths found`,
+        `<table class="dir-table"><thead><tr><th>Status</th><th>Path</th><th>Size</th><th>Redirect</th></tr></thead><tbody>${rows}</tbody></table>`);
     }
-
-    // ── Certificate transparency ──
-    if (passive.length) {
-      const certRows = passive.slice(0, 100).map(c =>
-        `<tr><td style="font-family:var(--mono)">${esc(c.subdomain)}</td><td style="font-size:.72rem;color:var(--muted)">${esc((c.issuer||'').split('O=')[1]?.split(',')[0] || c.issuer || '')}</td><td style="font-size:.72rem;color:var(--muted)">${(c.not_after||'').substring(0,10)}</td></tr>`
-      ).join('');
-      html += dnsSection(`🔐 Certificate Transparency — crt.sh (${passive.length} certs)`,
-        `<table class="dns-record-table"><thead><tr><th>Subdomain</th><th>Issuer</th><th>Expires</th></tr></thead><tbody>${certRows}</tbody></table>`
-      );
-    }
-
-    // ── Errors ──
-    if (r.errors?.length) {
-      html += dnsSection('ℹ️ Notes',
-        r.errors.map(e => `<div style="font-size:.78rem;color:var(--muted);padding:3px 0">• ${esc(e)}</div>`).join('')
-      );
-    }
-
-    html += `</div>`;
-    el.innerHTML = html;
+    return h;
   }
 
-  function dnsSection(title, body) {
-    const id = 'dss' + Math.random().toString(36).slice(2,8);
-    return `<div class="dns-section">
-      <div class="dns-section-hdr" onclick="toggleDNSSection('${id}')">
-        <span class="dns-section-title">${title}</span>
-        <span id="arr${id}" style="color:var(--muted);font-size:.8rem">▾</span>
+  // ── Email Security View ─────────────────────────────────────────────────────
+  function buildEmailPanel(email, dns) {
+    const issues = email.issues || [];
+    let score = 100;
+    if (!email.spf_valid) score -= 35;
+    if (!email.dmarc_valid) score -= 35;
+    if (!(email.dkim_selectors_found||[]).length) score -= 20;
+    if (email.dmarc?.includes('p=none')) score -= 10;
+    const scoreColor = score>=80?'var(--green)':score>=50?'var(--yellow)':'var(--red)';
+    const scoreLabel = score>=80?'Good':score>=50?'Moderate Risk':'High Risk';
+
+    let h = `<div style="display:flex;align-items:center;gap:20px;margin-bottom:16px;padding:14px 18px;background:var(--surface);border:1px solid var(--border);border-radius:8px;">
+      <div style="text-align:center;min-width:60px">
+        <div style="font-size:2.4rem;font-weight:900;color:${scoreColor};line-height:1">${score}</div>
+        <div style="font-size:.68rem;color:var(--muted);text-transform:uppercase;letter-spacing:.05em">Score</div>
+        <div style="font-size:.76rem;color:${scoreColor};font-weight:600;margin-top:2px">${scoreLabel}</div>
       </div>
-      <div class="dns-section-body" id="${id}">${body}</div>
+      <div style="flex:1">${issues.length?issues.map(i=>`<div style="padding:3px 0;color:var(--yellow);font-size:.8rem">⚠ ${esc(i)}</div>`).join(''):'<div style="color:var(--green);font-size:.83rem">✓ No issues detected</div>'}</div>
+    </div>
+    <div class="esec-grid">
+      <div class="esec-card ${email.spf_valid?'pass':'fail'}">
+        <div class="esec-title">${email.spf_valid?'✅':'❌'} SPF</div>
+        ${email.spf?`<div class="esec-val">${esc(email.spf)}</div>`:'<div style="color:var(--red);font-size:.8rem">Missing — spoofing risk</div>'}
+      </div>
+      <div class="esec-card ${email.dmarc_valid?(email.dmarc?.includes('p=none')?'warn':'pass'):'fail'}">
+        <div class="esec-title">${email.dmarc_valid?(email.dmarc?.includes('p=none')?'⚠️':'✅'):'❌'} DMARC</div>
+        ${email.dmarc?`<div class="esec-val">${esc(email.dmarc)}</div>`:'<div style="color:var(--red);font-size:.8rem">Missing — no enforcement</div>'}
+      </div>
+      <div class="esec-card ${(email.dkim_selectors_found||[]).length?'pass':'fail'}">
+        <div class="esec-title">${(email.dkim_selectors_found||[]).length?'✅':'❌'} DKIM</div>
+        ${(email.dkim_selectors_found||[]).length
+          ?`<div class="esec-val">${email.dkim_selectors_found.map(s=>`<code style="background:rgba(255,255,255,.07);padding:1px 5px;border-radius:3px">${esc(s)}</code>`).join(' ')}</div>`
+          :'<div style="color:var(--muted);font-size:.8rem">No selectors found</div>'}
+      </div>
     </div>`;
+
+    const txts = dns.TXT||[];
+    if (txts.length) h += infraSec('📝 TXT Records', txts.map(t=>`<div style="font-family:var(--mono);font-size:.73rem;padding:3px 0;border-bottom:1px solid var(--border);word-break:break-all;color:var(--muted)">${esc(t)}</div>`).join(''));
+    return h;
   }
 
-  function toggleDNSSection(id) {
-    const el = document.getElementById(id);
-    const arr = document.getElementById('arr' + id);
-    const open = el.style.display !== 'none';
-    el.style.display = open ? 'none' : 'block';
-    arr.textContent = open ? '▸' : '▾';
+  // ── DNS Records View ────────────────────────────────────────────────────────
+  function buildRecordsPanel(dns, ptr, ipGeo, zt, ztSuccess) {
+    const recTypes = ['A','AAAA','MX','NS','TXT','CNAME','SOA','CAA'];
+    let rows = '';
+    for (const type of recTypes) {
+      if (!dns[type]) continue;
+      for (const val of dns[type]) {
+        const geo = (type==='A'||type==='AAAA') ? ipGeo[val] : null;
+        const g = geo ? `<span style="font-size:.7rem;color:var(--muted)">${[geo.city,geo.countryCode].filter(Boolean).join(' ')} ${geo.org||''}</span>` : '';
+        const p = ptr[val] ? `<span style="color:var(--muted);font-size:.7rem"> → ${esc(ptr[val])}</span>` : '';
+        rows += `<tr><td><span class="rc rc-info" style="font-size:.65rem">${type}</span></td><td style="font-family:var(--mono);font-size:.78rem">${esc(val)}${p}</td><td>${g}</td></tr>`;
+      }
+    }
+    return rows
+      ? `<table class="sub-tbl"><thead><tr><th>Type</th><th>Value</th><th>Location / Org</th></tr></thead><tbody>${rows}</tbody></table>`
+      : '<p style="color:var(--muted)">No records</p>';
   }
+
+  // ── Port scan trigger ───────────────────────────────────────────────────────
+  async function triggerPortScan(invId) {
+    if (!invId) return;
+    const btn = document.getElementById('portScanBtn');
+    if (btn) { btn.disabled = true; btn.textContent = '⏳ Scanning…'; }
+    toast('Port scan & directory enumeration started — this may take 30–60 seconds');
+    try {
+      const res = await fetch(`/api/dns/investigations/${invId}/scan`, {method:'POST'});
+      const d = await res.json();
+      if (!d.ok) { toast(d.error||'Error', 'error'); if(btn){btn.disabled=false;btn.textContent='🔌 Scan Ports & Dirs';} return; }
+      // Poll for results
+      const poll = setInterval(async () => {
+        try {
+          const r = await (await fetch(`/api/dns/investigations/${invId}/scan/status`)).json();
+          if (r.ready) {
+            clearInterval(poll);
+            toast('Port scan complete!');
+            loadDNSResult(invId);
+          }
+        } catch(e) { clearInterval(poll); }
+      }, 3000);
+    } catch(e) { toast('Network error', 'error'); if(btn){btn.disabled=false;btn.textContent='🔌 Scan Ports & Dirs';} }
+  }
+
+  // ── View switcher ───────────────────────────────────────────────────────────
+  function dnsSetView(view, btn) {
+    _dnsView = view;
+    document.querySelectorAll('.dns-view-panel').forEach(p => p.style.display = 'none');
+    const panel = document.getElementById('dv-'+view);
+    if (panel) panel.style.display = 'block';
+    document.querySelectorAll('.dns-view-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    if (view==='graph'&&_dnsCurrent) {
+      requestAnimationFrame(()=>drawGraph(_dnsCurrent.domain,_dnsCurrent.result.dns_records||{},_dnsCurrent.result.subdomains_resolved||[],_dnsCurrent.result.subdomains_bruteforce||[],_dnsCurrent.result.ip_geo||{}));
+    }
+  }
+
+  // ── Helpers ─────────────────────────────────────────────────────────────────
+  function geoStr(geoArr) {
+    if (!geoArr) return '';
+    const arr = Array.isArray(geoArr) ? geoArr : [geoArr];
+    return arr.filter(g=>g&&g.country).map(g=>[g.city,g.countryCode].filter(Boolean).join(' ')).join(' / ');
+  }
+
+  function infraSec(title, body) {
+    const id = 'is'+Math.random().toString(36).slice(2,8);
+    return `<div class="is"><div class="is-hdr" onclick="toggleIS(this)"><span class="is-title">${title}</span><span style="color:var(--muted);font-size:.8rem" id="arr${id}">▾</span></div><div class="is-body" id="${id}">${body}</div></div>`;
+  }
+  function toggleIS(hdr) {
+    const body = hdr.nextElementSibling;
+    const open = body.style.display !== 'none';
+    body.style.display = open ? 'none' : 'block';
+    hdr.querySelector('span:last-child').textContent = open ? '▸' : '▾';
+  }
+
+  // keep compat aliases
+  function dnsSection(t,b) { return infraSec(t,b); }
+  function toggleDNSSection(id) { const el=document.getElementById(id); if(el){const open=el.style.display!=='none';el.style.display=open?'none':'block';} }
 
   function exportDNSpdf(id, domain) {
     toast(`Generating PDF for ${domain}…`);
@@ -3380,7 +3979,7 @@
     showDNSHistory();
   }
 
-  // ── Channel Monitor ────────────────────────────────────────────────────────
+    // ── Channel Monitor ────────────────────────────────────────────────────────
   let _cmActiveJobId = null;
   let _cmPollTimer   = null;
   let _cmLogOffset   = 0;

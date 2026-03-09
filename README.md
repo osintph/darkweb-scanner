@@ -32,7 +32,7 @@ DOMAIN=scanner.yourdomain.com SSL_EMAIL=you@example.com \
 - **Telegram Scraper** — monitors public Telegram channels for keyword hits using the same engine as the crawler
 - **Projects** — scoped monitoring engagements with per-project keywords, target domains, entities, and hit tracking
 - **IP Investigation** — parallel AbuseIPDB + VirusTotal lookups with geolocation, ASN, and history
-- **DNS Reconnaissance** — full passive/active DNS recon, zone transfer attempts, certificate transparency, SPF/DMARC analysis
+- **Infrastructure Recon** — DNSDumpster-style overview (server map, ASN/hosting breakdown, live HTTP service banners and tech fingerprinting), full passive + active DNS recon, active subdomain brute-force (100-entry wordlist), TCP port scanning across 30 common services, live HTTP/HTTPS directory enumeration (70-path wordlist), certificate transparency, zone transfer attempts, SPF/DMARC/DKIM email security scoring, interactive subdomain node graph, and per-IP port heatmap — all from the dashboard
 - **Web Check** — on-demand OSINT analysis for any domain: SSL, headers, open ports, tech stack, WHOIS, and more — available at `webcheck.osintph.info`
 - **Ransomware Tracker** — live tracking of active ransomware groups with SEA/PH regional focus
 - **Threat Actor Profiles** — structured APT and cybercriminal profiles relevant to Southeast Asia
@@ -235,7 +235,7 @@ src/darkweb_scanner/
   storage.py           # SQLAlchemy models and storage layer
   feeds.py             # OTX, CISA, abuse.ch, RSS feeds
   digest.py            # daily email digest
-  dns_crawler.py       # DNS reconnaissance module
+  dns_crawler.py       # DNS recon + subdomain brute-force + port scan + dir enum
   ip_lookup.py         # IP investigation module
   telegram_scraper.py  # Telegram channel scraper (keyword hit pipeline)
   channel_monitor.py   # Telegram channel monitor (on-demand scrape + translate)
@@ -275,7 +275,8 @@ make stop          # stop all containers
 ## 🗺️ Roadmap
 
 - Breach data search (HIBP integration)
-- Certificate transparency monitoring
+- Custom port scan wordlist upload via dashboard
+- Scheduled / recurring DNS recon jobs
 - Mobile interface
 - Expanded SEA/PH threat actor profiles and keyword coverage
 
@@ -301,3 +302,6 @@ OSINT PH: https://www.osintph.info
 
 ### v0.9.1
 - Project dropdown in Keyword Generator now populates correctly on tab load
+
+### v1.0.0
+- Infrastructure Recon: active subdomain brute-force, TCP port scanning, and directory enumeration added to DNS tab

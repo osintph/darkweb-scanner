@@ -47,6 +47,8 @@ dashboard = [
     "langdetect>=1.0",
     "psycopg2-binary>=2.9",
     "dnspython>=2.4",
+    "matplotlib>=3.7",
+    "numpy>=1.24",
 ]
 dev = [
     "pytest>=7.4",
@@ -73,6 +75,8 @@ all = [
     "feedparser>=6.0",
     "flask>=3.0",
     "gunicorn>=21.0",
+    "matplotlib>=3.7",
+    "numpy>=1.24",
 ]
 
 [project.scripts]

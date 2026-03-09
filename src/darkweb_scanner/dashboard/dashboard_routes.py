@@ -1115,7 +1115,7 @@ def api_report_pdf():
             ParagraphStyle("Footer", parent=s_small, textColor=colors.HexColor("#8b949e"), fontSize=7),
         ))
 
-        doc.build(story)
+        doc.build(story, onFirstPage=dark_page, onLaterPages=dark_page)
         buf.seek(0)
 
         filename = f"threat-intel-report-{dt.utcnow().strftime('%Y%m%d-%H%M')}.pdf"
@@ -1677,16 +1677,24 @@ def api_dns_delete(inv_id: int):
 @dashboard_bp.route("/api/dns/investigations/<int:inv_id>/pdf", methods=["GET"])
 @require_login
 def api_dns_pdf(inv_id: int):
-    """Export DNS investigation as PDF report."""
+    """Export DNS investigation as a rich PDF report — DNSDumpster-inspired layout."""
     from io import BytesIO
     from datetime import datetime as dt
+    from collections import Counter
+
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    plt.style.use('dark_background')
+    import matplotlib.patches as mpatches
+    import math
 
     from reportlab.lib import colors
     from reportlab.lib.pagesizes import A4
     from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
     from reportlab.lib.units import mm
     from reportlab.platypus import (
-        HRFlowable, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle,
+        HRFlowable, Image, PageBreak, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle,
     )
 
     storage = get_storage()
@@ -1704,14 +1712,39 @@ def api_dns_pdf(inv_id: int):
     email_sec = r.get("email_security", {})
     resolved = r.get("subdomains_resolved", [])
     passive = r.get("subdomains_passive", [])
+    bruteforce = r.get("subdomains_bruteforce", [])
     ip_geo = r.get("ip_geo", {})
     ptr = r.get("ptr_records", {})
+    port_scan = r.get("port_scan", {})
+    dir_enum = r.get("dir_enum", {})
+    services = r.get("services", {})
     zt_success = any(v.get("success") for v in zt.values() if isinstance(v, dict))
+    main_ips = dns.get("A", []) + dns.get("AAAA", [])
+
+    # ── Colour palette ──
+    C_BG      = colors.HexColor("#0d1117")
+    C_SURFACE = colors.HexColor("#161b22")
+    C_BORDER  = colors.HexColor("#30363d")
+    C_TEXT    = colors.HexColor("#e6edf3")
+    C_MUTED   = colors.HexColor("#8b949e")
+    C_ACCENT  = colors.HexColor("#58a6ff")
+    C_RED     = colors.HexColor("#f85149")
+    C_GREEN   = colors.HexColor("#3fb950")
+    C_YELLOW  = colors.HexColor("#d29922")
+    C_PURPLE  = colors.HexColor("#bc8cff")
+    C_WHITE   = colors.white
 
     buf = BytesIO()
     W, H = A4
-    M = 18 * mm
-    doc = SimpleDocTemplate(buf, pagesize=A4, leftMargin=M, rightMargin=M,
+    M = 15 * mm
+    def dark_page(canvas, doc):
+        canvas.saveState()
+        canvas.setFillColor(colors.HexColor("#0d1117"))
+        canvas.rect(0, 0, W, H, fill=1, stroke=0)
+        canvas.restoreState()
+
+    doc = SimpleDocTemplate(buf, pagesize=A4,
+                            leftMargin=M, rightMargin=M,
                             topMargin=M, bottomMargin=M)
     PW = W - 2 * M
     styles = getSampleStyleSheet()
@@ -1719,236 +1752,640 @@ def api_dns_pdf(inv_id: int):
     def S(name, **kw):
         return ParagraphStyle(name, parent=styles["Normal"], **kw)
 
-    s_h1 = S("h1", fontSize=20, fontName="Helvetica-Bold", textColor=colors.HexColor("#0d1117"), spaceAfter=2, leading=24)
-    s_tagline = S("tl", fontSize=10, textColor=colors.HexColor("#f85149"), fontName="Helvetica-Bold", spaceAfter=3, leading=14)
-    s_meta = S("meta", fontSize=8, textColor=colors.HexColor("#8b949e"), spaceAfter=0, leading=12)
-    s_body = S("body", fontSize=8.5, textColor=colors.HexColor("#24292f"), leading=13)
-    s_small = S("small", fontSize=7.5, textColor=colors.HexColor("#57606a"), leading=11)
-    s_mono = S("mono", fontSize=7, fontName="Courier", textColor=colors.HexColor("#0550ae"), leading=10, wordWrap="CJK")
-    s_warn = S("warn", fontSize=8, textColor=colors.HexColor("#f85149"), fontName="Helvetica-Bold", leading=12)
-    s_footer = S("footer", fontSize=7, textColor=colors.HexColor("#8b949e"), leading=10)
-
-    no_pad = TableStyle([
-        ("LEFTPADDING", (0, 0), (-1, -1), 0),
-        ("RIGHTPADDING", (0, 0), (-1, -1), 0),
-        ("TOPPADDING", (0, 0), (-1, -1), 0),
-        ("BOTTOMPADDING", (0, 0), (-1, -1), 1),
-        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-    ])
+    s_h1    = S("h1",    fontSize=22, fontName="Helvetica-Bold",   textColor=C_TEXT,   leading=26, spaceAfter=2)
+    s_h2    = S("h2",    fontSize=13, fontName="Helvetica-Bold",   textColor=C_TEXT,   leading=17, spaceBefore=12, spaceAfter=4)
+    s_h3    = S("h3",    fontSize=9,  fontName="Helvetica-Bold",   textColor=C_ACCENT, leading=13, spaceBefore=6, spaceAfter=2)
+    s_body  = S("body",  fontSize=8,  textColor=C_TEXT,   leading=12)
+    s_small = S("small", fontSize=7,  textColor=C_MUTED,  leading=10)
+    s_mono  = S("mono",  fontSize=7,  fontName="Courier", textColor=C_ACCENT, leading=10, wordWrap="CJK")
+    s_warn  = S("warn",  fontSize=8,  fontName="Helvetica-Bold", textColor=C_RED, leading=12)
+    s_ok    = S("ok",    fontSize=8,  fontName="Helvetica-Bold", textColor=C_GREEN, leading=12)
+    s_tag   = S("tag",   fontSize=7,  fontName="Helvetica-Bold", textColor=C_TEXT, leading=10)
+    s_foot  = S("foot",  fontSize=6.5, textColor=C_MUTED, leading=10)
 
     story = []
 
-    # ── Masthead: logo left, stacked text right (prevents overlap) ──
-    story.append(HRFlowable(width=PW, thickness=4, color=colors.HexColor("#f85149"), spaceAfter=10))
-    logo_tbl = Table([[Paragraph('<font color="#f85149" size="26"><b>⬡</b></font>',
-        S("logo_d", fontSize=26, textColor=colors.HexColor("#f85149"), leading=30))]], colWidths=[14 * mm])
-    logo_tbl.setStyle(no_pad)
-    text_tbl = Table([
-        [Paragraph("DNS Reconnaissance Report", s_h1)],
-        [Paragraph("powered by OSINT PH  ·  osintph.info", s_tagline)],
-        [Paragraph(f"Target: {domain}  ·  Investigated: {created}  ·  Generated: {dt.utcnow().strftime('%Y-%m-%d %H:%M UTC')}", s_meta)],
-    ], colWidths=[PW - 16 * mm])
-    text_tbl.setStyle(TableStyle([
-        ("LEFTPADDING", (0, 0), (-1, -1), 8),
-        ("RIGHTPADDING", (0, 0), (-1, -1), 0),
-        ("TOPPADDING", (0, 0), (-1, -1), 0),
-        ("BOTTOMPADDING", (0, 0), (-1, -1), 1),
-        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-    ]))
-    header_tbl = Table([[logo_tbl, text_tbl]], colWidths=[16 * mm, PW - 16 * mm])
-    header_tbl.setStyle(TableStyle([
-        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-        ("LEFTPADDING", (0, 0), (-1, -1), 0),
-        ("RIGHTPADDING", (0, 0), (-1, -1), 0),
-        ("TOPPADDING", (0, 0), (-1, -1), 0),
-        ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
-    ]))
-    story.append(header_tbl)
-    story.append(Spacer(1, 8))
-    story.append(HRFlowable(width=PW, thickness=0.5, color=colors.HexColor("#d0d7de"), spaceAfter=10))
-    s_body = S("body", fontSize=8.5, textColor=colors.HexColor("#24292f"), leading=13)
-    s_small = S("small", fontSize=7.5, textColor=colors.HexColor("#57606a"), leading=11)
-    s_mono = S("mono", fontSize=7, fontName="Courier", textColor=colors.HexColor("#0550ae"), leading=10, wordWrap="CJK")
-    s_warn = S("warn", fontSize=8, textColor=colors.HexColor("#f85149"), fontName="Helvetica-Bold", leading=12)
-    s_footer = S("footer", fontSize=7, textColor=colors.HexColor("#8b949e"), leading=10)
+    # ── helpers ──────────────────────────────────────────────────────────────
 
-    def section(title, color="#0d1117"):
-        story.append(Spacer(1, 4))
-        story.append(Paragraph(title, S(f"sh{title[:8]}", fontSize=11, fontName="Helvetica-Bold",
-            textColor=colors.HexColor(color), spaceBefore=10, spaceAfter=3)))
-        story.append(HRFlowable(width=PW, thickness=0.5, color=colors.HexColor("#d0d7de"), spaceAfter=3))
-
-    def make_table(headers, rows, col_widths, row_bg=None):
+    def dark_table(headers, rows, col_widths, row_colors=None):
+        """Build a dark-themed table. headers = list of cells, rows = list of row lists."""
         data = [headers] + rows
         tbl = Table(data, colWidths=col_widths, repeatRows=1)
-        tbl.setStyle(TableStyle([
-            ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#0d1117")),
-            ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
-            ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-            ("FONTSIZE", (0, 0), (-1, -1), 7.5),
-            ("ROWBACKGROUNDS", (0, 1), (-1, -1), row_bg or [colors.HexColor("#f6f8fa"), colors.white]),
-            ("GRID", (0, 0), (-1, -1), 0.4, colors.HexColor("#d0d7de")),
-            ("PADDING", (0, 0), (-1, -1), 5),
-            ("VALIGN", (0, 0), (-1, -1), "TOP"),
-        ]))
+        row_bg = row_colors or [C_SURFACE, C_BG]
+        cmds = [
+            ("BACKGROUND",  (0, 0), (-1, 0),  C_BG),
+            ("TEXTCOLOR",   (0, 0), (-1, 0),  C_TEXT),
+            ("FONTNAME",    (0, 0), (-1, 0),  "Helvetica-Bold"),
+            ("FONTSIZE",    (0, 0), (-1, -1), 7.5),
+            ("ROWBACKGROUNDS", (0, 1), (-1, -1), row_bg),
+            ("GRID",        (0, 0), (-1, -1), 0.3, C_BORDER),
+            ("TOPPADDING",  (0, 0), (-1, -1), 4),
+            ("BOTTOMPADDING",(0,0), (-1, -1), 4),
+            ("LEFTPADDING", (0, 0), (-1, -1), 6),
+            ("RIGHTPADDING",(0, 0), (-1, -1), 6),
+            ("VALIGN",      (0, 0), (-1, -1), "TOP"),
+        ]
+        tbl.setStyle(TableStyle(cmds))
         return tbl
 
-    # ── Summary ──
-    section("Executive Summary")
-    main_ips = dns.get("A", []) + dns.get("AAAA", [])
-    summary_data = [
-        ["Metric", "Value"],
-        ["Domain", domain],
-        ["Subdomains Discovered", str(inv.get("subdomain_count") or 0)],
-        ["Subdomains Resolved", str(inv.get("resolved_count") or 0)],
-        ["IP Addresses", str(len(main_ips))],
-        ["Zone Transfer", "⚠ VULNERABLE — Transfer Succeeded" if zt_success else "Secure (refused)"],
-        ["SPF Record", "✓ Present" if email_sec.get("spf_valid") else "✗ Missing — spoofing risk"],
-        ["DMARC Record", "✓ Present" if email_sec.get("dmarc_valid") else "✗ Missing — no enforcement"],
-        ["DKIM Selectors", ", ".join(email_sec.get("dkim_selectors_found", [])) or "None found"],
-    ]
-    tbl = Table(summary_data, colWidths=[PW * 0.45, PW * 0.55])
-    tbl.setStyle(TableStyle([
-        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#0d1117")),
-        ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
-        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-        ("FONTSIZE", (0, 0), (-1, -1), 8.5),
-        ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.HexColor("#f6f8fa"), colors.white]),
-        ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#d0d7de")),
-        ("PADDING", (0, 0), (-1, -1), 6),
-        # Highlight zone transfer row red if vulnerable
-        *(
-            [("TEXTCOLOR", (1, 5), (1, 5), colors.HexColor("#f85149")),
-             ("FONTNAME", (1, 5), (1, 5), "Helvetica-Bold")]
-            if zt_success else []
-        ),
-    ]))
-    story.append(tbl)
+    def section_header(title, color=None):
+        story.append(Spacer(1, 6))
+        story.append(HRFlowable(width=PW, thickness=1, color=color or C_BORDER, spaceAfter=4))
+        story.append(Paragraph(title, S(f"sh_{title[:6]}", fontSize=10, fontName="Helvetica-Bold",
+                     textColor=color or C_ACCENT, leading=14, spaceBefore=4, spaceAfter=3)))
 
-    # ── Email security issues ──
+    def badge(text, bg="#161b22", fg="#e6edf3"):
+        return Paragraph(f'<font color="{fg}"><b>{text}</b></font>',
+                         S(f"bd_{text[:4]}", fontSize=7, backColor=colors.HexColor(bg),
+                           borderPadding=(2,5,2,5), leading=10))
+
+    def geo_str(geo_list):
+        if not geo_list:
+            return ""
+        parts = [f"{g.get('city','')} {g.get('countryCode','')}" for g in (geo_list if isinstance(geo_list, list) else [geo_list]) if g and g.get("country")]
+        return " / ".join(p.strip() for p in parts if p.strip())
+
+    # ── ASN / hosting breakdown ───────────────────────────────────────────────
+    asn_counter = Counter()
+    org_counter = Counter()
+    country_counter = Counter()
+    all_geo = list(ip_geo.values())
+    for sub in resolved:
+        for g in (sub.get("geo") or []):
+            if g and g.get("as"):
+                asn_counter[g["as"]] += 1
+            if g and g.get("org"):
+                org_counter[g["org"]] += 1
+            if g and g.get("country"):
+                country_counter[g["country"]] += 1
+
+    # ── matplotlib helpers ────────────────────────────────────────────────────
+
+    def fig_to_image(fig, width_mm=None):
+        """Convert a matplotlib figure to a ReportLab Image."""
+        img_buf = BytesIO()
+        fig.savefig(img_buf, format="png", dpi=150, bbox_inches="tight",
+                    facecolor="#161b22")
+        img_buf.seek(0)
+        plt.close(fig)
+        from reportlab.lib.utils import ImageReader
+        ir = ImageReader(img_buf)
+        iw, ih = ir.getSize()
+        ratio = ih / iw
+        w = (width_mm or 170) * mm
+        return Image(img_buf, width=w, height=w * ratio)
+
+    # ── GRAPH: subdomain node diagram ─────────────────────────────────────────
+    def build_graph_image():
+        all_subs = {s["subdomain"]: s for s in resolved}
+        for b in bruteforce:
+            if b["subdomain"] not in all_subs:
+                all_subs[b["subdomain"]] = b
+
+        nodes = {}   # id -> (x, y, label, color, size)
+        edges = []
+
+        # Root
+        nodes["root"] = (0, 0, domain, "#f85149", 400)
+
+        sub_list = list(all_subs.values())[:60]
+        n = len(sub_list)
+        for i, s in enumerate(sub_list):
+            angle = 2 * math.pi * i / max(n, 1)
+            radius = 2.2
+            sx = radius * math.cos(angle)
+            sy = radius * math.sin(angle)
+            is_brute = s["subdomain"] in {b["subdomain"] for b in bruteforce}
+            col = "#bc8cff" if is_brute else "#58a6ff"
+            label = s["subdomain"].replace("." + domain, "")
+            sid = f"s{i}"
+            nodes[sid] = (sx, sy, label, col, 120)
+            edges.append(("root", sid))
+
+            for j, ip in enumerate((s.get("ips") or [])[:2]):
+                ip_id = f"ip_{ip.replace('.','_').replace(':','_')}"
+                if ip_id not in nodes:
+                    ia = angle + (j - 0.5) * 0.35
+                    ir = radius + 1.1
+                    nodes[ip_id] = (ir * math.cos(ia), ir * math.sin(ia), ip, "#3fb950", 60)
+                edges.append((sid, ip_id))
+
+        fig, ax = plt.subplots(figsize=(10, 7))
+        fig.patch.set_facecolor("#0d1117")
+        ax.set_facecolor("#0d1117")
+        ax.axis("off")
+
+        # Draw edges
+        for (a, b_) in edges:
+            if a in nodes and b_ in nodes:
+                x1, y1 = nodes[a][:2]
+                x2, y2 = nodes[b_][:2]
+                col = "#3fb95033" if nodes[b_][3] == "#3fb950" else nodes[b_][3] + "44"
+                ax.plot([x1, x2], [y1, y2], color=col, lw=0.6, zorder=1)
+
+        # Draw nodes
+        for nid, (nx, ny, lbl, col, sz) in nodes.items():
+            ax.scatter(nx, ny, c=col, s=sz, zorder=3, edgecolors=col, linewidths=0.5, alpha=0.9)
+            fs = 5.5 if nid == "root" else 4
+            fw = "bold" if nid == "root" else "normal"
+            ax.annotate(lbl, (nx, ny), xytext=(0, -10), textcoords="offset points",
+                        ha="center", va="top", fontsize=fs, color="#e6edf3",
+                        fontweight=fw, fontfamily="monospace")
+
+        # Legend
+        legend_els = [
+            mpatches.Patch(color="#f85149", label="Root domain"),
+            mpatches.Patch(color="#58a6ff", label="Passive subdomain"),
+            mpatches.Patch(color="#bc8cff", label="Brute-forced"),
+            mpatches.Patch(color="#3fb950", label="IP address"),
+        ]
+        ax.legend(handles=legend_els, loc="lower right", fontsize=6,
+                  facecolor="#161b22", edgecolor="#30363d", labelcolor="#e6edf3",
+                  framealpha=0.9)
+
+        ax.set_aspect("equal")
+        ax.margins(0.15)
+        return fig_to_image(fig, width_mm=175)
+
+    # ── GRAPH: ASN bar chart ──────────────────────────────────────────────────
+    def build_asn_chart():
+        if not org_counter:
+            return None
+        top = org_counter.most_common(6)
+        labels = [o[:22] for o, _ in top]
+        vals = [v for _, v in top]
+        fig, ax = plt.subplots(figsize=(5.5, 2.8))
+        fig.patch.set_facecolor("#161b22")
+        ax.set_facecolor("#0d1117")
+        bars = ax.barh(labels[::-1], vals[::-1], color="#58a6ff", height=0.55)
+        for bar, val in zip(bars, vals[::-1]):
+            ax.text(bar.get_width() + 0.05, bar.get_y() + bar.get_height() / 2,
+                    str(val), va="center", ha="left", color="#e6edf3", fontsize=7)
+        ax.set_xlabel("IP count", color="#8b949e", fontsize=7)
+        ax.tick_params(colors="#8b949e", labelsize=7)
+        ax.spines[:].set_color("#30363d")
+        ax.set_title("Hosting / Networks", color="#e6edf3", fontsize=8, fontweight="bold", pad=6)
+        fig.tight_layout()
+        return fig_to_image(fig, width_mm=82)
+
+    # ── GRAPH: country pie ────────────────────────────────────────────────────
+    def build_country_chart():
+        if not country_counter:
+            return None
+        top = country_counter.most_common(5)
+        labels = [c for c, _ in top]
+        vals = [v for _, v in top]
+        palette = ["#58a6ff", "#3fb950", "#bc8cff", "#f85149", "#d29922"]
+        fig, ax = plt.subplots(figsize=(3, 2.8))
+        fig.patch.set_facecolor("#161b22")
+        ax.set_facecolor("#161b22")
+        wedges, texts, autotexts = ax.pie(
+            vals, labels=labels, autopct="%1.0f%%",
+            colors=palette[:len(vals)], startangle=140,
+            textprops={"color": "#e6edf3", "fontsize": 7},
+            pctdistance=0.75,
+        )
+        for at in autotexts:
+            at.set_color("#0d1117")
+            at.set_fontsize(6)
+        ax.set_title("Locations", color="#e6edf3", fontsize=8, fontweight="bold", pad=6)
+        fig.tight_layout()
+        return fig_to_image(fig, width_mm=58)
+
+    # ── GRAPH: port heatmap ───────────────────────────────────────────────────
+    def build_port_heatmap():
+        if not port_scan:
+            return None
+        all_ports = {}
+        for ip, ports in port_scan.items():
+            for p in ports:
+                key = f"{p['port']}/{p['service']}"
+                if key not in all_ports:
+                    all_ports[key] = {}
+                all_ports[key][ip] = p["status"]
+
+        open_ports = {k: v for k, v in all_ports.items() if any(s == "open" for s in v.values())}
+        if not open_ports:
+            return None
+
+        ips = list(port_scan.keys())
+        port_keys = sorted(open_ports.keys(), key=lambda x: int(x.split("/")[0]))
+        matrix = []
+        for pk in port_keys:
+            row = []
+            for ip in ips:
+                status = all_ports.get(pk, {}).get(ip, "closed")
+                row.append(1 if status == "open" else 0.3 if status == "filtered" else 0)
+            matrix.append(row)
+
+        fig, ax = plt.subplots(figsize=(max(4, len(ips) * 1.2), max(3, len(port_keys) * 0.35)))
+        fig.patch.set_facecolor("#161b22")
+        ax.set_facecolor("#161b22")
+        import numpy as np
+        from matplotlib.colors import LinearSegmentedColormap
+        cmap = LinearSegmentedColormap.from_list("ports", ["#0d1117", "#d29922", "#3fb950"])
+        ax.imshow(np.array(matrix), aspect="auto", cmap=cmap, vmin=0, vmax=1)
+        ax.set_xticks(range(len(ips)))
+        ax.set_xticklabels(ips, fontsize=6, color="#8b949e", rotation=20, ha="right")
+        ax.set_yticks(range(len(port_keys)))
+        ax.set_yticklabels(port_keys, fontsize=6, color="#e6edf3", fontfamily="monospace")
+        ax.set_title("Open Port Heatmap", color="#e6edf3", fontsize=8, fontweight="bold", pad=6)
+        ax.tick_params(colors="#30363d")
+        for spine in ax.spines.values():
+            spine.set_color("#30363d")
+        fig.tight_layout()
+        return fig_to_image(fig, width_mm=175)
+
+    # ════════════════════════════════════════════════════════════════════════
+    # STORY BUILD
+    # ════════════════════════════════════════════════════════════════════════
+
+    # ── Page 1: Cover / header ───────────────────────────────────────────────
+    story.append(HRFlowable(width=PW, thickness=4, color=C_RED, spaceAfter=0))
+
+    # Dark header band
+    hdr_inner = Table([
+        [
+            Paragraph(f'<font color="#f85149"><b>⬡</b></font>', S("logo", fontSize=28, leading=32, textColor=C_RED)),
+            Table([
+                [Paragraph("Infrastructure Recon Report", s_h1)],
+                [Paragraph(f'<font color="#f85149">OSINT PH  ·  osintph.info</font>',
+                            S("tl", fontSize=9, fontName="Helvetica-Bold", textColor=C_RED, leading=13))],
+                [Paragraph(f'Target: <font color="#58a6ff"><b>{domain}</b></font>  ·  '
+                           f'Investigated: {created}  ·  Generated: {dt.utcnow().strftime("%Y-%m-%d %H:%M UTC")}',
+                           S("meta", fontSize=7.5, textColor=C_MUTED, leading=11))],
+            ], colWidths=[PW - 20 * mm]),
+        ]
+    ], colWidths=[16 * mm, PW - 16 * mm])
+    hdr_inner.setStyle(TableStyle([
+        ("VALIGN", (0,0), (-1,-1), "MIDDLE"),
+        ("BACKGROUND", (0,0), (-1,-1), C_BG),
+        ("LEFTPADDING", (0,0), (-1,-1), 8),
+        ("RIGHTPADDING", (0,0), (-1,-1), 8),
+        ("TOPPADDING", (0,0), (-1,-1), 10),
+        ("BOTTOMPADDING", (0,0), (-1,-1), 10),
+    ]))
+    story.append(hdr_inner)
+    story.append(HRFlowable(width=PW, thickness=1, color=C_BORDER, spaceAfter=8))
+
+    # ── Stat strip ───────────────────────────────────────────────────────────
+    bf_count = len(bruteforce)
+    cert_count = len(passive)
+    stat_items = [
+        (str(inv.get("subdomain_count") or 0), "SUBDOMAINS"),
+        (str(inv.get("resolved_count") or 0), "RESOLVED"),
+        (str(bf_count), "BRUTE-FORCED"),
+        (str(cert_count), "CERT SANs"),
+        (str(len(main_ips)), "IPs"),
+        ("⚠ YES" if zt_success else "✓ NO", "ZONE XFR"),
+        ("✓" if email_sec.get("spf_valid") else "✗", "SPF"),
+        ("✓" if email_sec.get("dmarc_valid") else "✗", "DMARC"),
+    ]
+    stat_colors = {
+        "⚠ YES": C_RED, "✓ NO": C_GREEN,
+        "✓": C_GREEN, "✗": C_RED,
+    }
+    stat_cells = []
+    for val, lbl in stat_items:
+        vc = stat_colors.get(val, C_ACCENT)
+        cell = Table([
+            [Paragraph(f'<b>{val}</b>', S(f"sv_{lbl}", fontSize=14, fontName="Helvetica-Bold", textColor=vc, leading=17))],
+            [Paragraph(lbl, S(f"sl_{lbl}", fontSize=6, textColor=C_MUTED, leading=8, fontName="Helvetica-Bold"))],
+        ], colWidths=[PW / len(stat_items) - 2])
+        cell.setStyle(TableStyle([
+            ("ALIGN", (0,0), (-1,-1), "CENTER"),
+            ("BACKGROUND", (0,0), (-1,-1), C_SURFACE),
+            ("TOPPADDING", (0,0), (-1,-1), 6),
+            ("BOTTOMPADDING", (0,0), (-1,-1), 6),
+            ("LEFTPADDING", (0,0), (-1,-1), 2),
+            ("RIGHTPADDING", (0,0), (-1,-1), 2),
+            ("BOX", (0,0), (-1,-1), 0.4, C_BORDER),
+        ]))
+        stat_cells.append(cell)
+
+    stat_tbl = Table([stat_cells], colWidths=[PW / len(stat_items)] * len(stat_items))
+    stat_tbl.setStyle(TableStyle([
+        ("LEFTPADDING", (0,0), (-1,-1), 2),
+        ("RIGHTPADDING", (0,0), (-1,-1), 2),
+        ("TOPPADDING", (0,0), (-1,-1), 0),
+        ("BOTTOMPADDING", (0,0), (-1,-1), 0),
+    ]))
+    story.append(stat_tbl)
+    story.append(Spacer(1, 8))
+
+    # ── Zone transfer alert ──────────────────────────────────────────────────
+    if zt_success:
+        ns_vuln = [ns for ns, info in zt.items() if isinstance(info, dict) and info.get("success")]
+        alert_tbl = Table([[
+            Paragraph("🚨", S("alertico", fontSize=16, leading=20)),
+            Paragraph(f"<b>CRITICAL: Zone Transfer Succeeded</b><br/>"
+                      f"Nameserver(s) {', '.join(ns_vuln)} are leaking full DNS zone data. "
+                      f"Restrict AXFR to authorised secondaries immediately.",
+                      S("alerttxt", fontSize=8, textColor=C_RED, leading=12)),
+        ]], colWidths=[10*mm, PW-10*mm])
+        alert_tbl.setStyle(TableStyle([
+            ("BACKGROUND", (0,0), (-1,-1), colors.HexColor("#3d0000")),
+            ("BOX", (0,0), (-1,-1), 1, C_RED),
+            ("VALIGN", (0,0), (-1,-1), "MIDDLE"),
+            ("TOPPADDING", (0,0), (-1,-1), 6),
+            ("BOTTOMPADDING", (0,0), (-1,-1), 6),
+            ("LEFTPADDING", (0,0), (-1,-1), 8),
+        ]))
+        story.append(alert_tbl)
+        story.append(Spacer(1, 6))
+
+    # ── Email security issues ─────────────────────────────────────────────────
     issues = email_sec.get("issues", [])
     if issues:
-        section("⚠ Email Security Issues", "#f85149")
         for issue in issues:
-            story.append(Paragraph(f"• {issue}", s_warn))
-            story.append(Spacer(1, 2))
+            story.append(Paragraph(f"⚠ {issue}", s_warn))
+        story.append(Spacer(1, 4))
 
-    # ── DNS Records ──
-    section("DNS Records")
-    rec_types = ["A", "AAAA", "MX", "NS", "TXT", "CNAME", "SOA", "CAA"]
+    # ── Page 1: Infrastructure overview (charts side by side) ────────────────
+    section_header("Infrastructure Overview")
+
+    asn_img = build_asn_chart()
+    cty_img = build_country_chart()
+    if asn_img and cty_img:
+        overview_tbl = Table([[asn_img, cty_img]], colWidths=[PW * 0.58, PW * 0.42])
+        overview_tbl.setStyle(TableStyle([
+            ("VALIGN", (0,0), (-1,-1), "TOP"),
+            ("LEFTPADDING", (0,0), (-1,-1), 0),
+            ("RIGHTPADDING", (0,0), (-1,-1), 4),
+        ]))
+        story.append(overview_tbl)
+    elif asn_img:
+        story.append(asn_img)
+
+    # ASN detail table
+    if org_counter:
+        story.append(Spacer(1, 6))
+        asn_rows = []
+        all_geo_by_org = {}
+        for sub in resolved:
+            for g in (sub.get("geo") or []):
+                if g and g.get("org"):
+                    org = g["org"]
+                    if org not in all_geo_by_org:
+                        all_geo_by_org[org] = {"ips": set(), "asn": g.get("as",""), "country": g.get("country","")}
+                    all_geo_by_org[org]["ips"].add(g.get("query",""))
+        for org, cnt in org_counter.most_common(10):
+            info = all_geo_by_org.get(org, {})
+            asn_rows.append([
+                Paragraph(org[:45], s_body),
+                Paragraph(info.get("asn",""), s_small),
+                Paragraph(info.get("country",""), s_small),
+                Paragraph(str(cnt), S("cnt", fontSize=8, fontName="Helvetica-Bold", textColor=C_ACCENT, leading=12)),
+            ])
+        story.append(dark_table(
+            [Paragraph(h, S(f"ah_{h}", fontSize=7.5, textColor=C_TEXT, fontName="Helvetica-Bold"))
+             for h in ["Organisation / ASN Name", "ASN", "Country", "IPs"]],
+            asn_rows, [PW*0.5, PW*0.22, PW*0.17, PW*0.11]
+        ))
+
+    # ── Page 2: Subdomain graph ───────────────────────────────────────────────
+    story.append(PageBreak())
+    section_header("Subdomain Infrastructure Graph")
+    story.append(Paragraph(
+        f"{len(resolved)} passive subdomains · {len(bruteforce)} brute-forced · "
+        f"{sum(len(s.get('ips',[])) for s in resolved)} IP nodes",
+        s_small))
+    story.append(Spacer(1, 4))
+    try:
+        graph_img = build_graph_image()
+        story.append(graph_img)
+    except Exception as e:
+        story.append(Paragraph(f"Graph generation failed: {e}", s_warn))
+
+    # ── DNS Records ───────────────────────────────────────────────────────────
+    section_header("DNS Records")
     rec_rows = []
-    for rtype in rec_types:
+    for rtype in ["A", "AAAA", "MX", "NS", "TXT", "CNAME", "SOA", "CAA"]:
         for val in dns.get(rtype, []):
             geo = ip_geo.get(val, {})
-            geo_str = f"{geo.get('city', '')} {geo.get('country', '')} · {geo.get('org', '')}".strip(" ·")
-            ptr_str = ptr.get(val, "")
+            geo_s = f"{geo.get('city','')} {geo.get('country','')} · {geo.get('org','')}".strip(" ·")
+            ptr_s = ptr.get(val, "")
             rec_rows.append([
                 Paragraph(rtype, S(f"rt{rtype}", fontSize=7, fontName="Helvetica-Bold",
-                    textColor=colors.white, backColor=colors.HexColor("#161b22"),
-                    borderPadding=(2, 4, 2, 4))),
+                    textColor=C_ACCENT, leading=10)),
                 Paragraph(val, s_mono),
-                Paragraph(ptr_str, s_small) if ptr_str else Paragraph("", s_small),
-                Paragraph(geo_str, s_small),
+                Paragraph(ptr_s, s_small),
+                Paragraph(geo_s, s_small),
             ])
     if rec_rows:
-        story.append(make_table(
-            [Paragraph(h, S(f"rh{h}", fontSize=7.5, textColor=colors.white, fontName="Helvetica-Bold"))
-             for h in ["Type", "Value", "PTR / Hostname", "Geolocation"]],
-            rec_rows,
-            [PW * 0.08, PW * 0.28, PW * 0.28, PW * 0.36],
+        story.append(dark_table(
+            [Paragraph(h, S(f"rh{h}", fontSize=7.5, textColor=C_TEXT, fontName="Helvetica-Bold"))
+             for h in ["Type", "Value", "PTR", "Geolocation / Org"]],
+            rec_rows, [PW*0.07, PW*0.27, PW*0.26, PW*0.40]
         ))
 
-    # ── Email security records ──
-    if email_sec.get("spf") or email_sec.get("dmarc"):
-        section("Email Authentication Records")
-        email_rows = []
-        if email_sec.get("spf"):
-            email_rows.append([Paragraph("SPF", s_body), Paragraph(email_sec["spf"], s_mono)])
-        if email_sec.get("dmarc"):
-            email_rows.append([Paragraph("DMARC", s_body), Paragraph(email_sec["dmarc"], s_mono)])
-        if email_sec.get("dkim_selectors_found"):
-            email_rows.append([Paragraph("DKIM", s_body),
-                Paragraph("Selectors: " + ", ".join(email_sec["dkim_selectors_found"]), s_body)])
-        story.append(make_table(
-            [Paragraph(h, S(f"eh{h}", fontSize=7.5, textColor=colors.white, fontName="Helvetica-Bold"))
-             for h in ["Record", "Value"]],
-            email_rows, [PW * 0.12, PW * 0.88],
+    # ── Email security ────────────────────────────────────────────────────────
+    section_header("Email Security Analysis")
+    spf_v = email_sec.get("spf_valid")
+    dmarc_v = email_sec.get("dmarc_valid")
+    dkim_sel = email_sec.get("dkim_selectors_found", [])
+    score = 100 - (0 if spf_v else 35) - (0 if dmarc_v else 35) - (0 if dkim_sel else 20)
+    score_col = C_GREEN if score >= 80 else C_YELLOW if score >= 50 else C_RED
+
+    esec_data = [
+        [Paragraph("Record", S("esh", fontSize=7.5, textColor=C_TEXT, fontName="Helvetica-Bold")),
+         Paragraph("Status", S("esh2", fontSize=7.5, textColor=C_TEXT, fontName="Helvetica-Bold")),
+         Paragraph("Value", S("esh3", fontSize=7.5, textColor=C_TEXT, fontName="Helvetica-Bold"))],
+        [Paragraph("SPF", s_body),
+         Paragraph("✓ Valid" if spf_v else "✗ Missing", S("sv2", fontSize=8, fontName="Helvetica-Bold", textColor=C_GREEN if spf_v else C_RED, leading=12)),
+         Paragraph(email_sec.get("spf") or "—", s_mono)],
+        [Paragraph("DMARC", s_body),
+         Paragraph("✓ Valid" if dmarc_v else "✗ Missing", S("dv2", fontSize=8, fontName="Helvetica-Bold", textColor=C_GREEN if dmarc_v else C_RED, leading=12)),
+         Paragraph(email_sec.get("dmarc") or "—", s_mono)],
+        [Paragraph("DKIM", s_body),
+         Paragraph(f"✓ {len(dkim_sel)} selector(s)" if dkim_sel else "✗ Not detected",
+                   S("kv2", fontSize=8, fontName="Helvetica-Bold", textColor=C_GREEN if dkim_sel else C_MUTED, leading=12)),
+         Paragraph(", ".join(dkim_sel) or "No selectors found", s_small)],
+    ]
+    esec_tbl = Table(esec_data, colWidths=[PW*0.12, PW*0.2, PW*0.68])
+    esec_tbl.setStyle(TableStyle([
+        ("BACKGROUND", (0,0), (-1,0), C_BG),
+        ("TEXTCOLOR", (0,0), (-1,0), C_TEXT),
+        ("FONTNAME", (0,0), (-1,0), "Helvetica-Bold"),
+        ("ROWBACKGROUNDS", (0,1), (-1,-1), [C_SURFACE, C_BG]),
+        ("GRID", (0,0), (-1,-1), 0.3, C_BORDER),
+        ("TOPPADDING", (0,0), (-1,-1), 5),
+        ("BOTTOMPADDING", (0,0), (-1,-1), 5),
+        ("LEFTPADDING", (0,0), (-1,-1), 6),
+        ("VALIGN", (0,0), (-1,-1), "MIDDLE"),
+    ]))
+
+    score_cell = Table([
+        [Paragraph(f'<b>{score}</b>', S("sc", fontSize=28, fontName="Helvetica-Bold", textColor=score_col, leading=32))],
+        [Paragraph("EMAIL SCORE", S("scl", fontSize=6, textColor=C_MUTED, leading=8, fontName="Helvetica-Bold"))],
+        [Paragraph("GOOD" if score>=80 else "MODERATE RISK" if score>=50 else "HIGH RISK",
+                   S("scr", fontSize=7, fontName="Helvetica-Bold", textColor=score_col, leading=9))],
+    ], colWidths=[25*mm])
+    score_cell.setStyle(TableStyle([
+        ("ALIGN", (0,0), (-1,-1), "CENTER"),
+        ("BACKGROUND", (0,0), (-1,-1), C_SURFACE),
+        ("TOPPADDING", (0,0), (-1,-1), 8),
+        ("BOTTOMPADDING", (0,0), (-1,-1), 8),
+        ("BOX", (0,0), (-1,-1), 0.4, score_col),
+        ("VALIGN", (0,0), (-1,-1), "MIDDLE"),
+    ]))
+
+    email_layout = Table([[score_cell, esec_tbl]], colWidths=[27*mm, PW-27*mm])
+    email_layout.setStyle(TableStyle([
+        ("VALIGN", (0,0), (-1,-1), "TOP"),
+        ("LEFTPADDING", (0,0), (-1,-1), 0),
+        ("RIGHTPADDING", (0,0), (0,0), 6),
+    ]))
+    story.append(email_layout)
+
+    # ── Subdomains table ──────────────────────────────────────────────────────
+    section_header(f"Resolved Subdomains ({len(resolved)} passive · {len(bruteforce)} brute-forced)")
+    all_sub_map = {s["subdomain"]: {**s, "src": "passive"} for s in resolved}
+    for b in bruteforce:
+        if b["subdomain"] not in all_sub_map:
+            all_sub_map[b["subdomain"]] = {**b, "src": "brute"}
+
+    sub_rows = []
+    for sub in sorted(all_sub_map.values(), key=lambda x: x["subdomain"]):
+        ips = ", ".join(sub.get("ips") or [])
+        geo = geo_str(sub.get("geo") or [])
+        src = sub.get("src", "passive")
+        src_col = "#bc8cff" if src == "brute" else "#58a6ff"
+        src_lbl = "brute-force" if src == "brute" else "passive"
+        sub_rows.append([
+            Paragraph(sub["subdomain"], s_mono),
+            Paragraph(ips, s_mono),
+            Paragraph(geo, s_small),
+            Paragraph(f'<font color="{src_col}"><b>{src_lbl}</b></font>',
+                      S(f"src_{src}", fontSize=6.5, leading=10)),
+        ])
+    if sub_rows:
+        story.append(dark_table(
+            [Paragraph(h, S(f"sbh{h}", fontSize=7.5, textColor=C_TEXT, fontName="Helvetica-Bold"))
+             for h in ["Subdomain", "IP Address(es)", "Location", "Source"]],
+            sub_rows, [PW*0.38, PW*0.23, PW*0.27, PW*0.12]
         ))
 
-    # ── Zone transfer ──
-    if zt_success:
-        section("🚨 Zone Transfer — CRITICAL FINDING", "#f85149")
-        story.append(Paragraph(
-            "Zone transfer succeeded. The DNS server is leaking its full zone data to unauthorized parties. "
-            "This exposes all DNS records and subdomains. Restrict AXFR to authorised secondary nameservers immediately.",
-            s_warn))
-        story.append(Spacer(1, 6))
-        for ns, info in zt.items():
-            if not info.get("success"):
-                continue
-            story.append(Paragraph(f"Nameserver: {ns} — {info['record_count']} records exposed", s_body))
-            zt_rows = [
-                [Paragraph(rec["name"], s_mono), Paragraph(rec["type"], s_body), Paragraph(rec["value"], s_mono)]
-                for rec in (info.get("records") or [])[:100]
-            ]
-            if zt_rows:
-                story.append(Spacer(1, 4))
-                story.append(make_table(
-                    [Paragraph(h, S(f"zh{h}", fontSize=7.5, textColor=colors.white, fontName="Helvetica-Bold"))
-                     for h in ["Name", "Type", "Value"]],
-                    zt_rows, [PW * 0.3, PW * 0.1, PW * 0.6],
-                    row_bg=[colors.HexColor("#fff8f8"), colors.white],
-                ))
-
-    # ── Resolved subdomains ──
-    if resolved:
-        section(f"Resolved Subdomains ({len(resolved)})")
-        sub_rows = []
-        for s in resolved[:200]:
-            ips = ", ".join(s.get("ips", []))
-            geo_parts = [f"{g.get('city','')} {g.get('countryCode','')}".strip()
-                         for g in (s.get("geo") or []) if g and g.get("country")]
-            geo = " / ".join(geo_parts)
-            sub_rows.append([Paragraph(s["subdomain"], s_mono), Paragraph(ips, s_mono), Paragraph(geo, s_small)])
-        story.append(make_table(
-            [Paragraph(h, S(f"sbh{h}", fontSize=7.5, textColor=colors.white, fontName="Helvetica-Bold"))
-             for h in ["Subdomain", "IP Address(es)", "Location"]],
-            sub_rows, [PW * 0.42, PW * 0.28, PW * 0.30],
-        ))
-
-    # ── Certificate transparency ──
+    # ── crt.sh certs ─────────────────────────────────────────────────────────
     if passive:
-        section(f"Certificate Transparency — crt.sh ({len(passive)} certificates)")
+        section_header(f"Certificate Transparency — {len(passive)} crt.sh certificates")
         cert_rows = []
-        for c in passive[:150]:
-            issuer = (c.get("issuer") or "").split("O=")[-1].split(",")[0][:40]
+        for c in passive[:100]:
+            issuer = (c.get("issuer") or "").split("O=")[-1].split(",")[0][:35]
             cert_rows.append([
-                Paragraph(c.get("subdomain", ""), s_mono),
+                Paragraph(c.get("subdomain",""), s_mono),
                 Paragraph(issuer, s_small),
                 Paragraph((c.get("not_after") or "")[:10], s_small),
             ])
-        story.append(make_table(
-            [Paragraph(h, S(f"ch{h}", fontSize=7.5, textColor=colors.white, fontName="Helvetica-Bold"))
+        story.append(dark_table(
+            [Paragraph(h, S(f"ch{h}", fontSize=7.5, textColor=C_TEXT, fontName="Helvetica-Bold"))
              for h in ["Subdomain / SAN", "Issuer", "Expires"]],
-            cert_rows, [PW * 0.5, PW * 0.3, PW * 0.2],
+            cert_rows, [PW*0.5, PW*0.3, PW*0.2]
         ))
 
-    # ── Footer ──
-    story.append(Spacer(1, 20))
-    story.append(HRFlowable(width=PW, thickness=0.5, color=colors.HexColor("#d0d7de")))
-    story.append(Spacer(1, 5))
-    story.append(Paragraph(
-        f"CONFIDENTIAL — DNS Reconnaissance Report powered by OSINT PH · osintph.info · "
-        f"Target: {domain} · Report ID: OSINTPH-DNS-{inv_id}-{dt.utcnow().strftime('%Y%m%d')}",
-        s_footer))
+    # ── Port scan ─────────────────────────────────────────────────────────────
+    if port_scan:
+        story.append(PageBreak())
+        section_header("Port Scan Results")
 
-    doc.build(story)
+        # Heatmap chart
+        try:
+            hm = build_port_heatmap()
+            if hm:
+                story.append(hm)
+                story.append(Spacer(1, 6))
+        except Exception:
+            pass
+
+        # Open ports detail table per IP
+        for ip, ports in port_scan.items():
+            open_p = [p for p in ports if p["status"] == "open"]
+            filt_p = [p for p in ports if p["status"] == "filtered"]
+            if not open_p and not filt_p:
+                continue
+            story.append(Paragraph(
+                f'<font color="#58a6ff"><b>{ip}</b></font> — '
+                f'<font color="#3fb950"><b>{len(open_p)} open</b></font>'
+                + (f', <font color="#d29922">{len(filt_p)} filtered</font>' if filt_p else ""),
+                S(f"ip_{ip}", fontSize=8, textColor=C_TEXT, leading=12, spaceBefore=6, spaceAfter=3)
+            ))
+            if open_p:
+                port_rows = [[
+                    Paragraph(str(p["port"]), S("pn", fontSize=7, fontName="Helvetica-Bold", textColor=C_GREEN, leading=10)),
+                    Paragraph(p["service"], s_body),
+                    Paragraph("OPEN", S("po", fontSize=7, fontName="Helvetica-Bold", textColor=C_GREEN, leading=10)),
+                ] for p in open_p]
+                story.append(dark_table(
+                    [Paragraph(h, S(f"ph{h}", fontSize=7, textColor=C_TEXT, fontName="Helvetica-Bold"))
+                     for h in ["Port", "Service", "Status"]],
+                    port_rows, [PW*0.12, PW*0.38, PW*0.50]
+                ))
+
+    # ── Directory enumeration ─────────────────────────────────────────────────
+    if dir_enum:
+        interesting_total = sum(len([p for p in paths if p.get("status_code") not in (404,410)])
+                                for paths in dir_enum.values())
+        if interesting_total:
+            section_header(f"Directory Enumeration — {interesting_total} paths found")
+            for target, paths in dir_enum.items():
+                interesting = [p for p in paths if p.get("status_code") not in (404, 410)]
+                if not interesting:
+                    continue
+                story.append(Paragraph(
+                    f'<font color="#58a6ff"><b>{target}</b></font> — {len(interesting)} paths',
+                    S(f"dt_{target[:8]}", fontSize=8, textColor=C_TEXT, leading=12, spaceBefore=6, spaceAfter=3)
+                ))
+                dir_rows = []
+                for p in interesting:
+                    sc = p["status_code"]
+                    sc_col = "#3fb950" if sc==200 else "#58a6ff" if 300<=sc<400 else "#d29922" if sc in (401,403) else "#f85149"
+                    dir_rows.append([
+                        Paragraph(f'<font color="{sc_col}"><b>{sc}</b></font>',
+                                  S(f"dsc{sc}", fontSize=8, fontName="Helvetica-Bold", leading=12)),
+                        Paragraph(p.get("path",""), s_mono),
+                        Paragraph(p.get("content_length","") or "—", s_small),
+                        Paragraph(p.get("redirect_to","") or "—", s_small),
+                    ])
+                story.append(dark_table(
+                    [Paragraph(h, S(f"dh{h}", fontSize=7, textColor=C_TEXT, fontName="Helvetica-Bold"))
+                     for h in ["Code", "Path", "Size", "Redirect"]],
+                    dir_rows, [PW*0.08, PW*0.42, PW*0.12, PW*0.38]
+                ))
+
+    # ── Zone transfer detail ──────────────────────────────────────────────────
+    if zt_success:
+        section_header("Zone Transfer Records — CRITICAL", C_RED)
+        for ns, info in zt.items():
+            if not info.get("success"):
+                continue
+            story.append(Paragraph(f"Nameserver: {ns} — {info.get('record_count',0)} records exposed", s_warn))
+            zt_rows = [
+                [Paragraph(rec["name"], s_mono), Paragraph(rec["type"], s_body), Paragraph(rec["value"], s_mono)]
+                for rec in (info.get("records") or [])[:80]
+            ]
+            if zt_rows:
+                story.append(dark_table(
+                    [Paragraph(h, S(f"zh{h}", fontSize=7, textColor=C_TEXT, fontName="Helvetica-Bold"))
+                     for h in ["Name", "Type", "Value"]],
+                    zt_rows, [PW*0.3, PW*0.1, PW*0.6],
+                    row_colors=[colors.HexColor("#2d0000"), colors.HexColor("#1a0000")]
+                ))
+
+    # ── Footer ────────────────────────────────────────────────────────────────
+    story.append(Spacer(1, 16))
+    story.append(HRFlowable(width=PW, thickness=0.5, color=C_BORDER))
+    story.append(Spacer(1, 4))
+    story.append(Paragraph(
+        f"CONFIDENTIAL — Infrastructure Recon Report  ·  OSINT PH / osintph.info  ·  "
+        f"Target: {domain}  ·  Report ID: OSINTPH-DNS-{inv_id}-{dt.utcnow().strftime('%Y%m%d')}",
+        s_foot))
+
+    doc.build(story, onFirstPage=dark_page, onLaterPages=dark_page)
     buf.seek(0)
     filename = f"osintph-dns-{domain}-{dt.utcnow().strftime('%Y%m%d')}.pdf"
     return Response(
         buf.read(),
         mimetype="application/pdf",
-        headers={"Content-Disposition": f"attachment; filename={filename}"},
     )
 
 

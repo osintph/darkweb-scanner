@@ -419,6 +419,17 @@ def run_dns_recon(domain: str) -> dict:
         if host.endswith(f".{domain}"):
             all_subs.add(host)
 
+    # ── Phase 2b: active brute-force subdomain enumeration ──
+    try:
+        bf_results = brute_force_subdomains(domain)
+        result["subdomains_bruteforce"] = bf_results
+        for r in bf_results:
+            all_subs.add(r["subdomain"])
+        logger.info(f"Brute-force added {len(bf_results)} new subdomains for {domain}")
+    except Exception as e:
+        result["errors"].append(f"Brute-force: {e}")
+        result["subdomains_bruteforce"] = []
+
     # ── Phase 3: resolve all subdomains ──
     result["subdomains_resolved"] = resolve_subdomains(list(all_subs))
 
@@ -437,6 +448,13 @@ def run_dns_recon(domain: str) -> dict:
     # ── Phase 6: geolocate main IPs ──
     result["ip_geo"] = geolocate_ips(main_ips[:20])
 
+    # ── Phase 7: HTTP banner / service probe ──
+    try:
+        result["services"] = probe_services(list(all_subs)[:40])
+    except Exception as e:
+        result["services"] = {}
+        result["errors"].append(f"Service probe: {e}")
+
     result["completed_at"] = datetime.utcnow().isoformat()
     result["subdomain_count"] = len(all_subs)
     result["resolved_count"] = len(result["subdomains_resolved"])
@@ -447,3 +465,426 @@ def run_dns_recon(domain: str) -> dict:
         f"{result['resolved_count']} resolved"
     )
     return result
+
+
+# ── Port Scanner (Scilla-inspired) ─────────────────────────────────────────────
+
+# Common ports with service names — mirrors Scilla's default port list
+COMMON_PORTS = [
+    (21, "FTP"),
+    (22, "SSH"),
+    (23, "Telnet"),
+    (25, "SMTP"),
+    (53, "DNS"),
+    (80, "HTTP"),
+    (110, "POP3"),
+    (143, "IMAP"),
+    (443, "HTTPS"),
+    (445, "SMB"),
+    (465, "SMTPS"),
+    (587, "SMTP-Sub"),
+    (993, "IMAPS"),
+    (995, "POP3S"),
+    (1433, "MSSQL"),
+    (1521, "Oracle"),
+    (3306, "MySQL"),
+    (3389, "RDP"),
+    (5432, "PostgreSQL"),
+    (5900, "VNC"),
+    (6379, "Redis"),
+    (8080, "HTTP-Alt"),
+    (8443, "HTTPS-Alt"),
+    (8888, "Dev-HTTP"),
+    (9200, "Elasticsearch"),
+    (27017, "MongoDB"),
+    (11211, "Memcached"),
+    (2181, "Zookeeper"),
+    (6443, "K8s-API"),
+    (9090, "Prometheus"),
+]
+
+PORT_SCAN_TIMEOUT = 1.5  # seconds per port — keep fast
+
+
+def scan_port(host: str, port: int, timeout: float = PORT_SCAN_TIMEOUT) -> str:
+    """
+    Attempt TCP connect to host:port.
+    Returns 'open', 'closed', or 'filtered'.
+    """
+    try:
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.settimeout(timeout)
+        result = sock.connect_ex((host, port))
+        sock.close()
+        return "open" if result == 0 else "closed"
+    except socket.timeout:
+        return "filtered"
+    except OSError:
+        return "filtered"
+
+
+def scan_ports(host: str, ports: list[tuple] = None, max_workers: int = 50) -> list[dict]:
+    """
+    Scan a list of (port, service) tuples against host in parallel.
+    Returns list of {port, service, status} sorted by port number.
+    """
+    if ports is None:
+        ports = COMMON_PORTS
+
+    results = []
+
+    def check(port_svc):
+        port, svc = port_svc
+        status = scan_port(host, port)
+        return {"port": port, "service": svc, "status": status}
+
+    with ThreadPoolExecutor(max_workers=max_workers) as ex:
+        futures = {ex.submit(check, ps): ps for ps in ports}
+        for future in as_completed(futures):
+            try:
+                results.append(future.result())
+            except Exception as e:
+                logger.debug(f"Port scan error: {e}")
+
+    results.sort(key=lambda x: x["port"])
+    return results
+
+
+def scan_ports_multi(hosts: list[str], max_workers: int = 30) -> dict[str, list[dict]]:
+    """
+    Scan all COMMON_PORTS against multiple hosts in parallel.
+    Returns dict of host -> list of port results.
+    """
+    results = {}
+
+    def scan_host(host):
+        return host, scan_ports(host, COMMON_PORTS, max_workers=50)
+
+    with ThreadPoolExecutor(max_workers=max_workers) as ex:
+        futures = {ex.submit(scan_host, h): h for h in hosts[:10]}  # cap at 10 hosts
+        for future in as_completed(futures):
+            try:
+                host, port_results = future.result()
+                results[host] = port_results
+            except Exception as e:
+                logger.debug(f"Host scan error: {e}")
+
+    return results
+
+
+# ── Subdomain Brute-Force (Scilla-inspired) ────────────────────────────────────
+
+# Built-in wordlist — common subdomain prefixes used by Scilla
+SUBDOMAIN_WORDLIST = [
+    "www", "mail", "email", "webmail", "smtp", "pop", "imap",
+    "ftp", "ftps", "sftp", "ssh",
+    "api", "api2", "api-v1", "api-v2", "rest", "graphql",
+    "dev", "development", "staging", "stage", "stg", "preprod", "uat",
+    "test", "testing", "sandbox", "demo", "preview",
+    "admin", "administrator", "backend", "cms", "portal", "dashboard",
+    "panel", "control", "manage", "management", "console",
+    "app", "apps", "mobile", "m", "wap",
+    "vpn", "remote", "access", "citrix", "rdp", "ras",
+    "intranet", "internal", "corp", "corporate", "extranet",
+    "cdn", "assets", "static", "media", "img", "images", "files",
+    "download", "downloads", "upload", "uploads",
+    "blog", "forum", "support", "help", "docs", "wiki", "kb",
+    "shop", "store", "pay", "payment", "billing", "invoice",
+    "auth", "login", "sso", "oauth", "id", "accounts",
+    "db", "database", "sql", "mysql", "postgres", "redis", "mongo",
+    "monitor", "status", "health", "metrics", "grafana", "kibana",
+    "git", "gitlab", "github", "bitbucket", "svn", "code", "repo",
+    "ci", "cd", "jenkins", "build", "deploy",
+    "proxy", "gateway", "lb", "loadbalancer", "ha",
+    "ns1", "ns2", "ns3", "dns", "dns1", "dns2",
+    "mx", "mx1", "mx2", "relay", "bounce",
+    "backup", "archive", "old", "legacy", "v1", "v2",
+    "secure", "ssl", "tls",
+    "cloud", "aws", "azure", "gcp",
+    "search", "es", "elastic",
+    "chat", "jabber", "xmpp", "slack", "teams",
+    "crm", "erp", "hr", "finance",
+    "video", "stream", "media", "live",
+    "web", "web1", "web2", "www2", "www3",
+    "server", "server1", "server2", "host",
+    "mail2", "mail3", "smtp2",
+    "vps", "vps1", "vps2",
+    "new", "beta", "alpha",
+    "reports", "reporting", "analytics", "data",
+]
+
+
+def brute_force_subdomains(domain: str, wordlist: list[str] = None, max_workers: int = 50) -> list[dict]:
+    """
+    Actively brute-force subdomains by DNS resolution against a wordlist.
+    Returns list of {subdomain, ips} for each that resolves.
+    """
+    if wordlist is None:
+        wordlist = SUBDOMAIN_WORDLIST
+
+    candidates = [f"{word}.{domain}" for word in wordlist]
+    found = []
+
+    def try_resolve(fqdn: str) -> Optional[dict]:
+        ips = resolve_ip(fqdn)
+        if ips:
+            return {"subdomain": fqdn, "ips": ips, "source": "bruteforce"}
+        return None
+
+    with ThreadPoolExecutor(max_workers=max_workers) as ex:
+        futures = {ex.submit(try_resolve, c): c for c in candidates}
+        for future in as_completed(futures):
+            result = future.result()
+            if result:
+                found.append(result)
+
+    found.sort(key=lambda x: x["subdomain"])
+    logger.info(f"Brute-force found {len(found)} subdomains for {domain}")
+    return found
+
+
+# ── Directory Enumeration (Scilla-inspired) ────────────────────────────────────
+
+# Common web paths — mirrors Scilla's built-in dir list
+DIR_WORDLIST = [
+    "/", "/admin", "/admin/", "/administrator", "/administrator/",
+    "/login", "/login/", "/signin", "/wp-admin", "/wp-admin/",
+    "/wp-login.php", "/wp-content/", "/wp-includes/",
+    "/api", "/api/", "/api/v1", "/api/v2", "/api/v3",
+    "/api/swagger", "/api/docs", "/swagger", "/swagger-ui.html",
+    "/openapi.json", "/graphql",
+    "/dashboard", "/dashboard/", "/portal", "/panel",
+    "/phpmyadmin", "/phpmyadmin/", "/pma", "/myadmin",
+    "/cpanel", "/webmail", "/roundcube",
+    "/backup", "/backup/", "/backups",
+    "/.env", "/.git", "/.git/config", "/.git/HEAD",
+    "/.htaccess", "/web.config", "/robots.txt", "/sitemap.xml",
+    "/server-status", "/server-info",
+    "/status", "/health", "/healthz", "/ping",
+    "/metrics", "/actuator", "/actuator/health",
+    "/console", "/h2-console",
+    "/uploads", "/upload", "/files", "/static", "/assets",
+    "/images", "/img", "/media",
+    "/config", "/config.php", "/configuration.php",
+    "/install", "/install.php", "/setup", "/setup.php",
+    "/test", "/test.php", "/info.php", "/phpinfo.php",
+    "/shell.php", "/cmd.php",
+    "/old", "/old/", "/legacy", "/bak",
+    "/cgi-bin", "/cgi-bin/",
+    "/js", "/css",
+    "/logout", "/signout",
+    "/register", "/signup",
+    "/forgot", "/reset",
+    "/search",
+    "/404", "/500",
+]
+
+HTTP_TIMEOUT = 5
+
+
+def enumerate_directories(
+    target: str,
+    paths: list[str] = None,
+    max_workers: int = 20,
+    follow_redirects: bool = False,
+) -> list[dict]:
+    """
+    Actively probe HTTP/HTTPS for each path in the wordlist.
+    target: hostname or IP (no protocol prefix)
+    Returns list of {path, url, status_code, content_length, redirect_to}
+    for any path that returns a non-404 response.
+    """
+    if paths is None:
+        paths = DIR_WORDLIST
+
+    results = []
+    protocols = ["https", "http"]
+
+    # First figure out which protocol is reachable
+    base_url = None
+    for proto in protocols:
+        try:
+            r = requests.head(
+                f"{proto}://{target}/",
+                timeout=HTTP_TIMEOUT,
+                allow_redirects=True,
+                headers={"User-Agent": "Mozilla/5.0 (compatible; OSINTPH-DirScan/1.0)"},
+                verify=False,
+            )
+            base_url = f"{proto}://{target}"
+            break
+        except Exception:
+            continue
+
+    if not base_url:
+        logger.debug(f"Dir enum: {target} unreachable on HTTP/HTTPS")
+        return []
+
+    def probe(path: str) -> Optional[dict]:
+        url = base_url + path
+        try:
+            r = requests.get(
+                url,
+                timeout=HTTP_TIMEOUT,
+                allow_redirects=follow_redirects,
+                headers={"User-Agent": "Mozilla/5.0 (compatible; OSINTPH-DirScan/1.0)"},
+                verify=False,
+                stream=True,
+            )
+            # Skip boring 404s and common irrelevant codes
+            if r.status_code in (404, 410):
+                return None
+            content_length = r.headers.get("content-length", "")
+            redirect_to = r.headers.get("location", "") if r.status_code in (301, 302, 307, 308) else ""
+            r.close()
+            return {
+                "path": path,
+                "url": url,
+                "status_code": r.status_code,
+                "content_length": content_length,
+                "redirect_to": redirect_to,
+            }
+        except Exception:
+            return None
+
+    with ThreadPoolExecutor(max_workers=max_workers) as ex:
+        futures = {ex.submit(probe, p): p for p in paths}
+        for future in as_completed(futures):
+            result = future.result()
+            if result:
+                results.append(result)
+
+    results.sort(key=lambda x: x["status_code"])
+    logger.info(f"Dir enum on {target}: {len(results)} non-404 paths found")
+    return results
+
+
+def run_port_and_dir_scan(domain: str, ips: list[str]) -> dict:
+    """
+    Run port scan + directory enumeration for a domain and its resolved IPs.
+    Called separately from run_dns_recon (on-demand from the dashboard).
+    Returns {port_scan: {ip: [results]}, dir_enum: {target: [results]}}
+    """
+    result = {
+        "domain": domain,
+        "started_at": datetime.utcnow().isoformat(),
+        "port_scan": {},
+        "dir_enum": {},
+        "errors": [],
+    }
+
+    # Port scan all resolved IPs
+    if ips:
+        logger.info(f"Port scanning {len(ips)} IPs for {domain}")
+        result["port_scan"] = scan_ports_multi(ips)
+
+    # Dir enum against domain + first IP
+    targets = [domain] + ips[:2]
+    for target in targets:
+        try:
+            logger.info(f"Directory enumeration on {target}")
+            result["dir_enum"][target] = enumerate_directories(target)
+        except Exception as e:
+            result["errors"].append(f"Dir enum {target}: {e}")
+
+    result["completed_at"] = datetime.utcnow().isoformat()
+    return result
+
+
+# ── HTTP Service / Banner Probe ────────────────────────────────────────────────
+
+HTTP_BANNER_TIMEOUT = 5
+HTTP_BANNER_HEADERS = {"User-Agent": "Mozilla/5.0 (compatible; OSINTPH-Recon/1.0)"}
+
+
+def probe_service(fqdn: str) -> Optional[dict]:
+    """
+    Probe a single hostname over HTTPS then HTTP.
+    Returns {host, url, status_code, server, title, tech, redirect_to} or None.
+    """
+    for proto in ("https", "http"):
+        url = f"{proto}://{fqdn}"
+        try:
+            resp = requests.get(
+                url,
+                timeout=HTTP_BANNER_TIMEOUT,
+                headers=HTTP_BANNER_HEADERS,
+                verify=False,
+                allow_redirects=True,
+                stream=True,
+            )
+            # Grab first 4KB for title extraction
+            chunk = b""
+            for part in resp.iter_content(4096):
+                chunk += part
+                break
+            resp.close()
+
+            server = resp.headers.get("server") or resp.headers.get("x-powered-by") or ""
+            # Normalise: strip version noise e.g. "nginx/1.18.0" -> "nginx"
+            server_clean = server.split("/")[0].strip().lower() if server else ""
+
+            # Extract <title>
+            title = ""
+            try:
+                decoded = chunk.decode("utf-8", errors="ignore")
+                import re as _re
+                m = _re.search(r"<title[^>]*>(.*?)</title>", decoded, _re.IGNORECASE | _re.DOTALL)
+                if m:
+                    title = " ".join(m.group(1).strip().split())[:80]
+            except Exception:
+                pass
+
+            # Detect tech stack from headers
+            tech = []
+            h = {k.lower(): v.lower() for k, v in resp.headers.items()}
+            if "cloudflare" in h.get("server", "") or "cf-ray" in h:
+                tech.append("Cloudflare")
+            if "x-powered-by" in h:
+                tech.append(h["x-powered-by"].split("/")[0].title()[:20])
+            if "x-aspnet-version" in h or "x-aspnetmvc-version" in h:
+                tech.append("ASP.NET")
+            if "x-wp-total" in h or "x-pingback" in h:
+                tech.append("WordPress")
+            if resp.headers.get("x-amz-cf-id") or resp.headers.get("x-amz-request-id"):
+                tech.append("AWS")
+            if "awselb" in server.lower() or "awsalb" in server.lower():
+                tech.append("AWS ELB")
+
+            final_url = resp.url
+            redirect_to = str(final_url) if str(final_url) != url else ""
+
+            return {
+                "host": fqdn,
+                "url": url,
+                "final_url": final_url,
+                "status_code": resp.status_code,
+                "server": server_clean or "unknown",
+                "server_raw": server,
+                "title": title,
+                "tech": tech,
+                "redirect_to": redirect_to,
+                "proto": proto,
+            }
+        except Exception:
+            continue
+    return None
+
+
+def probe_services(hosts: list[str], max_workers: int = 20) -> dict[str, dict]:
+    """
+    Probe a list of hostnames in parallel.
+    Returns dict of host -> probe result.
+    """
+    results = {}
+    with ThreadPoolExecutor(max_workers=max_workers) as ex:
+        futures = {ex.submit(probe_service, h): h for h in hosts}
+        for future in as_completed(futures):
+            try:
+                r = future.result()
+                if r:
+                    results[r["host"]] = r
+            except Exception as e:
+                logger.debug(f"Service probe error: {e}")
+    logger.info(f"Service probe complete: {len(results)}/{len(hosts)} hosts responded")
+    return results
