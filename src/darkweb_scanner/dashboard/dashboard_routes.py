@@ -2380,10 +2380,10 @@ def api_dns_pdf(inv_id: int):
 
     doc.build(story, onFirstPage=dark_page, onLaterPages=dark_page)
     buf.seek(0)
-    filename = f"osintph-dns-{domain}-{dt.utcnow().strftime('%Y%m%d')}.pdf"
     return Response(
         buf.read(),
         mimetype="application/pdf",
+        headers={"Content-Disposition": f"attachment; filename=osintph-dns-{domain}-{dt.utcnow().strftime('%Y%m%d')}.pdf"},
     )
 
 
@@ -2664,4 +2664,4 @@ def api_paste_scan():
 
 @dashboard_bp.route("/api/health")
 def health():
-    return jsonify({"status": "ok", "timestamp": datetime.utcnow().isoformat()})  
+    return jsonify({"status": "ok", "timestamp": datetime.utcnow().isoformat()})
