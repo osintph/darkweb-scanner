@@ -704,7 +704,7 @@ def enumerate_directories(
     base_url = None
     for proto in protocols:
         try:
-            r = requests.head(
+            requests.head(
                 f"{proto}://{target}/",
                 timeout=HTTP_TIMEOUT,
                 allow_redirects=True,

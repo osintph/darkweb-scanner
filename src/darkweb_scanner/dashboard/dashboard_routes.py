@@ -1115,6 +1115,12 @@ def api_report_pdf():
             ParagraphStyle("Footer", parent=s_small, textColor=colors.HexColor("#8b949e"), fontSize=7),
         ))
 
+        def dark_page(canvas, doc):
+            canvas.saveState()
+            canvas.setFillColor(colors.HexColor("#0d1117"))
+            canvas.rect(0, 0, A4[0], A4[1], fill=1, stroke=0)
+            canvas.restoreState()
+
         doc.build(story, onFirstPage=dark_page, onLaterPages=dark_page)
         buf.seek(0)
 
@@ -1717,7 +1723,6 @@ def api_dns_pdf(inv_id: int):
     ptr = r.get("ptr_records", {})
     port_scan = r.get("port_scan", {})
     dir_enum = r.get("dir_enum", {})
-    services = r.get("services", {})
     zt_success = any(v.get("success") for v in zt.values() if isinstance(v, dict))
     main_ips = dns.get("A", []) + dns.get("AAAA", [])
 
@@ -1731,8 +1736,6 @@ def api_dns_pdf(inv_id: int):
     C_RED     = colors.HexColor("#f85149")
     C_GREEN   = colors.HexColor("#3fb950")
     C_YELLOW  = colors.HexColor("#d29922")
-    C_PURPLE  = colors.HexColor("#bc8cff")
-    C_WHITE   = colors.white
 
     buf = BytesIO()
     W, H = A4
@@ -1753,14 +1756,10 @@ def api_dns_pdf(inv_id: int):
         return ParagraphStyle(name, parent=styles["Normal"], **kw)
 
     s_h1    = S("h1",    fontSize=22, fontName="Helvetica-Bold",   textColor=C_TEXT,   leading=26, spaceAfter=2)
-    s_h2    = S("h2",    fontSize=13, fontName="Helvetica-Bold",   textColor=C_TEXT,   leading=17, spaceBefore=12, spaceAfter=4)
-    s_h3    = S("h3",    fontSize=9,  fontName="Helvetica-Bold",   textColor=C_ACCENT, leading=13, spaceBefore=6, spaceAfter=2)
     s_body  = S("body",  fontSize=8,  textColor=C_TEXT,   leading=12)
     s_small = S("small", fontSize=7,  textColor=C_MUTED,  leading=10)
     s_mono  = S("mono",  fontSize=7,  fontName="Courier", textColor=C_ACCENT, leading=10, wordWrap="CJK")
     s_warn  = S("warn",  fontSize=8,  fontName="Helvetica-Bold", textColor=C_RED, leading=12)
-    s_ok    = S("ok",    fontSize=8,  fontName="Helvetica-Bold", textColor=C_GREEN, leading=12)
-    s_tag   = S("tag",   fontSize=7,  fontName="Helvetica-Bold", textColor=C_TEXT, leading=10)
     s_foot  = S("foot",  fontSize=6.5, textColor=C_MUTED, leading=10)
 
     story = []
@@ -1809,7 +1808,6 @@ def api_dns_pdf(inv_id: int):
     asn_counter = Counter()
     org_counter = Counter()
     country_counter = Counter()
-    all_geo = list(ip_geo.values())
     for sub in resolved:
         for g in (sub.get("geo") or []):
             if g and g.get("as"):
@@ -2666,4 +2664,4 @@ def api_paste_scan():
 
 @dashboard_bp.route("/api/health")
 def health():
-    return jsonify({"status": "ok", "timestamp": datetime.utcnow().isoformat()})
+    return jsonify({"status": "ok", "timestamp": datetime.utcnow().isoformat()})  
