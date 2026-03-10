@@ -2,7 +2,7 @@
 
 A self-hosted, open-source threat intelligence platform built for the Philippine and Southeast Asian security landscape. Crawls .onion networks, monitors Telegram channels, tracks ransomware groups, profiles threat actors, and delivers a daily intelligence digest — all from a single Docker deployment.
 
-**License: AGPL v3**
+**Version: 1.0.0 · License: AGPL v3**
 
 ---
 
@@ -32,8 +32,9 @@ DOMAIN=scanner.yourdomain.com SSL_EMAIL=you@example.com \
 - **Telegram Scraper** — monitors public Telegram channels for keyword hits using the same engine as the crawler
 - **Projects** — scoped monitoring engagements with per-project keywords, target domains, entities, and hit tracking
 - **IP Investigation** — parallel AbuseIPDB + VirusTotal lookups with geolocation, ASN, and history
-- **Infrastructure Recon** — DNSDumpster-style overview (server map, ASN/hosting breakdown, live HTTP service banners and tech fingerprinting), full passive + active DNS recon, active subdomain brute-force (100-entry wordlist), TCP port scanning across 30 common services, live HTTP/HTTPS directory enumeration (70-path wordlist), certificate transparency, zone transfer attempts, SPF/DMARC/DKIM email security scoring, interactive subdomain node graph, and per-IP port heatmap — all from the dashboard
-- **Web Check** — on-demand OSINT analysis for any domain: SSL, headers, open ports, tech stack, WHOIS, and more — available at `webcheck.osintph.info`
+- **Infrastructure Recon** — full passive + active DNS recon with DNSDumpster enrichment, active subdomain brute-force, TCP port scanning across 30 services, HTTP directory enumeration, certificate transparency history, zone transfer attempts, SPF/DMARC/DKIM email security scoring, interactive subdomain node graph, per-IP port heatmap, and PDF export with world map
+- **OSINT Toolkit** — seven proxied OSINT tools (Shodan, Censys, GreyNoise, URLScan, MXToolbox, SecurityTrails, VirusTotal) accessible directly from the dashboard
+- **Web Check** — on-demand OSINT analysis for any domain: SSL, headers, open ports, tech stack, WHOIS, and more
 - **Ransomware Tracker** — live tracking of active ransomware groups with SEA/PH regional focus
 - **Threat Actor Profiles** — structured APT and cybercriminal profiles relevant to Southeast Asia
 - **Daily Digest** — morning email with CISA KEV, OTX pulses, abuse.ch feeds, and curated RSS — delivered via Mailgun
@@ -47,7 +48,7 @@ DOMAIN=scanner.yourdomain.com SSL_EMAIL=you@example.com \
 ### Requirements
 
 - Fresh Linux server (Ubuntu 22.04/24.04 recommended)
-- 1GB RAM minimum, 2GB recommended
+- 2GB RAM minimum (Chromium for PDF map rendering requires headroom)
 - Ports 80 and 443 open
 - A domain name (optional but recommended for trusted SSL)
 
@@ -111,6 +112,7 @@ All configuration lives in `.env`. **Never commit this file.**
 | `OTX_API_KEY` | AlienVault OTX — free at otx.alienvault.com |
 | `ABUSEIPDB_API_KEY` | AbuseIPDB — free tier: 1,000 checks/day |
 | `VIRUSTOTAL_API_KEY` | VirusTotal — free tier: 4 req/min |
+| `DNSDUMPSTER_API_KEY` | DNSDumpster — for Infrastructure Recon enrichment |
 
 ### Daily digest (Mailgun)
 
@@ -137,15 +139,13 @@ The **Channel Monitor** tab lets you scrape any public Telegram channel on deman
 
 ### Setup
 
-Add the following to your `.env` (same credentials used by the existing Telegram scraper):
+Add the following to your `.env`:
 
 ```env
 TELEGRAM_API_ID=12345678
 TELEGRAM_API_HASH=abcdef1234567890abcdef1234567890
 TELEGRAM_PHONE=+639XXXXXXXXX
 ```
-
-`TELEGRAM_PHONE` is the only new variable — your phone number with country code (e.g. `+63` for Philippines).
 
 ### First-time authentication
 
@@ -168,57 +168,7 @@ asyncio.run(auth())
 "
 ```
 
-Enter the OTP sent to your Telegram app when prompted. The session is saved to `/app/data/channel_monitor/channel_monitor.session` and persists across restarts — you only need to do this once.
-
-### Using the tab
-
-1. Click **📡 Channel Monitor** in the nav bar
-2. Enter a channel username (e.g. `irna_1931`), invite link, or `@handle`
-3. Configure options:
-   - **Message Limit** — how many messages to fetch (0 = all)
-   - **Last N Days** — only fetch messages from the last N days
-   - **Force Source Language** — override auto-detection (useful for mixed-language channels)
-   - **Max Video Size** — skip videos larger than this (MB). Set to 0 to skip all videos
-   - **Min Free Disk** — abort if server disk drops below this threshold (GB)
-   - **Skip English translation** — skip the translation step if message is already in English
-4. Click **▶ Start Scan** — output streams live in the console panel
-5. When complete, click **⬇ Download ZIP** to get:
-   - `messages.html` — full rendered report with original text, English translations, and inline media
-   - `messages.json` — raw structured data
-   - `media/` — all downloaded photos and videos
-
-### Notes
-
-- Only **public** channels are supported
-- The scan runs in a background thread — you can navigate away and come back
-- Job history is kept in memory for the current server session; it resets on container restart
-- Output files are stored under `/app/data/channel_monitor/{job_id}/` on the server
-
-### Dependencies
-
-The Channel Monitor requires two additional Python packages (already added to `pyproject.toml`):
-
-```
-deep-translator>=1.11
-langdetect>=1.0
-```
-
-After copying the updated files, rebuild the container to install them:
-
-```bash
-cd ~/darkweb-scanner
-docker compose build --no-cache dashboard
-docker compose up -d
-```
-
-### Alerting
-
-| Variable | Description |
-|----------|-------------|
-| `ALERT_WEBHOOK_URL` | Slack or Discord webhook URL |
-| `SMTP_HOST` / `SMTP_PORT` | SMTP server for email alerts |
-| `SMTP_USER` / `SMTP_PASSWORD` | SMTP credentials |
-| `ALERT_EMAIL_FROM` / `ALERT_EMAIL_TO` | Alert email addresses |
+Enter the OTP sent to your Telegram app when prompted. The session persists across restarts — you only need to do this once.
 
 ---
 
@@ -299,9 +249,3 @@ Pull requests are welcome. If you're a Philippine or Southeast Asian security re
 Issues and feature requests: https://github.com/osintph/darkweb-scanner/issues
 
 OSINT PH: https://www.osintph.info
-
-### v0.9.1
-- Project dropdown in Keyword Generator now populates correctly on tab load
-
-### v1.0.0
-- Infrastructure Recon: active subdomain brute-force, TCP port scanning, and directory enumeration added to DNS tab

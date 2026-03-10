@@ -1680,6 +1680,259 @@ def api_dns_delete(inv_id: int):
     return jsonify({"ok": True})
 
 
+@dashboard_bp.route("/api/dns/investigations/<int:inv_id>/enrich", methods=["POST"])
+@require_login
+def api_dns_enrich(inv_id: int):
+    """
+    Fetch DNSDumpster data for this investigation and merge it into the stored result.
+    Deduplicates subdomains and adds dnsdumpster_data to the result JSON.
+    Requires DNSDUMPSTER_API_KEY env var.
+    """
+    import json as _json
+    import re as _re
+
+    storage = get_storage()
+    inv = storage.get_dns_investigation(inv_id)
+    if not inv:
+        return jsonify({"error": "not found"}), 404
+
+    api_key = os.getenv("DNSDUMPSTER_API_KEY", "").strip()
+    if not api_key:
+        return jsonify({"error": "DNSDUMPSTER_API_KEY not configured"}), 500
+
+    domain = inv["domain"]
+
+    # ── Call DNSDumpster API ──────────────────────────────────────────────────
+    status, body = _fetch_url(
+        f"https://api.dnsdumpster.com/domain/{domain}",
+        headers={
+            "X-API-Key": api_key,
+            "Accept": "application/json",
+            "User-Agent": "OSINTPH-DNSCrawler/1.0",
+        },
+        timeout=20,
+    )
+
+    if status != 200:
+        return jsonify({"error": f"DNSDumpster API returned {status}", "body": body[:200].decode("utf-8", errors="replace")}), 502
+
+    try:
+        dd_data = _json.loads(body)
+    except Exception as e:
+        return jsonify({"error": f"Failed to parse DNSDumpster response: {e}"}), 502
+
+    # ── Merge into existing result ────────────────────────────────────────────
+    result = inv.get("result", {})
+
+    # Store raw DNSDumpster data
+    result["dnsdumpster"] = dd_data
+
+    # Extract subdomains from DNS Dumpster response
+    # Their API returns: {dns_records: {host: [{host, ips, ttl, ...}]}, ...}
+    dd_new_subs = set()
+    dd_host_map = {}  # fqdn -> {ips, asn, country, ...}
+
+    for rtype in ("a", "aaaa", "mx", "ns", "txt"):
+        for rec in dd_data.get("dns_records", {}).get(rtype, []):
+            host = rec.get("host", "").strip().lower().rstrip(".")
+            if not host:
+                continue
+            if host.endswith(f".{domain}") or host == domain:
+                dd_new_subs.add(host)
+                dd_host_map[host] = {
+                    "ips": [ip.get("address", ip) if isinstance(ip, dict) else ip
+                            for ip in rec.get("ips", [])],
+                    "asn": rec.get("asn", ""),
+                    "country": rec.get("country", ""),
+                    "reverse_dns": rec.get("reverse_dns", ""),
+                }
+
+    # Also pull from "hosts" key if present
+    for rec in dd_data.get("hosts", []):
+        host = rec.get("domain", "").strip().lower().rstrip(".")
+        if host and (host.endswith(f".{domain}") or host == domain):
+            dd_new_subs.add(host)
+            dd_host_map.setdefault(host, {
+                "ips": [ip.get("address", ip) if isinstance(ip, dict) else ip
+                        for ip in rec.get("ips", [])],
+                "asn": rec.get("asn", ""),
+                "country": rec.get("country", ""),
+            })
+
+    # Merge into subdomains_resolved — deduplicate by subdomain name
+    existing_subs = {s["subdomain"]: s for s in result.get("subdomains_resolved", [])}
+    dd_count_new = 0
+    for fqdn, info in dd_host_map.items():
+        if fqdn not in existing_subs:
+            existing_subs[fqdn] = {
+                "subdomain": fqdn,
+                "ips": info["ips"],
+                "geo": [],
+                "source": "dnsdumpster",
+            }
+            dd_count_new += 1
+        else:
+            # Tag existing entry as also seen by DNSDumpster
+            existing_subs[fqdn]["source"] = existing_subs[fqdn].get("source", "passive") + "+dnsdumpster"
+            # Merge any new IPs
+            existing_ips = set(existing_subs[fqdn].get("ips", []))
+            for ip in info["ips"]:
+                if ip and ip not in existing_ips:
+                    existing_subs[fqdn]["ips"].append(ip)
+
+    result["subdomains_resolved"] = list(existing_subs.values())
+    result["subdomain_count"] = len(existing_subs)
+    result["resolved_count"] = len(result["subdomains_resolved"])
+    result["dnsdumpster_enriched"] = True
+    result["dnsdumpster_new_subs"] = dd_count_new
+
+    # Persist updated result
+    with storage.get_session() as db_session:
+        from ..storage import DNSInvestigation
+        row = db_session.get(DNSInvestigation, inv_id)
+        if row:
+            row.result_json = _json.dumps(result)
+            row.subdomain_count = result["subdomain_count"]
+            row.resolved_count = result["resolved_count"]
+            db_session.commit()
+
+    return jsonify({
+        "ok": True,
+        "new_subdomains": dd_count_new,
+        "total_subdomains": result["subdomain_count"],
+        "dnsdumpster_data": dd_data,
+    })
+
+
+@dashboard_bp.route("/api/dns/certs/<path:domain>", methods=["GET"], strict_slashes=False)
+@require_login
+def api_dns_certs(domain: str):
+    """
+    Fetch full certificate transparency history from crt.sh for a domain.
+    Returns rich cert data: issuer, validity, SANs, grouped by cert.
+    """
+    import json as _json
+    import requests as _requests
+
+    domain = domain.strip().lower().split("/")[0]
+
+    # Query crt.sh — use the deduplicated JSON endpoint
+    try:
+        resp = _requests.get(
+            f"https://crt.sh/?q=%.{domain}&output=json",
+            headers={"User-Agent": "OSINTPH-DNSCrawler/1.0", "Accept": "application/json"},
+            timeout=30,
+            verify=False,
+        )
+    except _requests.exceptions.Timeout:
+        return jsonify({"error": "crt.sh timed out — try again in a moment"}), 502
+    except Exception as e:
+        return jsonify({"error": f"crt.sh connection failed: {str(e)}"}), 502
+
+    if resp.status_code != 200:
+        return jsonify({"error": f"crt.sh returned HTTP {resp.status_code}"}), 502
+
+    try:
+        raw = resp.json()
+    except Exception:
+        preview = resp.text[:120]
+        return jsonify({"error": f"crt.sh returned non-JSON: {preview}"}), 502
+
+    from datetime import datetime as dt
+    now = dt.utcnow()
+
+    certs = []
+    seen_ids = set()
+
+    for entry in raw:
+        cid = entry.get("id")
+        if cid in seen_ids:
+            continue
+        seen_ids.add(cid)
+
+        # Parse dates — crt.sh uses both "2024-01-01T00:00:00" and "2024-01-01" formats
+        not_before_str = entry.get("not_before", "")
+        not_after_str = entry.get("not_after", "")
+        not_before = None
+        not_after = None
+        for fmt in ("%Y-%m-%dT%H:%M:%S", "%Y-%m-%d"):
+            try:
+                not_before = dt.strptime(not_before_str[:19], fmt[:len(not_before_str[:19])])
+                break
+            except Exception:
+                pass
+        for fmt in ("%Y-%m-%dT%H:%M:%S", "%Y-%m-%d"):
+            try:
+                not_after = dt.strptime(not_after_str[:19], fmt[:len(not_after_str[:19])])
+                break
+            except Exception:
+                pass
+
+        is_expired = (not_after < now) if not_after else False
+        days_remaining = (not_after - now).days if (not_after and not is_expired) else None
+        expiring_soon = days_remaining is not None and days_remaining <= 30
+
+        # SANs from name_value
+        sans = sorted(set(
+            n.strip().lower()
+            for n in entry.get("name_value", "").split("\n")
+            if n.strip()
+        ))
+
+        # Issuer parsing
+        issuer_raw = entry.get("issuer_name", "")
+        issuer_cn = ""
+        issuer_org = ""
+        for part in issuer_raw.split(","):
+            part = part.strip()
+            if part.startswith("CN="):
+                issuer_cn = part[3:].strip()
+            elif part.startswith("O="):
+                issuer_org = part[2:].strip()
+
+        certs.append({
+            "id": cid,
+            "serial": entry.get("serial_number", ""),
+            "issuer_cn": issuer_cn,
+            "issuer_org": issuer_org,
+            "issuer_raw": issuer_raw,
+            "not_before": not_before_str,
+            "not_after": not_after_str,
+            "not_before_ts": int(not_before.timestamp()) if not_before else 0,
+            "not_after_ts": int(not_after.timestamp()) if not_after else 0,
+            "is_expired": is_expired,
+            "expiring_soon": expiring_soon,
+            "days_remaining": days_remaining,
+            "sans": sans,
+            "san_count": len(sans),
+        })
+
+    # Sort newest first
+    certs.sort(key=lambda c: c.get("not_before_ts", 0), reverse=True)
+
+    # Build summary stats
+    total = len(certs)
+    expired = sum(1 for c in certs if c["is_expired"])
+    expiring_soon_count = sum(1 for c in certs if c.get("expiring_soon"))
+    all_sans = sorted(set(s for c in certs for s in c["sans"]))
+
+    # Issuer breakdown
+    from collections import Counter
+    issuer_counts = Counter(c["issuer_org"] or c["issuer_cn"] for c in certs)
+
+    return jsonify({
+        "domain": domain,
+        "total": total,
+        "expired": expired,
+        "expiring_soon": expiring_soon_count,
+        "active": total - expired,
+        "unique_sans": len(all_sans),
+        "all_sans": all_sans,
+        "issuers": dict(issuer_counts.most_common(10)),
+        "certs": certs,
+    })
+
+
 @dashboard_bp.route("/api/dns/investigations/<int:inv_id>/pdf", methods=["GET"])
 @require_login
 def api_dns_pdf(inv_id: int):
@@ -1808,6 +2061,8 @@ def api_dns_pdf(inv_id: int):
     asn_counter = Counter()
     org_counter = Counter()
     country_counter = Counter()
+    cc_counter = Counter()   # ISO 2-letter codes for map
+    cc_names   = {}          # cc -> full country name
     for sub in resolved:
         for g in (sub.get("geo") or []):
             if g and g.get("as"):
@@ -1816,6 +2071,10 @@ def api_dns_pdf(inv_id: int):
                 org_counter[g["org"]] += 1
             if g and g.get("country"):
                 country_counter[g["country"]] += 1
+            if g and g.get("countryCode"):
+                cc = g["countryCode"].upper()
+                cc_counter[cc] += 1
+                cc_names[cc] = g.get("country", cc)
 
     # ── matplotlib helpers ────────────────────────────────────────────────────
 
@@ -1904,6 +2163,174 @@ def api_dns_pdf(inv_id: int):
         ax.set_aspect("equal")
         ax.margins(0.15)
         return fig_to_image(fig, width_mm=175)
+
+    # ── GRAPH: world map via Playwright + jsvectormap ────────────────────────
+    def build_world_map():
+        """Screenshot the real jsvectormap using Playwright — same map as the dashboard."""
+        import json as _json
+        from io import BytesIO as _BytesIO
+        from reportlab.lib.utils import ImageReader as _IR
+
+        if not cc_counter:
+            return None
+
+        centroids_pw = {
+            'US':[38,-97],'CA':[56,-96],'MX':[23,-102],'BR':[-10,-55],'AR':[-34,-64],
+            'CO':[4,-74],'CL':[-30,-71],'PE':[-10,-76],'VE':[8,-66],
+            'GB':[54,-3],'IE':[53,-8],'FR':[46,2],'DE':[51,10],'NL':[52,5],
+            'BE':[50,4],'ES':[40,-4],'PT':[39,-8],'IT':[42,12],'CH':[47,8],
+            'AT':[47,14],'PL':[52,20],'CZ':[50,15],'HU':[47,19],'RO':[46,25],
+            'BG':[43,25],'GR':[39,22],'HR':[45,16],'UA':[49,32],'SE':[62,15],
+            'NO':[62,10],'FI':[64,26],'DK':[56,10],'BY':[53,28],'RS':[44,21],
+            'RU':[62,105],'TR':[39,35],'IL':[31,35],'SA':[24,45],'AE':[24,54],
+            'IR':[32,53],'IQ':[33,44],'EG':[27,30],'LY':[27,17],'DZ':[28,3],
+            'MA':[32,-6],'NG':[10,8],'KE':[-1,38],'ZA':[-29,25],'ET':[9,40],
+            'GH':[8,-1],'TZ':[-6,35],'AO':[-12,18],'CM':[4,12],'CD':[-4,24],
+            'IN':[21,78],'PK':[30,70],'BD':[24,90],'LK':[7,81],'NP':[28,84],
+            'CN':[35,105],'JP':[36,138],'KR':[36,128],'TW':[23,121],'HK':[22,114],
+            'SG':[1,104],'MY':[4,110],'TH':[15,101],'VN':[16,108],'PH':[12,122],
+            'ID':[-5,120],'MM':[17,96],'KH':[13,105],'KZ':[48,68],
+            'AU':[-25,134],'NZ':[-41,174],
+        }
+
+        regions = list(cc_counter.keys())
+        markers = [
+            {'coords': centroids_pw[cc], 'name': f"{cc_names.get(cc,cc)} ({cnt} IPs)"}
+            for cc, cnt in cc_counter.items() if cc in centroids_pw
+        ]
+
+        html = f"""<!DOCTYPE html><html><head><meta charset="utf-8">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/jsvectormap@1.5.3/dist/css/jsvectormap.min.css"/>
+<style>
+*{{margin:0;padding:0;box-sizing:border-box}}
+body{{background:#0d1117}}
+#map{{width:900px;height:240px;background:#0d1117}}
+.jvm-tooltip{{background:#1c2d3a!important;color:#e6edf3!important;border:1px solid #30363d!important;font-size:11px!important;border-radius:4px!important;padding:4px 8px!important}}
+</style></head><body>
+<div id="map"></div>
+<script src="https://cdn.jsdelivr.net/npm/jsvectormap@1.5.3/dist/js/jsvectormap.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jsvectormap@1.5.3/dist/maps/world.js"></script>
+<script>
+window._ready = false;
+try {{
+  new jsVectorMap({{
+    map:'world', selector:'#map',
+    zoomButtons:false, zoomOnScroll:false, draggable:false,
+    selectedRegions:{_json.dumps(regions)},
+    markers:{_json.dumps(markers)},
+    regionStyle:{{
+      initial:{{fill:'#1c2d3a',stroke:'#2d4a5e',strokeWidth:0.5}},
+      selected:{{fill:'#1d3a5e'}},
+    }},
+    markerStyle:{{
+      initial:{{fill:'#58a6ff',stroke:'#79c0ff',strokeWidth:1.5,r:5}},
+      selected:{{fill:'#58a6ff'}},
+    }},
+    backgroundColor:'#0d1117',
+  }});
+}} catch(e){{console.error(e)}}
+window._ready = true;
+</script></body></html>"""
+
+        try:
+            from playwright.sync_api import sync_playwright as _swp
+            import tempfile as _tmp, os as _os
+            with _swp() as _p:
+                _browser = _p.chromium.launch(headless=True)
+                _page = _browser.new_page(viewport={'width': 900, 'height': 240})
+                # Write to a temp file so Playwright can load it as a proper page
+                # (set_content doesn't fire network requests for external scripts)
+                _tf = _tmp.NamedTemporaryFile(suffix='.html', delete=False, mode='w')
+                _tf.write(html)
+                _tf.close()
+                _page.goto(f"file://{_tf.name}", wait_until='networkidle', timeout=20000)
+                _page.wait_for_timeout(800)
+                # Get the actual SVG element bounds inside the map div and crop to it
+                _svg_box = _page.evaluate("""() => {
+                    const svg = document.querySelector('#map svg');
+                    if (!svg) return null;
+                    const r = svg.getBoundingClientRect();
+                    return {x: r.left, y: r.top, width: r.width, height: r.height};
+                }""")
+                if _svg_box and _svg_box['height'] > 20:
+                    _png = _page.screenshot(clip=_svg_box)
+                else:
+                    _png = _page.locator('#map').screenshot()
+                _browser.close()
+                _os.unlink(_tf.name)
+
+            if len(_png) < 5000:
+                return None
+
+            _buf = _BytesIO(_png)
+            _ir = _IR(_buf)
+            _iw, _ih = _ir.getSize()
+            _w = 175 * mm
+            _h = _w * (_ih / _iw)
+            # Cap height so it always fits on page 1 alongside the ASN table
+            _max_h = 70 * mm
+            if _h > _max_h:
+                _w = _max_h * (_iw / _ih)
+                _h = _max_h
+            return Image(_buf, width=_w, height=_h)
+        except Exception as _e:
+            return None
+
+    # ── CERT: issuer bar chart ─────────────────────────────────────────────────
+    def build_cert_issuer_chart(cert_data):
+        issuers = cert_data.get("issuers", {})
+        if not issuers:
+            return None
+        top = sorted(issuers.items(), key=lambda x: x[1], reverse=True)[:8]
+        labels = [l[:28] for l, _ in top]
+        vals = [v for _, v in top]
+        palette = ["#58a6ff","#3fb950","#bc8cff","#f85149","#d29922","#8b949e","#79c0ff","#56d364"]
+        fig, ax = plt.subplots(figsize=(5.5, 2.6))
+        fig.patch.set_facecolor("#161b22")
+        ax.set_facecolor("#0d1117")
+        bars = ax.barh(labels[::-1], vals[::-1],
+                       color=[palette[i % len(palette)] for i in range(len(labels)-1,-1,-1)],
+                       height=0.55)
+        for bar, val in zip(bars, vals[::-1]):
+            ax.text(bar.get_width() + 0.1, bar.get_y() + bar.get_height()/2,
+                    str(val), va="center", ha="left", color="#e6edf3", fontsize=7)
+        ax.set_xlabel("Certs issued", color="#8b949e", fontsize=7)
+        ax.tick_params(colors="#8b949e", labelsize=6.5)
+        ax.spines[:].set_color("#30363d")
+        ax.set_title("Certificate Issuers", color="#e6edf3", fontsize=8,
+                     fontweight="bold", pad=6)
+        fig.tight_layout()
+        return fig_to_image(fig, width_mm=88)
+
+    # ── CERT: issuance timeline chart ─────────────────────────────────────────
+    def build_cert_timeline_chart(cert_data):
+        certs = cert_data.get("certs", [])
+        if not certs:
+            return None
+        by_year = {}
+        for c in certs:
+            yr = (c.get("not_before") or "")[:4]
+            if yr and yr.isdigit():
+                by_year[yr] = by_year.get(yr, 0) + 1
+        if len(by_year) < 2:
+            return None
+        years = sorted(by_year.keys())
+        vals = [by_year[y] for y in years]
+        palette = ["#3fb950" if y == max(years) else "#58a6ff" for y in years]
+        fig, ax = plt.subplots(figsize=(5, 2.6))
+        fig.patch.set_facecolor("#161b22")
+        ax.set_facecolor("#0d1117")
+        bars = ax.bar(years, vals, color=palette, width=0.6)
+        for bar, val in zip(bars, vals):
+            ax.text(bar.get_x() + bar.get_width()/2, bar.get_height() + 0.1,
+                    str(val), ha="center", va="bottom", color="#e6edf3", fontsize=6.5)
+        ax.tick_params(colors="#8b949e", labelsize=6.5, axis="x", rotation=30)
+        ax.tick_params(colors="#8b949e", labelsize=6.5, axis="y")
+        ax.spines[:].set_color("#30363d")
+        ax.set_title("Cert Issuance by Year", color="#e6edf3", fontsize=8,
+                     fontweight="bold", pad=6)
+        fig.tight_layout()
+        return fig_to_image(fig, width_mm=78)
 
     # ── GRAPH: ASN bar chart ──────────────────────────────────────────────────
     def build_asn_chart():
@@ -2115,9 +2542,16 @@ def api_dns_pdf(inv_id: int):
     elif asn_img:
         story.append(asn_img)
 
-    # ASN detail table
+    # ── World map + ASN table side by side ───────────────────────────────────
+    wmap = None
+    if cc_counter:
+        try:
+            wmap = build_world_map()
+        except Exception:
+            wmap = None
+
+    asn_tbl = None
     if org_counter:
-        story.append(Spacer(1, 6))
         asn_rows = []
         all_geo_by_org = {}
         for sub in resolved:
@@ -2135,13 +2569,31 @@ def api_dns_pdf(inv_id: int):
                 Paragraph(info.get("country",""), s_small),
                 Paragraph(str(cnt), S("cnt", fontSize=8, fontName="Helvetica-Bold", textColor=C_ACCENT, leading=12)),
             ])
-        story.append(dark_table(
+        asn_tbl = dark_table(
             [Paragraph(h, S(f"ah_{h}", fontSize=7.5, textColor=C_TEXT, fontName="Helvetica-Bold"))
              for h in ["Organisation / ASN Name", "ASN", "Country", "IPs"]],
             asn_rows, [PW*0.5, PW*0.22, PW*0.17, PW*0.11]
-        ))
+        )
 
-    # ── Page 2: Subdomain graph ───────────────────────────────────────────────
+    if wmap and asn_tbl:
+        # Map left, ASN table right
+        combo = Table([[wmap, asn_tbl]], colWidths=[PW * 0.48, PW * 0.52])
+        combo.setStyle(TableStyle([
+            ("VALIGN", (0,0), (-1,-1), "TOP"),
+            ("LEFTPADDING", (0,0), (-1,-1), 0),
+            ("RIGHTPADDING", (0,0), (0,-1), 6),
+            ("RIGHTPADDING", (1,0), (-1,-1), 0),
+        ]))
+        story.append(Spacer(1, 6))
+        story.append(combo)
+    elif wmap:
+        story.append(Spacer(1, 6))
+        story.append(wmap)
+    elif asn_tbl:
+        story.append(Spacer(1, 6))
+        story.append(asn_tbl)
+
+    # ── Subdomain graph ───────────────────────────────────────────────────────
     story.append(PageBreak())
     section_header("Subdomain Infrastructure Graph")
     story.append(Paragraph(
@@ -2264,22 +2716,189 @@ def api_dns_pdf(inv_id: int):
             sub_rows, [PW*0.38, PW*0.23, PW*0.27, PW*0.12]
         ))
 
-    # ── crt.sh certs ─────────────────────────────────────────────────────────
+    # ── Certificate Transparency (rich version if available) ──────────────────
     if passive:
-        section_header(f"Certificate Transparency — {len(passive)} crt.sh certificates")
-        cert_rows = []
-        for c in passive[:100]:
-            issuer = (c.get("issuer") or "").split("O=")[-1].split(",")[0][:35]
-            cert_rows.append([
-                Paragraph(c.get("subdomain",""), s_mono),
-                Paragraph(issuer, s_small),
-                Paragraph((c.get("not_after") or "")[:10], s_small),
-            ])
-        story.append(dark_table(
-            [Paragraph(h, S(f"ch{h}", fontSize=7.5, textColor=C_TEXT, fontName="Helvetica-Bold"))
-             for h in ["Subdomain / SAN", "Issuer", "Expires"]],
-            cert_rows, [PW*0.5, PW*0.3, PW*0.2]
-        ))
+        # Try to fetch rich cert data from crt.sh for the PDF
+        rich_cert_data = None
+        try:
+            import requests as _req
+            _cr = _req.get(
+                f"https://crt.sh/?q=%.{domain}&output=json",
+                headers={"User-Agent": "OSINTPH-PDFGen/1.0", "Accept": "application/json"},
+                timeout=20, verify=False,
+            )
+            if _cr.status_code == 200:
+                from datetime import datetime as _dt
+                _now = _dt.utcnow()
+                _raw = _cr.json()
+                _certs = []
+                _seen = set()
+                _issuer_cnt = Counter()
+                _san_set = set()
+                _expired = _expiring = _active = 0
+                for _e in _raw:
+                    _cid = _e.get("id")
+                    if _cid in _seen:
+                        continue
+                    _seen.add(_cid)
+                    _nb = _e.get("not_before","")
+                    _na = _e.get("not_after","")
+                    _nb_dt = _na_dt = None
+                    for _fmt in ("%Y-%m-%dT%H:%M:%S", "%Y-%m-%d"):
+                        try:
+                            _nb_dt = _dt.strptime(_nb[:19], _fmt[:len(_nb[:19])])
+                            break
+                        except Exception:
+                            pass
+                    for _fmt in ("%Y-%m-%dT%H:%M:%S", "%Y-%m-%d"):
+                        try:
+                            _na_dt = _dt.strptime(_na[:19], _fmt[:len(_na[:19])])
+                            break
+                        except Exception:
+                            pass
+                    _is_exp = (_na_dt < _now) if _na_dt else False
+                    _days = (_na_dt - _now).days if (_na_dt and not _is_exp) else None
+                    _exp_soon = _days is not None and _days <= 30
+                    _sans = sorted(set(s.strip().lower() for s in _e.get("name_value","").split("\n") if s.strip()))
+                    _san_set.update(_sans)
+                    _issuer_raw = _e.get("issuer_name","")
+                    _icn = ""
+                    for _p in _issuer_raw.split(","):
+                        _p = _p.strip()
+                        if _p.startswith("O="):
+                            _icn = _p[2:].strip()
+                            break
+                    if not _icn:
+                        for _p in _issuer_raw.split(","):
+                            _p = _p.strip()
+                            if _p.startswith("CN="):
+                                _icn = _p[3:].strip()
+                                break
+                    if _icn:
+                        _issuer_cnt[_icn] += 1
+                    if _is_exp:
+                        _expired += 1
+                    elif _exp_soon:
+                        _expiring += 1
+                    else:
+                        _active += 1
+                    _certs.append({
+                        "id": _cid, "issuer_org": _icn, "not_before": _nb,
+                        "not_after": _na, "not_before_ts": int(_nb_dt.timestamp()) if _nb_dt else 0,
+                        "is_expired": _is_exp, "expiring_soon": _exp_soon,
+                        "days_remaining": _days, "sans": _sans,
+                    })
+                _certs.sort(key=lambda c: c.get("not_before_ts", 0), reverse=True)
+                rich_cert_data = {
+                    "total": len(_certs), "expired": _expired,
+                    "expiring_soon": _expiring, "active": _active,
+                    "unique_sans": len(_san_set), "issuers": dict(_issuer_cnt),
+                    "certs": _certs,
+                }
+        except Exception:
+            rich_cert_data = None
+
+        if rich_cert_data and rich_cert_data.get("total", 0) > 0:
+            cd = rich_cert_data
+            section_header(f"Certificate Transparency — {cd['total']} certificates")
+
+            # Stat strip
+            cert_stat_items = [
+                (str(cd["total"]), "TOTAL CERTS"),
+                (str(cd["active"]), "ACTIVE"),
+                (str(cd["expired"]), "EXPIRED"),
+                (str(cd["expiring_soon"]), "EXPIRING SOON"),
+                (str(cd["unique_sans"]), "UNIQUE SANs"),
+            ]
+            cert_stat_cells = []
+            for val, lbl in cert_stat_items:
+                col = C_RED if lbl == "EXPIRED" and int(val) > 0 else \
+                      C_YELLOW if lbl == "EXPIRING SOON" and int(val) > 0 else \
+                      C_GREEN if lbl == "ACTIVE" else C_ACCENT
+                cell = Table([
+                    [Paragraph(f'<b>{val}</b>', S(f"csv_{lbl[:4]}", fontSize=13,
+                               fontName="Helvetica-Bold", textColor=col, leading=16))],
+                    [Paragraph(lbl, S(f"csl_{lbl[:4]}", fontSize=5.5, textColor=C_MUTED,
+                               leading=8, fontName="Helvetica-Bold"))],
+                ], colWidths=[PW / len(cert_stat_items) - 2])
+                cell.setStyle(TableStyle([
+                    ("ALIGN", (0,0), (-1,-1), "CENTER"),
+                    ("BACKGROUND", (0,0), (-1,-1), C_SURFACE),
+                    ("TOPPADDING", (0,0), (-1,-1), 5),
+                    ("BOTTOMPADDING", (0,0), (-1,-1), 5),
+                    ("BOX", (0,0), (-1,-1), 0.4, C_BORDER),
+                ]))
+                cert_stat_cells.append(cell)
+            cert_stat_tbl = Table([cert_stat_cells],
+                                  colWidths=[PW / len(cert_stat_items)] * len(cert_stat_items))
+            cert_stat_tbl.setStyle(TableStyle([
+                ("LEFTPADDING", (0,0), (-1,-1), 2),
+                ("RIGHTPADDING", (0,0), (-1,-1), 2),
+                ("TOPPADDING", (0,0), (-1,-1), 0),
+                ("BOTTOMPADDING", (0,0), (-1,-1), 0),
+            ]))
+            story.append(cert_stat_tbl)
+            story.append(Spacer(1, 6))
+
+            # Issuer chart + timeline side by side
+            try:
+                ci_img = build_cert_issuer_chart(cd)
+                ct_img = build_cert_timeline_chart(cd)
+                if ci_img and ct_img:
+                    charts_tbl = Table([[ci_img, ct_img]], colWidths=[PW*0.55, PW*0.45])
+                    charts_tbl.setStyle(TableStyle([
+                        ("VALIGN", (0,0), (-1,-1), "TOP"),
+                        ("LEFTPADDING", (0,0), (-1,-1), 0),
+                        ("RIGHTPADDING", (0,0), (-1,-1), 4),
+                    ]))
+                    story.append(charts_tbl)
+                    story.append(Spacer(1, 6))
+                elif ci_img:
+                    story.append(ci_img)
+                    story.append(Spacer(1, 6))
+            except Exception:
+                pass
+
+            # Cert table — show all, colour-code expired/expiring
+            cert_rows = []
+            for c in cd["certs"][:150]:
+                is_exp = c.get("is_expired")
+                exp_soon = c.get("expiring_soon")
+                days = c.get("days_remaining")
+                status_txt = "EXPIRED" if is_exp else (f"⚠ {days}d" if exp_soon else "✓ Active")
+                status_col = C_RED if is_exp else (C_YELLOW if exp_soon else C_GREEN)
+                san_preview = (c["sans"][0] if c.get("sans") else "—")
+                issuer_s = (c.get("issuer_org") or "—")[:32]
+                cert_rows.append([
+                    Paragraph(san_preview, s_mono),
+                    Paragraph(issuer_s, s_small),
+                    Paragraph((c.get("not_after") or "")[:10], s_small),
+                    Paragraph(f'<b>{status_txt}</b>',
+                              S(f"cst_{c['id']}", fontSize=6.5, fontName="Helvetica-Bold",
+                                textColor=status_col, leading=9)),
+                ])
+            story.append(dark_table(
+                [Paragraph(h, S(f"cth{h}", fontSize=7.5, textColor=C_TEXT, fontName="Helvetica-Bold"))
+                 for h in ["Subdomain / SAN", "Issuer", "Expires", "Status"]],
+                cert_rows, [PW*0.42, PW*0.28, PW*0.14, PW*0.16]
+            ))
+
+        else:
+            # Fallback: basic cert table from passive subdomains
+            section_header(f"Certificate Transparency — {len(passive)} crt.sh certificates")
+            cert_rows = []
+            for c in passive[:100]:
+                issuer = (c.get("issuer") or "").split("O=")[-1].split(",")[0][:35]
+                cert_rows.append([
+                    Paragraph(c.get("subdomain",""), s_mono),
+                    Paragraph(issuer, s_small),
+                    Paragraph((c.get("not_after") or "")[:10], s_small),
+                ])
+            story.append(dark_table(
+                [Paragraph(h, S(f"ch{h}", fontSize=7.5, textColor=C_TEXT, fontName="Helvetica-Bold"))
+                 for h in ["Subdomain / SAN", "Issuer", "Expires"]],
+                cert_rows, [PW*0.5, PW*0.3, PW*0.2]
+            ))
 
     # ── Port scan ─────────────────────────────────────────────────────────────
     if port_scan:
@@ -2657,6 +3276,174 @@ def api_paste_scan():
         return jsonify({"ok": True, **result})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+
+# ── OSINT Toolkit Proxy Routes ────────────────────────────────────────────────
+# Server-side proxy so browser CORS restrictions don't block external APIs
+
+import urllib.request
+import urllib.error
+import ssl
+
+def _fetch_url(url, headers=None, timeout=10):
+    """Simple HTTP GET helper, returns (status, body_bytes)."""
+    req = urllib.request.Request(url, headers=headers or {
+        "User-Agent": "Mozilla/5.0 (compatible; OsintBot/1.0)",
+        "Accept": "application/json, text/html, */*",
+    })
+    ctx = ssl.create_default_context()
+    ctx.check_hostname = False
+    ctx.verify_mode = ssl.CERT_NONE
+    try:
+        with urllib.request.urlopen(req, timeout=timeout, context=ctx) as resp:
+            return resp.status, resp.read()
+    except urllib.error.HTTPError as e:
+        return e.code, e.read()
+
+
+@dashboard_bp.route("/api/osint/github/<username>")
+@require_login
+def osint_github(username):
+    """Proxy GitHub public API."""
+    import json as _json
+    status, body = _fetch_url(f"https://api.github.com/users/{username}", headers={
+        "Accept": "application/vnd.github+json",
+        "User-Agent": "OsintTool/1.0",
+    })
+    # Also fetch events for email extraction
+    _, ev_body = _fetch_url(f"https://api.github.com/users/{username}/events/public?per_page=10", headers={
+        "Accept": "application/vnd.github+json",
+        "User-Agent": "OsintTool/1.0",
+    })
+    try:
+        profile = _json.loads(body)
+        events = _json.loads(ev_body) if ev_body else []
+        emails = list({
+            ev.get("payload", {}).get("commits", [{}])[0].get("author", {}).get("email", "")
+            for ev in (events if isinstance(events, list) else [])
+            if ev.get("payload", {}).get("commits")
+            and "noreply" not in ev.get("payload", {}).get("commits", [{}])[0].get("author", {}).get("email", "noreply")
+        } - {""})
+        profile["_extracted_emails"] = emails
+        return jsonify(profile), status
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@dashboard_bp.route("/api/osint/reddit/<username>")
+@require_login
+def osint_reddit(username):
+    import json as _json
+    status, body = _fetch_url(f"https://www.reddit.com/user/{username}/about.json", headers={
+        "User-Agent": "OsintTool/1.0 (research)",
+        "Accept": "application/json",
+    })
+    try:
+        return jsonify(_json.loads(body)), status
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@dashboard_bp.route("/api/osint/discord/<user_id>")
+@require_login
+def osint_discord(user_id):
+    import json as _json
+    status, body = _fetch_url(f"https://discordlookup.mesalytic.moe/v1/user/{user_id}")
+    try:
+        return jsonify(_json.loads(body)), status
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@dashboard_bp.route("/api/osint/domain/<path:domain>")
+@require_login
+def osint_domain(domain):
+    import json as _json
+    domain = domain.strip().lower().split("/")[0]
+    results = {}
+    # RDAP
+    rdap_status, rdap_body = _fetch_url(f"https://rdap.org/domain/{domain}")
+    try:
+        results["rdap"] = _json.loads(rdap_body)
+        results["rdap_status"] = rdap_status
+    except Exception:
+        results["rdap"] = None
+        results["rdap_status"] = rdap_status
+    # crt.sh
+    crt_status, crt_body = _fetch_url(f"https://crt.sh/?q={domain}&output=json", headers={
+        "User-Agent": "OsintTool/1.0",
+        "Accept": "application/json",
+    })
+    try:
+        certs = _json.loads(crt_body) if crt_status == 200 else []
+        names = sorted(set(
+            n.strip()
+            for c in certs
+            for n in c.get("name_value", "").split("\n")
+            if n.strip()
+        ))
+        results["crtsh"] = names
+    except Exception:
+        results["crtsh"] = []
+    return jsonify(results)
+
+
+@dashboard_bp.route("/api/osint/tiktok/<username>")
+@require_login
+def osint_tiktok(username):
+    import json as _json
+    # TikTok timestamp trick: user ID is encoded in the video ID
+    status, body = _fetch_url(
+        f"https://www.tiktok.com/api/user/detail/?uniqueId={username}&aid=1988",
+        headers={
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+            "Referer": "https://www.tiktok.com/",
+            "Accept": "application/json",
+        }
+    )
+    try:
+        data = _json.loads(body)
+        return jsonify(data), status
+    except Exception as e:
+        return jsonify({"error": str(e), "raw": body[:200].decode("utf-8", errors="replace")}), 500
+
+
+@dashboard_bp.route("/api/osint/username/<username>")
+@require_login
+def osint_username_check(username):
+    """Check a username against WhatsMyName dataset."""
+    import json as _json
+    import concurrent.futures
+    _, wmn_body = _fetch_url(
+        "https://raw.githubusercontent.com/WebBreacher/WhatsMyName/main/wmn-data.json"
+    )
+    try:
+        wmn = _json.loads(wmn_body)
+    except Exception as e:
+        return jsonify({"error": f"Could not fetch WMN data: {e}"}), 500
+
+    sites = [s for s in wmn.get("sites", []) if s.get("uri_check") and s.get("e_code") == 200][:200]
+    found = []
+
+    def check(site):
+        url = site["uri_check"].replace("{account}", username)
+        try:
+            st, body_b = _fetch_url(url, timeout=6)
+            text = body_b.decode("utf-8", errors="replace")
+            e_string = site.get("e_string", "")
+            m_string = site.get("m_string", "")
+            if st == site["e_code"] and (not e_string or e_string in text) and (not m_string or m_string not in text):
+                return {"name": site["name"], "url": url, "pretty": site.get("uri_pretty", "").replace("{account}", username)}
+        except Exception:
+            pass
+        return None
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=30) as pool:
+        for result in pool.map(check, sites):
+            if result:
+                found.append(result)
+
+    return jsonify({"found": found, "checked": len(sites)})
 
 
 # ── Health ─────────────────────────────────────────────────────────────────────
