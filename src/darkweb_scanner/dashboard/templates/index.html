@@ -20,17 +20,17 @@
     /* ── Nav ── */
     header {
       background: var(--surface); border-bottom: 1px solid var(--border);
-      padding: 0 28px; display: flex; align-items: center; position: sticky; top: 0; z-index: 100;
+      padding: 0 28px; display: flex; align-items: center; flex-wrap: wrap; position: sticky; top: 0; z-index: 100;
     }
-    .logo { display: flex; align-items: center; gap: 10px; padding: 14px 0; margin-right: 20px; }
+    .logo { display: flex; align-items: center; gap: 10px; padding: 14px 0; margin-right: 20px; flex-shrink: 0; }
     .logo h1 { font-size: 1rem; font-weight: 700; white-space: nowrap; }
     .logo .badge { background: var(--red); color: white; font-size: 0.65rem; padding: 2px 7px; border-radius: 20px; font-weight: 700; }
     .status-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--green); flex-shrink: 0; }
     .status-dot.pulse { animation: pulse 1.5s infinite; }
     @keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.5;transform:scale(1.3)} }
-    nav { display: flex; gap: 2px; flex: 1; }
+    nav { display: flex; gap: 0; flex: 1; flex-wrap: wrap; min-width: 0; overflow: visible; }
     .nav-tab {
-      padding: 16px 14px; font-size: 0.84rem; font-weight: 500; color: var(--muted);
+      padding: 14px 11px; font-size: 0.78rem; font-weight: 500; color: var(--muted);
       cursor: pointer; border-bottom: 2px solid transparent; transition: all 0.15s;
       white-space: nowrap; background: none; border-top: none; border-left: none; border-right: none;
       font-family: var(--font);
@@ -39,7 +39,7 @@
     .nav-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
     .admin-only { display: none; }
     .admin-only.visible { display: block; }
-    .header-right { margin-left: auto; display: flex; align-items: center; gap: 10px; padding-left: 20px; }
+    .header-right { display: flex; align-items: center; gap: 10px; padding: 8px 0 8px 16px; margin-left: auto; flex-shrink: 0; }
     .theme-btn { background: none; border: 1px solid var(--border); color: var(--muted); padding: 5px 9px; cursor: pointer; font-size: 13px; border-radius: 4px; transition: all .2s; line-height:1; }
     .theme-btn:hover { border-color: var(--accent); color: var(--accent); }
     body.light { --bg: #f6f8fa; --surface: #ffffff; --surface2: #f0f2f5; --border: #d0d7de; --text: #1f2328; --muted: #656d76; }
@@ -52,6 +52,10 @@
 
     /* ── Layout ── */
     main { padding: 28px; max-width: 1400px; margin: 0 auto; }
+    @media (max-width: 900px) {
+      main { padding: 16px; }
+      header { padding: 0 16px; }
+    }
     .tab-panel { display: none; }
     .tab-panel.active { display: block; }
 
@@ -404,10 +408,53 @@
     .settings-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 18px; }
     .section-title { font-size: 0.77rem; font-weight: 600; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin-bottom: 14px; }
 
+    /* ── OSINT Toolkit ── */
+    .osint-sub-tab {
+      background: var(--surface2); border: 1px solid var(--border); color: var(--muted);
+      padding: 6px 14px; border-radius: 6px; font-size: .8rem; cursor: pointer; transition: all .15s;
+    }
+    .osint-sub-tab:hover { color: var(--text); border-color: var(--accent); }
+    .osint-sub-tab.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+    .osint-tool-panel { display: none; }
+    .osint-tool-panel.active { display: block; }
+    .osint-result-card {
+      background: var(--surface2); border: 1px solid var(--border); border-radius: 8px;
+      padding: 14px 16px; margin-bottom: 10px;
+    }
+    .osint-result-card h3 { font-size: .85rem; font-weight: 700; color: var(--text); margin: 0 0 8px; }
+    .osint-kv { display: grid; grid-template-columns: 140px 1fr; gap: 4px 10px; font-size: .8rem; }
+    .osint-kv-key { color: var(--muted); font-weight: 600; }
+    .osint-kv-val { color: var(--text); word-break: break-all; font-family: var(--mono); }
+    .osint-found-badge {
+      display: inline-flex; align-items: center; gap: 5px;
+      background: rgba(63,185,80,.1); border: 1px solid rgba(63,185,80,.3); color: #3fb950;
+      border-radius: 5px; padding: 4px 10px; font-size: .76rem; text-decoration: none;
+      transition: background .15s;
+    }
+    .osint-found-badge:hover { background: rgba(63,185,80,.2); }
+    .osint-resource-card {
+      background: var(--surface2); border: 1px solid var(--border); border-radius: 8px;
+      padding: 14px; text-decoration: none; display: block; transition: border-color .15s, transform .15s;
+    }
+    .osint-resource-card:hover { border-color: var(--accent); transform: translateY(-2px); }
+    .osint-resource-card-title { font-size: .85rem; font-weight: 700; color: var(--accent); margin-bottom: 4px; }
+    .osint-resource-card-desc { font-size: .75rem; color: var(--muted); }
+
     /* ── Info banner ── */
     .info-banner { background: rgba(88,166,255,.06); border: 1px solid rgba(88,166,255,.2); border-radius: 6px; padding: 10px 14px; font-size: 0.8rem; color: var(--muted); margin-top: 14px; }
     code { color: var(--accent); background: var(--bg); padding: 1px 5px; border-radius: 3px; font-family: var(--mono); font-size: .85em; }
+
+    /* ── Cert History ── */
+    #dv-certs .dns-stat-chip { min-width: 80px; }
+    #certPanelContent .infra-a-tbl th { font-size: .72rem; }
+    #certPanelContent .infra-a-tbl td { vertical-align: top; padding: 5px 8px; }
+    #certPanelContent .infra-a-tbl tr:hover td { background: var(--surface2); }
+
+    /* ── jsvectormap overrides ── */
+    .jvm-tooltip { background: #1c2d3a !important; color: #e6edf3 !important; border: 1px solid #30363d !important; font-family: var(--mono) !important; font-size: .75rem !important; border-radius: 4px !important; padding: 4px 8px !important; }
+    #infra-world-map { width: 100%; height: 220px; background: #0d1117; border-radius: 4px; border: 1px solid #30363d; }
   </style>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/jsvectormap@1.5.3/dist/css/jsvectormap.min.css"/>
 </head>
 <body>
 
@@ -432,6 +479,7 @@
     <button class="nav-tab" onclick="window.open('https://webcheck.osintph.info', '_blank')">🔍 Web Check</button>
     <button class="nav-tab" onclick="switchTab('channelmonitor', this)">📡 Channel Monitor</button>
     <button class="nav-tab" onclick="switchTab('reports', this)">📄 Reports</button>
+    <button class="nav-tab" onclick="switchTab('osint', this)">🧰 OSINT Toolkit</button>
     <button class="nav-tab" onclick="switchTab('settings', this)">⚙️ Settings</button>
   </nav>
   <div class="header-right">
@@ -938,6 +986,7 @@
         <button class="dns-view-btn" onclick="dnsSetView('dirs',this)">📂 Directories</button>
         <button class="dns-view-btn" onclick="dnsSetView('email',this)">📧 Email Sec</button>
         <button class="dns-view-btn" onclick="dnsSetView('records',this)">📋 DNS Records</button>
+        <button class="dns-view-btn" onclick="dnsSetView('certs',this)">🔒 Cert History</button>
       </div>
     </div>
     <div id="dnsContent" style="padding:0;">
@@ -1105,6 +1154,162 @@
           <button class="btn btn-secondary" onclick="addSubscriber()">+ Add</button>
         </div>
         <div id="subscribersList"><p style="color:var(--muted);font-size:.83rem">Loading subscribers…</p></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── OSINT Toolkit Tab (HOT-inspired) ── -->
+  <div class="tab-panel" id="panel-osint">
+    <div style="max-width:1100px;margin:0 auto">
+      <div style="margin-bottom:20px">
+        <h2 style="font-size:1.15rem;font-weight:700;color:var(--text);margin:0 0 4px">🧰 OSINT Toolkit</h2>
+        <p style="color:var(--muted);font-size:.82rem;margin:0">Integrated OSINT tools for quick investigations — username lookups, social profiling, domain intel, and more.</p>
+      </div>
+
+      <!-- Sub-tabs -->
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:18px;border-bottom:1px solid var(--border);padding-bottom:12px" id="osintSubTabs">
+        <button class="osint-sub-tab active" onclick="osintSwitchTool('username',this)">👤 Username</button>
+        <button class="osint-sub-tab" onclick="osintSwitchTool('github',this)">🐙 GitHub</button>
+        <button class="osint-sub-tab" onclick="osintSwitchTool('reddit',this)">🟠 Reddit</button>
+        <button class="osint-sub-tab" onclick="osintSwitchTool('tiktok',this)">🎵 TikTok</button>
+        <button class="osint-sub-tab" onclick="osintSwitchTool('google',this)">🔍 Google Account</button>
+        <button class="osint-sub-tab" onclick="osintSwitchTool('discord',this)">💬 Discord</button>
+        <button class="osint-sub-tab" onclick="osintSwitchTool('domain',this)">🌐 Domain WHOIS</button>
+        <button class="osint-sub-tab" onclick="osintSwitchTool('email',this)">📧 Email OSINT</button>
+        <button class="osint-sub-tab" onclick="osintSwitchTool('resources',this)">📚 Resources</button>
+      </div>
+
+      <!-- Username Lookup -->
+      <div class="osint-tool-panel active" id="osint-username">
+        <div class="panel" style="margin-bottom:0">
+          <div class="panel-header"><h2>👤 Username Search</h2><span style="color:var(--muted);font-size:.78rem">Search a username across 500+ platforms</span></div>
+          <div class="panel-body">
+            <div style="display:flex;gap:8px;margin-bottom:16px">
+              <input id="osint-username-input" type="text" placeholder="Enter username..." style="flex:1;background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:6px;font-size:.85rem" onkeydown="if(event.key==='Enter')osintUsernameSearch()"/>
+              <button class="btn btn-primary" onclick="osintUsernameSearch()" id="osintUsernameBtn">🔍 Search</button>
+            </div>
+            <div id="osint-username-results" style="display:none">
+              <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
+                <div id="osint-username-progress-bar" style="flex:1;height:4px;background:var(--surface2);border-radius:2px;overflow:hidden">
+                  <div id="osint-username-progress-fill" style="height:100%;background:var(--accent);width:0%;transition:width .3s"></div>
+                </div>
+                <span id="osint-username-progress-text" style="font-size:.75rem;color:var(--muted);white-space:nowrap">0 / 0</span>
+              </div>
+              <div id="osint-username-found" style="display:flex;flex-wrap:wrap;gap:8px"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- GitHub Lookup -->
+      <div class="osint-tool-panel" id="osint-github">
+        <div class="panel" style="margin-bottom:0">
+          <div class="panel-header"><h2>🐙 GitHub User Intel</h2><span style="color:var(--muted);font-size:.78rem">Profile, repos, email extraction</span></div>
+          <div class="panel-body">
+            <div style="display:flex;gap:8px;margin-bottom:16px">
+              <input id="osint-github-input" type="text" placeholder="GitHub username..." style="flex:1;background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:6px;font-size:.85rem" onkeydown="if(event.key==='Enter')osintGithubSearch()"/>
+              <button class="btn btn-primary" onclick="osintGithubSearch()">🔍 Lookup</button>
+            </div>
+            <div id="osint-github-results"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Reddit Lookup -->
+      <div class="osint-tool-panel" id="osint-reddit">
+        <div class="panel" style="margin-bottom:0">
+          <div class="panel-header"><h2>🟠 Reddit User Intel</h2><span style="color:var(--muted);font-size:.78rem">Account info, post history, karma breakdown</span></div>
+          <div class="panel-body">
+            <div style="display:flex;gap:8px;margin-bottom:16px">
+              <input id="osint-reddit-input" type="text" placeholder="Reddit username (without u/)..." style="flex:1;background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:6px;font-size:.85rem" onkeydown="if(event.key==='Enter')osintRedditSearch()"/>
+              <button class="btn btn-primary" onclick="osintRedditSearch()">🔍 Lookup</button>
+            </div>
+            <div id="osint-reddit-results"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- TikTok Lookup -->
+      <div class="osint-tool-panel" id="osint-tiktok">
+        <div class="panel" style="margin-bottom:0">
+          <div class="panel-header"><h2>🎵 TikTok User Intel</h2><span style="color:var(--muted);font-size:.78rem">Profile info, video timestamps, account details</span></div>
+          <div class="panel-body">
+            <div style="display:flex;gap:8px;margin-bottom:16px">
+              <input id="osint-tiktok-input" type="text" placeholder="TikTok username (without @)..." style="flex:1;background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:6px;font-size:.85rem" onkeydown="if(event.key==='Enter')osintTikTokSearch()"/>
+              <button class="btn btn-primary" onclick="osintTikTokSearch()">🔍 Lookup</button>
+            </div>
+            <div id="osint-tiktok-results"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Google Account -->
+      <div class="osint-tool-panel" id="osint-google">
+        <div class="panel" style="margin-bottom:0">
+          <div class="panel-header"><h2>🔍 Google Account Intel</h2><span style="color:var(--muted);font-size:.78rem">Lookup Google account info via email</span></div>
+          <div class="panel-body">
+            <div style="display:flex;gap:8px;margin-bottom:16px">
+              <input id="osint-google-input" type="text" placeholder="Google email address..." style="flex:1;background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:6px;font-size:.85rem" onkeydown="if(event.key==='Enter')osintGoogleSearch()"/>
+              <button class="btn btn-primary" onclick="osintGoogleSearch()">🔍 Lookup</button>
+            </div>
+            <div id="osint-google-results"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Discord Lookup -->
+      <div class="osint-tool-panel" id="osint-discord">
+        <div class="panel" style="margin-bottom:0">
+          <div class="panel-header"><h2>💬 Discord User Intel</h2><span style="color:var(--muted);font-size:.78rem">Look up Discord user info by User ID</span></div>
+          <div class="panel-body">
+            <div style="display:flex;gap:8px;margin-bottom:16px">
+              <input id="osint-discord-input" type="text" placeholder="Discord User ID (numeric)..." style="flex:1;background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:6px;font-size:.85rem" onkeydown="if(event.key==='Enter')osintDiscordSearch()"/>
+              <button class="btn btn-primary" onclick="osintDiscordSearch()">🔍 Lookup</button>
+            </div>
+            <div id="osint-discord-results"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Domain WHOIS -->
+      <div class="osint-tool-panel" id="osint-domain">
+        <div class="panel" style="margin-bottom:0">
+          <div class="panel-header"><h2>🌐 Domain WHOIS & CRT.sh</h2><span style="color:var(--muted);font-size:.78rem">Registration info, cert transparency, subdomains</span></div>
+          <div class="panel-body">
+            <div style="display:flex;gap:8px;margin-bottom:16px">
+              <input id="osint-domain-input" type="text" placeholder="domain.com" style="flex:1;background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:6px;font-size:.85rem" onkeydown="if(event.key==='Enter')osintDomainSearch()"/>
+              <button class="btn btn-primary" onclick="osintDomainSearch()">🔍 Lookup</button>
+            </div>
+            <div id="osint-domain-results"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Email OSINT -->
+      <div class="osint-tool-panel" id="osint-email">
+        <div class="panel" style="margin-bottom:0">
+          <div class="panel-header"><h2>📧 Email OSINT</h2><span style="color:var(--muted);font-size:.78rem">Check email across breach databases and online tools</span></div>
+          <div class="panel-body">
+            <div style="display:flex;gap:8px;margin-bottom:16px">
+              <input id="osint-email-input" type="text" placeholder="target@example.com" style="flex:1;background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:6px;font-size:.85rem" onkeydown="if(event.key==='Enter')osintEmailSearch()"/>
+              <button class="btn btn-primary" onclick="osintEmailSearch()">🔍 Search</button>
+            </div>
+            <div id="osint-email-results"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Resources -->
+      <div class="osint-tool-panel" id="osint-resources">
+        <div class="panel" style="margin-bottom:0">
+          <div class="panel-header"><h2>📚 OSINT Resources</h2><span style="color:var(--muted);font-size:.78rem">Curated external tools and databases</span></div>
+          <div class="panel-body">
+            <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px">
+              ${''/* Resource cards will be rendered by JS */}
+            </div>
+            <div id="osint-resource-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px"></div>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -3411,6 +3616,7 @@
         <code style="font-size:.9rem;font-weight:700;color:var(--accent)">${esc(data.domain)}</code>
         <span style="font-size:.73rem;color:var(--muted)">${fmtTime(data.created_at)}</span>
         <button class="btn btn-secondary" style="font-size:.75rem;padding:4px 10px" id="portScanBtn" onclick="triggerPortScan(${data.id})">${hasScanData ? '↺ Re-Scan Ports/Dirs' : '🔌 Scan Ports & Dirs'}</button>
+        <button class="btn btn-secondary" style="font-size:.75rem;padding:4px 10px" id="ddEnrichBtn" onclick="triggerDNSDumpsterEnrich(${data.id})">🔍 Enrich w/ DNSDumpster</button>
         <button class="btn btn-primary" style="font-size:.75rem;padding:4px 10px" onclick="exportDNSpdf(${data.id},'${esc(data.domain)}')">⬇ PDF</button>
         <button class="btn btn-secondary" style="font-size:.75rem;padding:4px 10px" onclick="showDNSHistory()">← Back</button>
       </div>
@@ -3428,7 +3634,10 @@
     html += buildAllViews(data.domain, dns, allSubs, resolved, passive, bruteforce, ptr, ipGeo, zt, ztSuccess, email, portScan, dirEnum, mainIPs, services);
     html += '</div>';
     el.innerHTML = html;
-    requestAnimationFrame(() => drawGraph(data.domain, dns, resolved, bruteforce, ipGeo));
+    requestAnimationFrame(() => {
+      drawGraph(data.domain, dns, resolved, bruteforce, ipGeo);
+      initInfraMap();
+    });
   }
 
   function buildAllViews(domain, dns, allSubs, resolved, passive, bruteforce, ptr, ipGeo, zt, ztSuccess, email, portScan, dirEnum, mainIPs, services) {
@@ -3439,6 +3648,7 @@
     h += `<div id="dv-dirs" class="dns-view-panel">${buildDirsPanel(dirEnum, domain)}</div>`;
     h += `<div id="dv-email" class="dns-view-panel">${buildEmailPanel(email, dns)}</div>`;
     h += `<div id="dv-records" class="dns-view-panel">${buildRecordsPanel(dns, ptr, ipGeo, zt, ztSuccess)}</div>`;
+    h += `<div id="dv-certs" class="dns-view-panel">${buildCertHistoryPanel(domain, passive)}</div>`;
     return h;
   }
 
@@ -3479,38 +3689,51 @@
     const topSvcs = Object.entries(svcCounts).sort((a,b)=>b[1]-a[1]).slice(0,6);
     const totalSvcs = topSvcs.reduce((s,[,v])=>s+v, 0) || 1;
 
-    // ── SVG world map (simplified Robinson projection dot map) ──
-    // Country centroids [countryCode, cx%, cy%] — enough for common countries
-    const centroids = {
-      'US':[23,24],'CA':[20,18],'GB':[46,20],'DE':[49,20],'FR':[47,22],
-      'NL':[48,19],'SE':[51,16],'NO':[50,15],'FI':[53,15],'RU':[62,17],
-      'CN':[74,23],'JP':[82,23],'KR':[80,24],'SG':[76,33],'HK':[77,27],
-      'AU':[79,38],'IN':[69,27],'PH':[80,30],'ID':[78,34],'MY':[77,32],
-      'TH':[75,30],'VN':[77,29],'BD':[71,28],'PK':[66,25],'IR':[61,24],
-      'TR':[55,23],'SA':[59,27],'AE':[62,27],'IL':[55,25],'EG':[54,26],
-      'ZA':[52,38],'NG':[49,30],'KE':[56,33],'BR':[30,36],'AR':[28,39],
-      'MX':[19,27],'CO':[25,33],'CL':[27,38],'PE':[25,35],'VE':[28,31],
-      'PL':[51,19],'UA':[54,19],'RO':[53,21],'CZ':[50,19],'AT':[50,20],
-      'CH':[48,21],'ES':[45,23],'PT':[44,23],'IT':[50,22],'GR':[52,23],
-      'BG':[53,21],'HR':[50,21],'HU':[51,20],'SK':[51,19],'BE':[48,19],
-      'DK':[49,18],'IE':[44,19],'LT':[52,17],'LV':[52,17],'EE':[53,16],
-    };
-
-    const activeCountries = Object.keys(countryCounts).filter(c => centroids[c]);
+    // ── jsvectormap data ──
+    const activeCountries = Object.keys(countryCounts);
     const maxCount = Math.max(...Object.values(countryCounts), 1);
 
-    const dots = activeCountries.map(cc => {
-      const [cx, cy] = centroids[cc];
-      // viewBox is 0 0 100 70 so centroid values map directly to SVG units
-      const r = Math.max(2.5, Math.min(5.5, 2.5 + (countryCounts[cc]/maxCount)*3));
-      return `<circle cx="${cx}" cy="${cy}" r="${r}" fill="#58a6ff" opacity="${0.6+countryCounts[cc]/maxCount*0.4}" style="filter:drop-shadow(0 0 3px #58a6ff)">
-        <title>${countryNames[cc]||cc}: ${countryCounts[cc]} IP(s)</title>
-      </circle>`;
-    }).join('');
+    // [lat, lng] centroids for jsvectormap markers
+    const markerLatLng = {
+      'US':[38,-97],'CA':[56,-106],'MX':[23,-102],'BR':[-10,-55],'AR':[-34,-64],
+      'CO':[4,-74],'CL':[-30,-71],'PE':[-10,-76],'VE':[8,-66],'EC':[-2,-78],
+      'GB':[55,-3],'IE':[53,-8],'FR':[46,2],'DE':[51,10],'NL':[52,5],
+      'BE':[50,4],'ES':[40,-4],'PT':[39,-8],'IT':[42,12],'CH':[47,8],
+      'AT':[47,14],'PL':[52,20],'CZ':[50,15],'SK':[49,19],'HU':[47,19],
+      'RO':[46,25],'BG':[43,25],'GR':[39,22],'HR':[45,16],'UA':[49,32],
+      'SE':[62,15],'NO':[62,10],'FI':[64,26],'DK':[56,10],'LT':[56,24],
+      'LV':[57,25],'EE':[59,25],'BY':[53,28],'MD':[47,29],'RS':[44,21],
+      'RU':[62,105],'TR':[39,35],'IL':[31,35],'SA':[24,45],'AE':[24,54],
+      'IR':[32,53],'IQ':[33,44],'SY':[35,38],'JO':[31,36],'KW':[29,48],
+      'EG':[27,30],'LY':[27,17],'TN':[34,9],'DZ':[28,3],'MA':[32,-6],
+      'NG':[10,8],'KE':[-1,38],'ZA':[-29,25],'ET':[9,40],'GH':[8,-1],
+      'TZ':[-6,35],'MZ':[-18,35],'AO':[-12,18],'SD':[15,32],'CM':[4,12],
+      'IN':[21,78],'PK':[30,70],'BD':[24,90],'LK':[7,81],'NP':[28,84],
+      'CN':[35,105],'JP':[36,138],'KR':[36,128],'TW':[23,121],'HK':[22,114],
+      'SG':[1,104],'MY':[4,110],'TH':[15,101],'VN':[16,108],'PH':[12,122],
+      'ID':[-5,120],'MM':[17,96],'KH':[13,105],'MN':[47,105],'KZ':[48,68],
+      'AU':[-25,134],'NZ':[-41,174],
+    };
+
+    const jvmMarkers = activeCountries
+      .filter(cc => markerLatLng[cc])
+      .map(cc => ({
+        name: `${countryNames[cc]||cc}: ${countryCounts[cc]} IP(s)`,
+        coords: markerLatLng[cc],
+        style: { fill: '#4a90d9' }
+      }));
+
+    const jvmSelectedRegions = activeCountries
+      .map(cc => cc.toLowerCase())
+      .filter(cc => cc.length === 2);
 
     const flagRow = activeCountries.slice(0,8).map(cc =>
       cc.split('').map(c=>String.fromCodePoint(c.charCodeAt(0)+127397)).join('')
     ).join(' ');
+
+    // Store for initInfraMap() called after DOM injection
+    window._jvmMarkers = jvmMarkers;
+    window._jvmRegions = jvmSelectedRegions;
 
     // ── ASN bars ──
     const asnBars = topOrgs.map(([org, cnt]) => `
@@ -3581,15 +3804,7 @@
       <div style="padding:14px 16px 0">
         <div class="infra-card-title">🌍 System Locations</div>
         <div class="world-map-wrap">
-          <svg viewBox="0 0 100 45" style="width:100%;height:220px;display:block" xmlns="http://www.w3.org/2000/svg" style="background:#0d1117;border-radius:4px;border:1px solid #30363d">
-              <rect width="100" height="70" fill="#0d1117"/>
-              <line x1="25" y1="0" x2="25" y2="70" stroke="#30363d" stroke-width=".3"/>
-              <line x1="50" y1="0" x2="50" y2="70" stroke="#30363d" stroke-width=".3"/>
-              <line x1="75" y1="0" x2="75" y2="70" stroke="#30363d" stroke-width=".3"/>
-              <line x1="0" y1="23" x2="100" y2="23" stroke="#30363d" stroke-width=".3"/>
-              <line x1="0" y1="46" x2="100" y2="46" stroke="#30363d" stroke-width=".3"/>
-              ${dots}
-          </svg>
+          <div id="infra-world-map"></div>
           <div style="margin-top:6px;font-size:1rem;letter-spacing:2px">${flagRow}</div>
         </div>
       </div>
@@ -3618,6 +3833,58 @@
   }
 
     // ── Graph View ──────────────────────────────────────────────────────────────
+  function initInfraMap() {
+    const el = document.getElementById('infra-world-map');
+    if (!el) return;
+    if (typeof jsVectorMap === 'undefined') {
+      // Load jsvectormap JS then world map data, then init
+      const s1 = document.createElement('script');
+      s1.src = 'https://cdn.jsdelivr.net/npm/jsvectormap@1.5.3/dist/js/jsvectormap.min.js';
+      s1.onload = () => {
+        const s2 = document.createElement('script');
+        s2.src = 'https://cdn.jsdelivr.net/npm/jsvectormap@1.5.3/dist/maps/world.js';
+        s2.onload = () => _renderJvMap(el);
+        document.head.appendChild(s2);
+      };
+      document.head.appendChild(s1);
+    } else {
+      _renderJvMap(el);
+    }
+  }
+
+  function _renderJvMap(el) {
+    // Destroy previous instance if any
+    if (el._jvmInstance) { try { el._jvmInstance.destroy(); } catch(e){} }
+    el.innerHTML = '';
+    try {
+      el._jvmInstance = new jsVectorMap({
+        map: 'world',
+        selector: '#infra-world-map',
+        zoomButtons: true,
+        zoomOnScroll: false,
+        backgroundColor: '#0d1117',
+        regionStyle: {
+          initial: { fill: '#1c2d3a', stroke: '#2a3f52', strokeWidth: 0.5 },
+          hover:   { fill: '#2a4a62', fillOpacity: 1 },
+          selected:{ fill: '#4a90d9' },
+          selectedHover: { fill: '#58a6ff' }
+        },
+        markerStyle: {
+          initial: { fill: '#58a6ff', stroke: '#0d1117', strokeWidth: 1, r: 6 },
+          hover:   { fill: '#79c0ff', r: 8 }
+        },
+        selectedRegions: window._jvmRegions || [],
+        markers: window._jvmMarkers || [],
+        onMarkerTooltipShow(e, tooltip, index) {
+          tooltip.text(tooltip.text(), true);
+        }
+      });
+    } catch(err) {
+      console.warn('jsVectorMap init failed:', err);
+      el.innerHTML = '<div style="color:#58a6ff;font-size:.8rem;padding:8px">Map unavailable</div>';
+    }
+  }
+
   function buildGraphPanel(domain, dns, resolved, bruteforce, ipGeo) {
     return `<div style="margin-bottom:10px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
         <span style="font-weight:600;font-size:.85rem">Subdomain Infrastructure Graph</span>
@@ -3932,6 +4199,189 @@
     } catch(e) { toast('Network error', 'error'); if(btn){btn.disabled=false;btn.textContent='🔌 Scan Ports & Dirs';} }
   }
 
+  // ── DNSDumpster enrichment ──────────────────────────────────────────────────
+  async function triggerDNSDumpsterEnrich(invId) {
+    if (!invId) return;
+    const btn = document.getElementById('ddEnrichBtn');
+    if (btn) { btn.disabled = true; btn.textContent = '⏳ Enriching…'; }
+    toast('Fetching DNSDumpster data — merging into results…');
+    try {
+      const res = await fetch(`/api/dns/investigations/${invId}/enrich`, {method:'POST'});
+      const d = await res.json();
+      if (d.error) {
+        toast(d.error, 'error');
+        if (btn) { btn.disabled = false; btn.textContent = '🔍 Enrich w/ DNSDumpster'; }
+        return;
+      }
+      toast(`✅ DNSDumpster: +${d.new_subdomains} new subdomains (${d.total_subdomains} total)`);
+      if (btn) { btn.disabled = false; btn.textContent = '✅ DNSDumpster Enriched'; btn.style.borderColor='var(--green)'; btn.style.color='var(--green)'; }
+      // Store enriched data and refresh the infra panel in-place
+      if (_dnsCurrent) {
+        _dnsCurrent.result = _dnsCurrent.result || {};
+        _dnsCurrent.result.dnsdumpster = d.dnsdumpster_data;
+        _dnsCurrent.result.subdomains_resolved = d.total_subdomains;
+        _dnsCurrent.result.dnsdumpster_enriched = true;
+        // Refresh infra map stat
+        const chip = document.querySelector('.dns-stat-chip .sv');
+        // Reload full result to get merged data
+        loadDNSResult(invId);
+      }
+    } catch(e) {
+      toast('Network error during enrichment', 'error');
+      if (btn) { btn.disabled = false; btn.textContent = '🔍 Enrich w/ DNSDumpster'; }
+    }
+  }
+
+  // ── Certificate History Panel ───────────────────────────────────────────────
+  function buildCertHistoryPanel(domain, passiveCerts) {
+    // Placeholder shown before lazy-load completes
+    // passiveCerts is the crt.sh data from the initial scan (subdomain-only)
+    const cached = passiveCerts.length;
+    return `<div id="certPanelInner">
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;flex-wrap:wrap">
+        <span style="font-weight:700;font-size:.9rem">🔒 Certificate Transparency History</span>
+        <span style="font-size:.75rem;color:var(--muted)">${cached} certs from initial scan</span>
+        <button class="btn btn-secondary" style="font-size:.73rem;padding:3px 9px;margin-left:auto" onclick="if(_dnsCurrent)loadCertHistory(_dnsCurrent.domain,document.getElementById('dv-certs'),true)">↺ Refresh</button>
+      </div>
+      <div id="certPanelContent">
+        <div class="dns-running" style="padding:30px;text-align:center"><div class="dns-spinner"></div><div style="margin-top:8px;color:var(--muted);font-size:.8rem">Loading from crt.sh…</div></div>
+      </div>
+    </div>`;
+  }
+
+  async function loadCertHistory(domain, panel, force) {
+    const content = document.getElementById('certPanelContent');
+    if (!content) return;
+    if (!force && content._loaded) return;
+    content.innerHTML = '<div class="dns-running" style="padding:30px;text-align:center"><div class="dns-spinner"></div><div style="margin-top:8px;color:var(--muted);font-size:.8rem">Fetching full certificate history from crt.sh…</div></div>';
+
+    try {
+      const res = await fetch(`/api/dns/certs/${encodeURIComponent(domain)}`);
+      const data = await res.json();
+      if (data.error) { content.innerHTML = `<div style="color:var(--red);padding:16px">${esc(data.error)}</div>`; return; }
+      content._loaded = true;
+      content.innerHTML = renderCertPanel(data);
+    } catch(e) {
+      content.innerHTML = `<div style="color:var(--red);padding:16px">Failed to load cert history: ${esc(String(e))}</div>`;
+    }
+  }
+
+  function renderCertPanel(data) {
+    const { total, expired, expiring_soon, active, unique_sans, all_sans, issuers, certs } = data;
+
+    // ── Stat cards ──
+    let html = `<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:18px">
+      <div class="dns-stat-chip"><div class="sv">${total}</div><div class="sl">Total Certs</div></div>
+      <div class="dns-stat-chip sok"><div class="sv">${active}</div><div class="sl">Active</div></div>
+      <div class="dns-stat-chip ${expired?'sdanger':'sok'}"><div class="sv">${expired}</div><div class="sl">Expired</div></div>
+      <div class="dns-stat-chip ${expiring_soon?'sdanger':''}"><div class="sv">${expiring_soon}</div><div class="sl">Expiring ≤30d</div></div>
+      <div class="dns-stat-chip"><div class="sv">${unique_sans}</div><div class="sl">Unique SANs</div></div>
+    </div>`;
+
+    // ── Issuer breakdown ──
+    if (Object.keys(issuers).length) {
+      const maxIss = Math.max(...Object.values(issuers));
+      html += `<div class="infra-card" style="margin-bottom:16px">
+        <div class="infra-card-title">🏢 Issuers</div>
+        ${Object.entries(issuers).map(([name, cnt]) => `
+          <div class="asn-bar-row">
+            <div class="asn-bar-label" title="${esc(name)}">${esc(name.slice(0,32))}</div>
+            <div class="asn-bar-track"><div class="asn-bar-fill" style="width:${Math.round(cnt/maxIss*100)}%"></div></div>
+            <div class="asn-bar-count">${cnt}</div>
+          </div>`).join('')}
+      </div>`;
+    }
+
+    // ── Timeline bar chart (ASCII-style, SVG) ──
+    const byYear = {};
+    for (const c of certs) {
+      if (!c.not_before) continue;
+      const yr = c.not_before.slice(0,4);
+      byYear[yr] = (byYear[yr]||0) + 1;
+    }
+    const years = Object.keys(byYear).sort();
+    if (years.length > 1) {
+      const maxY = Math.max(...Object.values(byYear));
+      const barW = Math.max(20, Math.min(48, Math.floor(560 / years.length)));
+      const svgH = 80;
+      const bars = years.map((yr, i) => {
+        const cnt = byYear[yr];
+        const bh = Math.max(3, Math.round((cnt/maxY) * (svgH-22)));
+        const x = i * (barW + 4);
+        const y = svgH - 18 - bh;
+        return `<g>
+          <rect x="${x}" y="${y}" width="${barW}" height="${bh}" fill="#58a6ff" rx="2" opacity=".8"/>
+          <text x="${x+barW/2}" y="${svgH-4}" text-anchor="middle" font-size="8" fill="#8b949e">${yr.slice(2)}</text>
+          <title>${yr}: ${cnt} cert${cnt!==1?'s':''}</title>
+        </g>`;
+      }).join('');
+      html += `<div class="infra-card" style="margin-bottom:16px">
+        <div class="infra-card-title">📅 Issuance Timeline</div>
+        <svg viewBox="0 0 ${years.length*(barW+4)} ${svgH}" style="width:100%;max-width:640px;height:${svgH}px;display:block">${bars}</svg>
+      </div>`;
+    }
+
+    // ── SAN discovery (unique subdomains from certs) ──
+    if (all_sans.length) {
+      const wildcards = all_sans.filter(s => s.startsWith('*'));
+      const normal = all_sans.filter(s => !s.startsWith('*'));
+      html += `<div class="infra-card" style="margin-bottom:16px">
+        <div class="infra-card-title" style="display:flex;align-items:center;gap:8px">
+          🌐 SAN Names — ${unique_sans} unique hosts/domains
+          <button class="btn btn-secondary" style="font-size:.68rem;padding:2px 7px;margin-left:auto" onclick="copyCertSANs()">⎘ Copy All</button>
+        </div>
+        <div id="certSANlist" style="max-height:240px;overflow-y:auto;margin-top:8px">
+          ${wildcards.length ? `<div style="font-size:.7rem;color:var(--muted);margin-bottom:4px">Wildcards</div>${wildcards.map(s=>`<div style="font-family:var(--mono);font-size:.74rem;padding:2px 0;border-bottom:1px solid var(--border);color:#d29922">⚡ ${esc(s)}</div>`).join('')}` : ''}
+          <div style="font-size:.7rem;color:var(--muted);margin:6px 0 4px">Hosts (${normal.length})</div>
+          ${normal.map(s=>`<div style="font-family:var(--mono);font-size:.74rem;padding:2px 0;border-bottom:1px solid var(--border)">${esc(s)}</div>`).join('')}
+        </div>
+      </div>`;
+    }
+
+    // ── Certificate table ──
+    const pageSize = 50;
+    const pageCerts = certs.slice(0, pageSize);
+    html += `<div class="infra-card">
+      <div class="infra-card-title">📜 Certificates (${total} total, showing ${pageCerts.length})</div>
+      <div style="overflow-x:auto">
+      <table class="infra-a-tbl" style="min-width:700px">
+        <thead><tr>
+          <th>Issued</th><th>Expires</th><th>Status</th><th>Issuer</th><th>SANs</th><th>ID</th>
+        </tr></thead>
+        <tbody>
+          ${pageCerts.map(c => {
+            const status = c.is_expired
+              ? `<span style="color:var(--red);font-size:.72rem">Expired</span>`
+              : c.expiring_soon
+                ? `<span style="color:#d29922;font-size:.72rem">⚠ ${c.days_remaining}d left</span>`
+                : `<span style="color:var(--green);font-size:.72rem">Active</span>`;
+            const issuer = esc((c.issuer_cn || c.issuer_org || '').slice(0, 36));
+            const sanPreview = c.sans.slice(0,3).map(s=>esc(s)).join('<br>') + (c.san_count>3?`<br><span style="color:var(--muted);font-size:.68rem">+${c.san_count-3} more</span>`:'');
+            return `<tr>
+              <td style="font-size:.74rem;white-space:nowrap">${(c.not_before||'').slice(0,10)}</td>
+              <td style="font-size:.74rem;white-space:nowrap">${(c.not_after||'').slice(0,10)}</td>
+              <td>${status}</td>
+              <td style="font-size:.74rem">${issuer}</td>
+              <td style="font-family:var(--mono);font-size:.71rem;max-width:260px">${sanPreview}</td>
+              <td><a href="https://crt.sh/?id=${c.id}" target="_blank" style="font-size:.7rem;color:var(--accent)">#${c.id}</a></td>
+            </tr>`;
+          }).join('')}
+        </tbody>
+      </table>
+      </div>
+      ${certs.length > pageSize ? `<div style="font-size:.75rem;color:var(--muted);margin-top:8px;text-align:center">Showing ${pageSize} of ${certs.length} — <a href="https://crt.sh/?q=%.${esc(data.domain)}" target="_blank" style="color:var(--accent)">view all on crt.sh ↗</a></div>` : ''}
+    </div>`;
+
+    return html;
+  }
+
+  function copyCertSANs() {
+    const el = document.getElementById('certSANlist');
+    if (!el) return;
+    const text = [...el.querySelectorAll('div[style*="mono"]')].map(d=>d.textContent.replace(/^⚡\s*/,'')).join('\n');
+    navigator.clipboard.writeText(text).then(()=>toast('Copied SANs to clipboard')).catch(()=>toast('Copy failed','error'));
+  }
+
   // ── View switcher ───────────────────────────────────────────────────────────
   function dnsSetView(view, btn) {
     _dnsView = view;
@@ -3940,8 +4390,12 @@
     if (panel) panel.style.display = 'block';
     document.querySelectorAll('.dns-view-btn').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
-    if (view==='graph'&&_dnsCurrent) {
+    if (view === 'graph' && _dnsCurrent) {
       requestAnimationFrame(()=>drawGraph(_dnsCurrent.domain,_dnsCurrent.result.dns_records||{},_dnsCurrent.result.subdomains_resolved||[],_dnsCurrent.result.subdomains_bruteforce||[],_dnsCurrent.result.ip_geo||{}));
+    }
+    if (view === 'certs' && _dnsCurrent && !panel._certsLoaded) {
+      panel._certsLoaded = true;
+      loadCertHistory(_dnsCurrent.domain, panel);
     }
   }
 
@@ -4148,6 +4602,374 @@
     }
     cmLoadJobs();
     toast('Job deleted');
+  }
+
+  // ── OSINT Toolkit ─────────────────────────────────────────────────────────
+
+  function osintSwitchTool(tool, btn) {
+    document.querySelectorAll('.osint-tool-panel').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('.osint-sub-tab').forEach(b => b.classList.remove('active'));
+    document.getElementById('osint-' + tool).classList.add('active');
+    btn.classList.add('active');
+    if (tool === 'resources') osintRenderResources();
+  }
+
+  function osintLoading(id, msg) {
+    document.getElementById(id).innerHTML = `<div style="color:var(--muted);font-size:.82rem;padding:12px 0;display:flex;align-items:center;gap:8px"><span style="display:inline-block;width:14px;height:14px;border:2px solid var(--accent);border-top-color:transparent;border-radius:50%;animation:spin .8s linear infinite"></span>${msg}</div>`;
+  }
+  function osintError(id, msg) {
+    document.getElementById(id).innerHTML = `<div style="color:#f85149;font-size:.82rem;background:rgba(248,81,73,.08);border:1px solid rgba(248,81,73,.2);border-radius:6px;padding:10px 14px">⚠️ ${esc(msg)}</div>`;
+  }
+  function osintKV(pairs) {
+    const rows = pairs.filter(([,v])=>v!=null&&v!==''&&v!==false);
+    if (!rows.length) return '';
+    return `<div class="osint-kv">${rows.map(([k,v])=>`<span class="osint-kv-key">${k}</span><span class="osint-kv-val">${esc(String(v))}</span>`).join('')}</div>`;
+  }
+
+  // ── GitHub ──
+  async function osintGithubSearch() {
+    const u = document.getElementById('osint-github-input').value.trim();
+    if (!u) return;
+    const el = document.getElementById('osint-github-results');
+    osintLoading(el.id, `Looking up @${u} on GitHub…`);
+    try {
+      const r = await fetch(`/api/osint/github/${encodeURIComponent(u)}`);
+      const p = await r.json();
+      if (p.error || p.message === 'Not Found') throw new Error(p.message || p.error || 'User not found');
+      const emails = [...new Set([p.email, ...(p._extracted_emails||[])].filter(Boolean))];
+      el.innerHTML = `
+        <div class="osint-result-card">
+          <div style="display:flex;gap:14px;align-items:flex-start;margin-bottom:12px">
+            <img src="${esc(p.avatar_url||'')}" style="width:64px;height:64px;border-radius:50%;border:2px solid var(--border)" onerror="this.style.display='none'"/>
+            <div>
+              <div style="font-size:1rem;font-weight:700;color:var(--text)">${esc(p.name||p.login)}</div>
+              <div style="color:var(--muted);font-size:.78rem">@${esc(p.login)}</div>
+              ${p.bio ? `<div style="font-size:.8rem;color:var(--text);margin-top:4px">${esc(p.bio)}</div>` : ''}
+            </div>
+          </div>
+          ${osintKV([
+            ['User ID', p.id],
+            ['Company', p.company],
+            ['Location', p.location],
+            ['Email(s)', emails.join(', ') || null],
+            ['Blog / URL', p.blog],
+            ['Twitter', p.twitter_username ? '@'+p.twitter_username : null],
+            ['Public Repos', p.public_repos],
+            ['Followers', p.followers?.toLocaleString()],
+            ['Following', p.following?.toLocaleString()],
+            ['Account Created', p.created_at ? new Date(p.created_at).toLocaleDateString() : null],
+            ['Last Active', p.updated_at ? new Date(p.updated_at).toLocaleDateString() : null],
+            ['Hireable', p.hireable === true ? 'Yes' : p.hireable === false ? 'No' : null],
+          ])}
+          <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
+            <a href="${esc(p.html_url)}" target="_blank" rel="noopener noreferrer" class="btn btn-primary" style="font-size:.78rem;padding:5px 12px">🔗 GitHub Profile</a>
+            ${emails.length ? `<a href="mailto:${esc(emails[0])}" class="osint-found-badge">📧 ${esc(emails[0])}</a>` : ''}
+          </div>
+        </div>`;
+    } catch(e) { osintError(el.id, e.message); }
+  }
+
+  // ── Reddit ──
+  async function osintRedditSearch() {
+    const u = document.getElementById('osint-reddit-input').value.trim().replace(/^u\//,'');
+    if (!u) return;
+    const el = document.getElementById('osint-reddit-results');
+    osintLoading(el.id, `Looking up u/${u} on Reddit…`);
+    try {
+      const r = await fetch(`/api/osint/reddit/${encodeURIComponent(u)}`);
+      const json = await r.json();
+      if (json.error || !json.data) throw new Error(json.message || 'User not found or suspended');
+      const p = json.data;
+      const created = p.created_utc ? new Date(p.created_utc * 1000) : null;
+      const ageStr = created ? `${Math.floor((Date.now()/1000 - p.created_utc) / 86400 / 365)} years, joined ${created.toLocaleDateString()}` : null;
+      el.innerHTML = `
+        <div class="osint-result-card">
+          <div style="display:flex;gap:14px;align-items:flex-start;margin-bottom:12px">
+            ${p.icon_img ? `<img src="${esc(p.icon_img.split('?')[0])}" style="width:64px;height:64px;border-radius:50%;border:2px solid var(--border)" onerror="this.style.display='none'"/>` : '<div style="width:64px;height:64px;border-radius:50%;background:rgba(255,69,0,.2);display:flex;align-items:center;justify-content:center;font-size:1.5rem">🟠</div>'}
+            <div>
+              <div style="font-size:1rem;font-weight:700;color:var(--text)">u/${esc(p.name)}</div>
+              ${p.subreddit?.public_description ? `<div style="font-size:.8rem;color:var(--muted);margin-top:4px">${esc(p.subreddit.public_description.slice(0,120))}</div>` : ''}
+            </div>
+          </div>
+          ${osintKV([
+            ['Reddit ID', 't2_' + p.id],
+            ['Account Age', ageStr],
+            ['Total Karma', ((p.link_karma||0) + (p.comment_karma||0)).toLocaleString()],
+            ['Post Karma', (p.link_karma||0).toLocaleString()],
+            ['Comment Karma', (p.comment_karma||0).toLocaleString()],
+            ['Verified Email', p.has_verified_email ? 'Yes' : 'No'],
+            ['Reddit Premium', p.is_gold ? 'Yes' : 'No'],
+            ['Moderator', p.is_mod ? 'Yes' : 'No'],
+            ['Employee', p.is_employee ? 'Yes' : 'No'],
+            ['NSFW Profile', p.over_18 ? 'Yes' : 'No'],
+            ['Subscribers', p.subreddit?.subscribers?.toLocaleString() || null],
+          ])}
+          <div style="margin-top:10px">
+            <a href="https://reddit.com/user/${esc(u)}" target="_blank" rel="noopener noreferrer" class="btn btn-primary" style="font-size:.78rem;padding:5px 12px">🔗 Reddit Profile</a>
+          </div>
+        </div>`;
+    } catch(e) { osintError(el.id, e.message); }
+  }
+
+  // ── Discord ──
+  async function osintDiscordSearch() {
+    const uid = document.getElementById('osint-discord-input').value.trim();
+    if (!uid || !/^\d+$/.test(uid)) { osintError('osint-discord-results', 'Enter a valid numeric Discord User ID'); return; }
+    const el = document.getElementById('osint-discord-results');
+    osintLoading(el.id, `Fetching Discord user ${uid}…`);
+    try {
+      const r = await fetch(`/api/osint/discord/${encodeURIComponent(uid)}`);
+      const p = await r.json();
+      if (p.error) throw new Error(p.error);
+      const avatar = p.avatar?.link;
+      // Discord snowflake → timestamp
+      const snowTs = new Date(Number(BigInt(uid) >> 22n) + 1420070400000);
+      el.innerHTML = `
+        <div class="osint-result-card">
+          <div style="display:flex;gap:14px;align-items:flex-start;margin-bottom:12px">
+            ${avatar ? `<img src="${esc(avatar)}" style="width:64px;height:64px;border-radius:50%;border:2px solid var(--border)" onerror="this.style.display='none'"/>` : '<div style="width:64px;height:64px;border-radius:50%;background:rgba(88,101,242,.2);display:flex;align-items:center;justify-content:center;font-size:1.5rem">💬</div>'}
+            <div>
+              <div style="font-size:1rem;font-weight:700;color:var(--text)">${esc(p.global_name || p.username || uid)}</div>
+              ${p.username ? `<div style="color:var(--muted);font-size:.78rem">@${esc(p.username)}</div>` : ''}
+            </div>
+          </div>
+          ${osintKV([
+            ['User ID', p.id],
+            ['Username', p.username],
+            ['Display Name', p.global_name],
+            ['Account Created (Snowflake)', snowTs.toLocaleString()],
+            ['Bot', p.bot ? 'Yes' : 'No'],
+            ['System Account', p.system ? 'Yes' : 'No'],
+            ['Badges', (p.badges||[]).join(', ') || 'None'],
+            ['Accent Color', p.accent_color || null],
+            ['Banner', p.banner?.link || null],
+          ])}
+        </div>`;
+    } catch(e) { osintError(el.id, e.message); }
+  }
+
+  // ── TikTok ──
+  async function osintTikTokSearch() {
+    const u = document.getElementById('osint-tiktok-input').value.trim().replace(/^@/,'');
+    if (!u) return;
+    const el = document.getElementById('osint-tiktok-results');
+    osintLoading(el.id, `Looking up @${u} on TikTok…`);
+    try {
+      const r = await fetch(`/api/osint/tiktok/${encodeURIComponent(u)}`);
+      const json = await r.json();
+      const p = json?.userInfo?.user;
+      const stats = json?.userInfo?.stats;
+      if (!p) throw new Error('User not found or TikTok blocked the request — try again shortly');
+      const created = p.createTime ? new Date(p.createTime * 1000) : null;
+      el.innerHTML = `
+        <div class="osint-result-card">
+          <div style="display:flex;gap:14px;align-items:flex-start;margin-bottom:12px">
+            ${p.avatarMedium ? `<img src="${esc(p.avatarMedium)}" style="width:64px;height:64px;border-radius:50%;border:2px solid var(--border)" onerror="this.style.display='none'"/>` : '<div style="width:64px;height:64px;border-radius:50%;background:rgba(254,44,85,.15);display:flex;align-items:center;justify-content:center;font-size:1.5rem">🎵</div>'}
+            <div>
+              <div style="font-size:1rem;font-weight:700;color:var(--text)">@${esc(p.uniqueId)}</div>
+              <div style="color:var(--muted);font-size:.78rem">${esc(p.nickname||'')}</div>
+              ${p.signature ? `<div style="font-size:.8rem;color:var(--text);margin-top:4px">${esc(p.signature.slice(0,120))}</div>` : ''}
+            </div>
+          </div>
+          ${osintKV([
+            ['User ID', p.id],
+            ['Unique ID', p.uniqueId],
+            ['Nickname', p.nickname],
+            ['Followers', stats?.followerCount?.toLocaleString()],
+            ['Following', stats?.followingCount?.toLocaleString()],
+            ['Total Likes', stats?.heartCount?.toLocaleString()],
+            ['Videos', stats?.videoCount?.toLocaleString()],
+            ['Verified', p.verified ? '✓ Yes' : 'No'],
+            ['Private', p.privateAccount ? 'Yes' : 'No'],
+            ['Region', p.region],
+            ['Language', p.language],
+            ['Created', created ? created.toLocaleDateString() : null],
+          ])}
+          <div style="margin-top:10px">
+            <a href="https://tiktok.com/@${esc(u)}" target="_blank" rel="noopener noreferrer" class="btn btn-primary" style="font-size:.78rem;padding:5px 12px">🔗 TikTok Profile</a>
+          </div>
+        </div>`;
+    } catch(e) {
+      osintError(el.id, e.message);
+      document.getElementById('osint-tiktok-results').innerHTML += `<div style="margin-top:8px;font-size:.78rem;color:var(--muted)">Also try: <a href="https://tiktok.com/@${esc(u)}" target="_blank" style="color:var(--accent)">TikTok Profile</a></div>`;
+    }
+  }
+
+  // ── Domain WHOIS ──
+  async function osintDomainSearch() {
+    const domain = document.getElementById('osint-domain-input').value.trim().replace(/^https?:\/\//,'').split('/')[0].toLowerCase();
+    if (!domain) return;
+    const el = document.getElementById('osint-domain-results');
+    osintLoading(el.id, `Looking up ${domain}…`);
+    try {
+      const r = await fetch(`/api/osint/domain/${encodeURIComponent(domain)}`);
+      const data = await r.json();
+
+      let whoisHtml = '';
+      if (data.rdap && data.rdap_status < 400) {
+        const w = data.rdap;
+        const registrar = w.entities?.find(e => (e.roles||[]).includes('registrar'));
+        const regName = registrar?.vcardArray?.[1]?.find(v=>v[0]==='fn')?.[3];
+        const ns = w.nameservers?.map(n=>n.ldhName).join(', ');
+        const reg = w.events?.find(e=>e.eventAction==='registration')?.eventDate;
+        const exp = w.events?.find(e=>e.eventAction==='expiration')?.eventDate;
+        const upd = w.events?.find(e=>e.eventAction==='last changed')?.eventDate;
+        whoisHtml = `<div class="osint-result-card" style="margin-bottom:10px">
+          <h3 style="font-size:.85rem;font-weight:700;margin:0 0 8px">📋 WHOIS / RDAP</h3>
+          ${osintKV([
+            ['Domain', w.ldhName || domain],
+            ['Registrar', regName || null],
+            ['Status', (w.status||[]).slice(0,3).join(', ') || null],
+            ['Name Servers', ns || null],
+            ['Registered', reg ? new Date(reg).toLocaleDateString() : null],
+            ['Expires', exp ? new Date(exp).toLocaleDateString() : null],
+            ['Updated', upd ? new Date(upd).toLocaleDateString() : null],
+          ])}
+        </div>`;
+      } else {
+        whoisHtml = `<div style="color:var(--muted);font-size:.8rem;margin-bottom:10px">RDAP lookup returned no data — domain may not exist or RDAP not supported</div>`;
+      }
+
+      let crtHtml = '';
+      if (data.crtsh?.length) {
+        const names = data.crtsh.slice(0, 60);
+        crtHtml = `<div class="osint-result-card" style="margin-bottom:10px">
+          <h3 style="font-size:.85rem;font-weight:700;margin:0 0 8px">🔐 Certificate Transparency — ${names.length}${data.crtsh.length > 60 ? '+' : ''} unique names</h3>
+          <div style="display:flex;flex-wrap:wrap;gap:5px;max-height:180px;overflow-y:auto">
+            ${names.map(d=>`<span style="font-family:var(--mono);font-size:.72rem;background:var(--surface);border:1px solid var(--border);border-radius:4px;padding:2px 7px">${esc(d)}</span>`).join('')}
+          </div>
+        </div>`;
+      }
+
+      el.innerHTML = whoisHtml + crtHtml + `<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:4px">
+        ${[
+          ['Shodan', `https://www.shodan.io/search?query=${domain}`],
+          ['VirusTotal', `https://www.virustotal.com/gui/domain/${domain}`],
+          ['URLScan.io', `https://urlscan.io/search/#domain:${domain}`],
+          ['SecurityTrails', `https://securitytrails.com/domain/${domain}/dns`],
+          ['DNSDumpster', `https://dnsdumpster.com/`],
+        ].map(([n,u])=>`<a href="${esc(u)}" target="_blank" rel="noopener noreferrer" class="osint-found-badge">🔗 ${esc(n)}</a>`).join('')}
+      </div>`;
+    } catch(e) { osintError(el.id, e.message); }
+  }
+
+  // ── Google Account ──
+  async function osintGoogleSearch() {
+    const email = document.getElementById('osint-google-input').value.trim();
+    if (!email) return;
+    const el = document.getElementById('osint-google-results');
+    // Compute SHA-256 for Gravatar
+    const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(email.toLowerCase().trim()));
+    const hash = Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
+    el.innerHTML = `<div class="osint-result-card">
+      <h3 style="font-size:.85rem;font-weight:700;margin:0 0 10px">🔍 Google / Email Intel: ${esc(email)}</h3>
+      <p style="font-size:.78rem;color:var(--muted);margin:0 0 12px">Google's People API requires OAuth — these server-accessible tools will give the best results:</p>
+      <div style="display:flex;flex-wrap:wrap;gap:8px">
+        ${[
+          ['Epieos', `https://epieos.com/?q=${encodeURIComponent(email)}&type=email`],
+          ['HaveIBeenPwned', `https://haveibeenpwned.com/account/${encodeURIComponent(email)}`],
+          ['Hunter.io Verify', `https://hunter.io/email-verifier/${encodeURIComponent(email)}`],
+          ['EmailRep.io', `https://emailrep.io/${encodeURIComponent(email)}`],
+          ['Gravatar', `https://en.gravatar.com/${hash}`],
+          ['Intelligence X', `https://intelx.io/?s=${encodeURIComponent(email)}`],
+          ['Holehe (CLI)', `https://github.com/megadose/holehe`],
+          ['GHunt (CLI)', `https://github.com/mxrch/GHunt`],
+        ].map(([n,u])=>`<a href="${esc(u)}" target="_blank" rel="noopener noreferrer" class="osint-found-badge">🔗 ${esc(n)}</a>`).join('')}
+      </div>
+      <div style="margin-top:12px;padding:10px;background:var(--surface);border-radius:6px;font-size:.75rem;color:var(--muted)">
+        💡 For full Google account OSINT, run <code>ghunt email ${esc(email)}</code> on your GHunt server or use Epieos which does this automatically.
+      </div>
+    </div>`;
+  }
+
+  // ── Email OSINT ──
+  async function osintEmailSearch() {
+    const email = document.getElementById('osint-email-input').value.trim();
+    if (!email) return;
+    const el = document.getElementById('osint-email-results');
+    el.innerHTML = `<div class="osint-result-card">
+      <h3 style="font-size:.85rem;font-weight:700;margin:0 0 10px">📧 Email Investigation: ${esc(email)}</h3>
+      <div style="display:flex;flex-wrap:wrap;gap:8px">
+        ${[
+          ['HaveIBeenPwned', `https://haveibeenpwned.com/account/${encodeURIComponent(email)}`],
+          ['Epieos', `https://epieos.com/?q=${encodeURIComponent(email)}&type=email`],
+          ['EmailRep.io', `https://emailrep.io/${encodeURIComponent(email)}`],
+          ['Intelligence X', `https://intelx.io/?s=${encodeURIComponent(email)}`],
+          ['Hunter.io', `https://hunter.io/email-verifier/${encodeURIComponent(email)}`],
+          ['Dehashed', `https://dehashed.com/search?query=${encodeURIComponent(email)}`],
+          ['Snusbase', `https://snusbase.com/`],
+          ['Holehe (CLI)', `https://github.com/megadose/holehe`],
+        ].map(([n,u])=>`<a href="${esc(u)}" target="_blank" rel="noopener noreferrer" class="osint-found-badge">🔗 ${esc(n)}</a>`).join('')}
+      </div>
+    </div>`;
+  }
+
+  // ── Username (server-side via proxy) ──
+  async function osintUsernameSearch() {
+    const u = document.getElementById('osint-username-input').value.trim();
+    if (!u) return;
+    const resEl = document.getElementById('osint-username-results');
+    const foundEl = document.getElementById('osint-username-found');
+    const btn = document.getElementById('osintUsernameBtn');
+    btn.disabled = true; btn.textContent = '⏳ Scanning…';
+    resEl.style.display = 'block';
+    foundEl.innerHTML = '<div style="color:var(--muted);font-size:.8rem;display:flex;align-items:center;gap:8px"><span style="display:inline-block;width:12px;height:12px;border:2px solid var(--accent);border-top-color:transparent;border-radius:50%;animation:spin .8s linear infinite"></span>Running server-side checks across 200 platforms…</div>';
+    document.getElementById('osint-username-progress-fill').style.width = '30%';
+    document.getElementById('osint-username-progress-text').textContent = 'Searching…';
+    try {
+      const r = await fetch(`/api/osint/username/${encodeURIComponent(u)}`);
+      const data = await r.json();
+      document.getElementById('osint-username-progress-fill').style.width = '100%';
+      if (data.error) throw new Error(data.error);
+      const found = data.found || [];
+      document.getElementById('osint-username-progress-text').textContent = `${found.length} found across ${data.checked} platforms`;
+      if (found.length === 0) {
+        foundEl.innerHTML = '<div style="color:var(--muted);font-size:.8rem;padding:8px 0">No accounts found across checked platforms.</div>';
+      } else {
+        foundEl.innerHTML = found.map(f => `<a href="${esc(f.url)}" target="_blank" rel="noopener noreferrer" class="osint-found-badge">✓ ${esc(f.name)}</a>`).join('');
+      }
+    } catch(e) {
+      foundEl.innerHTML = `<div style="color:#f85149;font-size:.82rem">${esc(e.message)}</div>`;
+    }
+    btn.disabled = false; btn.textContent = '🔍 Search';
+  }
+
+  // ── OSINT Resources ──
+  function osintRenderResources() {
+    const resources = [
+      { title: 'Shodan', url: 'https://shodan.io', cat: 'Network', desc: 'Search engine for internet-connected devices' },
+      { title: 'Censys', url: 'https://censys.io', cat: 'Network', desc: 'Internet-wide scanning and certificate data' },
+      { title: 'VirusTotal', url: 'https://virustotal.com', cat: 'Malware', desc: 'File, URL, IP, and domain analysis' },
+      { title: 'URLScan.io', url: 'https://urlscan.io', cat: 'Web', desc: 'Website scanning and screenshot service' },
+      { title: 'Intelligence X', url: 'https://intelx.io', cat: 'Search', desc: 'Dark web and paste search engine' },
+      { title: 'Epieos', url: 'https://epieos.com', cat: 'Email', desc: 'Reverse email lookup via Google/social' },
+      { title: 'HaveIBeenPwned', url: 'https://haveibeenpwned.com', cat: 'Breach', desc: 'Check emails in data breaches' },
+      { title: 'SpiderFoot', url: 'https://www.spiderfoot.net', cat: 'Automation', desc: 'Automated OSINT reconnaissance' },
+      { title: 'SecurityTrails', url: 'https://securitytrails.com', cat: 'DNS', desc: 'Historical DNS and domain data' },
+      { title: 'Wayback Machine', url: 'https://web.archive.org', cat: 'Archive', desc: 'Archived versions of websites' },
+      { title: 'OSINT Framework', url: 'https://osintframework.com', cat: 'Reference', desc: 'Comprehensive OSINT tools map' },
+      { title: 'Maltego', url: 'https://maltego.com', cat: 'Graphing', desc: 'Link analysis and data mining' },
+      { title: 'GrayhatWarfare', url: 'https://buckets.grayhatwarfare.com', cat: 'Cloud', desc: 'Public cloud bucket search' },
+      { title: 'Dehashed', url: 'https://dehashed.com', cat: 'Breach', desc: 'Search hacked databases' },
+      { title: 'GHunt', url: 'https://github.com/mxrch/GHunt', cat: 'Google', desc: 'Google account OSINT (CLI)' },
+      { title: 'Holehe', url: 'https://github.com/megadose/holehe', cat: 'Email', desc: 'Check email usage on 120+ sites (CLI)' },
+      { title: 'Maigret', url: 'https://github.com/soxoj/maigret', cat: 'Username', desc: 'Collect dossier from username (CLI)' },
+      { title: 'theHarvester', url: 'https://github.com/laramies/theHarvester', cat: 'Email/Domain', desc: 'Email, subdomain & host harvester (CLI)' },
+      { title: 'DNSDumpster', url: 'https://dnsdumpster.com', cat: 'DNS', desc: 'DNS recon & research, visual mapping' },
+      { title: 'Recon-ng', url: 'https://github.com/lanmaster53/recon-ng', cat: 'Automation', desc: 'Full-featured web recon framework (CLI)' },
+      { title: 'EmailRep.io', url: 'https://emailrep.io', cat: 'Email', desc: 'Email reputation and intel lookup' },
+      { title: 'Fofa', url: 'https://fofa.info', cat: 'Network', desc: 'Chinese internet asset search engine' },
+      { title: 'ZoomEye', url: 'https://zoomeye.org', cat: 'Network', desc: 'Cyberspace search engine by Knownsec' },
+      { title: 'Hunter.io', url: 'https://hunter.io', cat: 'Email', desc: 'Find professional email addresses' },
+    ];
+    document.getElementById('osint-resource-grid').innerHTML = resources.map(r => `
+      <a href="${esc(r.url)}" target="_blank" rel="noopener noreferrer" class="osint-resource-card">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:5px">
+          <span class="osint-resource-card-title">${esc(r.title)}</span>
+          <span style="font-size:.68rem;background:rgba(88,166,255,.1);color:var(--accent);border:1px solid rgba(88,166,255,.2);border-radius:3px;padding:1px 6px">${esc(r.cat)}</span>
+        </div>
+        <div class="osint-resource-card-desc">${esc(r.desc)}</div>
+      </a>`).join('');
   }
 
 </script>
