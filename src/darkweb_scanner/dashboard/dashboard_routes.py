@@ -8,7 +8,6 @@ import ssl
 import urllib.error
 import urllib.request
 import urllib3
-urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 from datetime import datetime
 from pathlib import Path
 
@@ -16,6 +15,8 @@ from flask import Blueprint, Response, jsonify, render_template, request, sessio
 
 from ..auth import hash_password, require_login, validate_password_strength
 from .storage_helper import get_storage
+
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 dashboard_bp = Blueprint("dashboard", __name__)
 
