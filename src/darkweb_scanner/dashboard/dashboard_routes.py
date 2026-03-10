@@ -4,6 +4,11 @@ Dashboard blueprint — all protected routes.
 
 import json
 import os
+import ssl
+import urllib.error
+import urllib.request
+import urllib3
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 from datetime import datetime
 from pathlib import Path
 
@@ -2282,7 +2287,7 @@ window._ready = true;
         if not issuers:
             return None
         top = sorted(issuers.items(), key=lambda x: x[1], reverse=True)[:8]
-        labels = [l[:28] for l, _ in top]
+        labels = [lbl[:28] for lbl, _ in top]
         vals = [v for _, v in top]
         palette = ["#58a6ff","#3fb950","#bc8cff","#f85149","#d29922","#8b949e","#79c0ff","#56d364"]
         fig, ax = plt.subplots(figsize=(5.5, 2.6))
@@ -3280,10 +3285,6 @@ def api_paste_scan():
 
 # ── OSINT Toolkit Proxy Routes ────────────────────────────────────────────────
 # Server-side proxy so browser CORS restrictions don't block external APIs
-
-import urllib.request
-import urllib.error
-import ssl
 
 def _fetch_url(url, headers=None, timeout=10):
     """Simple HTTP GET helper, returns (status, body_bytes)."""
