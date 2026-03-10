@@ -2210,7 +2210,7 @@ def api_dns_pdf(inv_id: int):
 <style>
 *{{margin:0;padding:0;box-sizing:border-box}}
 body{{background:#0d1117}}
-#map{{width:900px;height:240px;background:#0d1117}}
+#map{{width:1200px;height:500px;background:#0d1117}}
 .jvm-tooltip{{background:#1c2d3a!important;color:#e6edf3!important;border:1px solid #30363d!important;font-size:11px!important;border-radius:4px!important;padding:4px 8px!important}}
 </style></head><body>
 <div id="map"></div>
@@ -2222,6 +2222,7 @@ try {{
   new jsVectorMap({{
     map:'world', selector:'#map',
     zoomButtons:false, zoomOnScroll:false, draggable:false,
+    focusOn:{{ x:0.5, y:0.5, scale:1 }},
     selectedRegions:{_json.dumps(regions)},
     markers:{_json.dumps(markers)},
     regionStyle:{{
@@ -2243,25 +2244,13 @@ window._ready = true;
             import tempfile as _tmp, os as _os
             with _swp() as _p:
                 _browser = _p.chromium.launch(headless=True)
-                _page = _browser.new_page(viewport={'width': 900, 'height': 240})
-                # Write to a temp file so Playwright can load it as a proper page
-                # (set_content doesn't fire network requests for external scripts)
+                _page = _browser.new_page(viewport={'width': 1200, 'height': 500})
                 _tf = _tmp.NamedTemporaryFile(suffix='.html', delete=False, mode='w')
                 _tf.write(html)
                 _tf.close()
                 _page.goto(f"file://{_tf.name}", wait_until='networkidle', timeout=20000)
                 _page.wait_for_timeout(800)
-                # Get the actual SVG element bounds inside the map div and crop to it
-                _svg_box = _page.evaluate("""() => {
-                    const svg = document.querySelector('#map svg');
-                    if (!svg) return null;
-                    const r = svg.getBoundingClientRect();
-                    return {x: r.left, y: r.top, width: r.width, height: r.height};
-                }""")
-                if _svg_box and _svg_box['height'] > 20:
-                    _png = _page.screenshot(clip=_svg_box)
-                else:
-                    _png = _page.locator('#map').screenshot()
+                _png = _page.locator('#map').screenshot()
                 _browser.close()
                 _os.unlink(_tf.name)
 
@@ -2273,8 +2262,8 @@ window._ready = true;
             _iw, _ih = _ir.getSize()
             _w = 175 * mm
             _h = _w * (_ih / _iw)
-            # Cap height so it always fits on page 1 alongside the ASN table
-            _max_h = 70 * mm
+            # Cap height at 90mm for full-width map
+            _max_h = 90 * mm
             if _h > _max_h:
                 _w = _max_h * (_iw / _ih)
                 _h = _max_h
@@ -2548,7 +2537,7 @@ window._ready = true;
     elif asn_img:
         story.append(asn_img)
 
-    # ── World map + ASN table side by side ───────────────────────────────────
+    # ── World map ─────────────────────────────────────────────────────────────
     wmap = None
     if cc_counter:
         try:
@@ -2578,20 +2567,14 @@ window._ready = true;
         asn_tbl = dark_table(
             [Paragraph(h, S(f"ah_{h}", fontSize=7.5, textColor=C_TEXT, fontName="Helvetica-Bold"))
              for h in ["Organisation / ASN Name", "ASN", "Country", "IPs"]],
-            asn_rows, [PW*0.5, PW*0.22, PW*0.17, PW*0.11]
+            asn_rows, [PW*0.46, PW*0.26, PW*0.17, PW*0.11]
         )
 
     if wmap and asn_tbl:
-        # Map left, ASN table right
-        combo = Table([[wmap, asn_tbl]], colWidths=[PW * 0.48, PW * 0.52])
-        combo.setStyle(TableStyle([
-            ("VALIGN", (0,0), (-1,-1), "TOP"),
-            ("LEFTPADDING", (0,0), (-1,-1), 0),
-            ("RIGHTPADDING", (0,0), (0,-1), 6),
-            ("RIGHTPADDING", (1,0), (-1,-1), 0),
-        ]))
         story.append(Spacer(1, 6))
-        story.append(combo)
+        story.append(wmap)
+        story.append(Spacer(1, 6))
+        story.append(asn_tbl)
     elif wmap:
         story.append(Spacer(1, 6))
         story.append(wmap)
