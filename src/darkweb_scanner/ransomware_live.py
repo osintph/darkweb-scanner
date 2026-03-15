@@ -125,12 +125,18 @@ def get_victims(
 ) -> list:
     """GET /victims/ with optional filters."""
     params = {}
-    if group:   params["group"]   = group
-    if country: params["country"] = country
-    if sector:  params["sector"]  = sector
-    if year:    params["year"]    = year
-    if month:   params["month"]   = month
-    if query:   params["query"]   = query
+    if group:
+        params["group"] = group
+    if country:
+        params["country"] = country
+    if sector:
+        params["sector"] = sector
+    if year:
+        params["year"] = year
+    if month:
+        params["month"] = month
+    if query:
+        params["query"] = query
 
     data = _get("/victims/", params=params)
     if isinstance(data, list):
@@ -218,9 +224,12 @@ def get_negotiation_chat(group_name: str, chat_id: str) -> Optional[dict]:
 def get_press_recent(country: str = None, year: str = None, month: str = None) -> list:
     """GET /press/recent — response wrapped in {results:[...]}"""
     params = {}
-    if country: params["country"] = country
-    if year:    params["year"]    = year
-    if month:   params["month"]   = month
+    if country:
+        params["country"] = country
+    if year:
+        params["year"] = year
+    if month:
+        params["month"] = month
     data = _get("/press/recent", params=params)
     if isinstance(data, list):
         return data
@@ -234,9 +243,12 @@ def get_press_recent(country: str = None, year: str = None, month: str = None) -
 def get_press_all(country: str = None, year: str = None, month: str = None) -> list:
     """GET /press/all — response wrapped in {results:[...]}"""
     params = {}
-    if country: params["country"] = country
-    if year:    params["year"]    = year
-    if month:   params["month"]   = month
+    if country:
+        params["country"] = country
+    if year:
+        params["year"] = year
+    if month:
+        params["month"] = month
     data = _get("/press/all", params=params)
     if isinstance(data, list):
         return data
@@ -315,9 +327,12 @@ def get_group_yara(group_name: str) -> Optional[str]:
 def get_8k_filings(ticker: str = None, year: str = None, month: str = None) -> list:
     """GET /8k — SEC cybersecurity disclosures."""
     params = {}
-    if ticker: params["ticker"] = ticker
-    if year:   params["year"]   = year
-    if month:  params["month"]  = month
+    if ticker:
+        params["ticker"] = ticker
+    if year:
+        params["year"] = year
+    if month:
+        params["month"] = month
     data = _get("/8k", params=params)
     return data if isinstance(data, list) else []
 

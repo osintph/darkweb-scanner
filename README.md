@@ -2,7 +2,7 @@
 
 A self-hosted, open-source threat intelligence platform built for the Philippine and Southeast Asian security landscape. Crawls .onion networks, monitors Telegram channels, tracks ransomware groups, profiles threat actors, and delivers a daily intelligence digest — all from a single Docker deployment.
 
-**Version: 1.1.0 · License: AGPL v3**
+**Version: 1.0.1 · License: AGPL v3**
 
 ---
 

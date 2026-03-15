@@ -3,7 +3,7 @@
 All notable changes to this project will be documented in this file.
 The format follows **Keep a Changelog**. This project adheres to **Semantic Versioning**.
 
-## [1.1.0] - 2026-03-15
+## [1.0.1] - 2026-03-15
 
 ### Added
 - **Intelligence Dashboard (Home tab)** — new start page replacing the crawler stats as the default landing page
