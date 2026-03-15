@@ -2,7 +2,7 @@
 
 A self-hosted, open-source threat intelligence platform built for the Philippine and Southeast Asian security landscape. Crawls .onion networks, monitors Telegram channels, tracks ransomware groups, profiles threat actors, and delivers a daily intelligence digest — all from a single Docker deployment.
 
-**Version: 1.0.0 · License: AGPL v3**
+**Version: 1.1.0 · License: AGPL v3**
 
 ---
 
@@ -28,6 +28,9 @@ DOMAIN=scanner.yourdomain.com SSL_EMAIL=you@example.com \
 ## 🧩 Features
 
 - **Dark Web Crawler** — async Tor-based crawler for .onion sites, configurable keyword monitoring, real-time alerts
+- **Intelligence Dashboard** — new start page with live threat level, ransomware victim feed, group rankings, SEA country breakdown, ThreatFox IOC mini-feed, and press headlines
+- **ransomware.live PRO Integration** — full PRO API integration: 324+ tracked groups, 26,000+ victims, IOCs, negotiation chats, ransom notes, YARA rules, SEC 8-K filings, CSIRT directory
+- **IOC Feed** — live indicators of compromise from ThreatFox, URLhaus, and Feodo Tracker with search, type filtering, and confidence scoring
 - **Channel Monitor** — interactive dashboard tab to scrape any Telegram channel on demand, auto-translate messages to English, download results as a ZIP (HTML report + media)
 - **Telegram Scraper** — monitors public Telegram channels for keyword hits using the same engine as the crawler
 - **Projects** — scoped monitoring engagements with per-project keywords, target domains, entities, and hit tracking
@@ -35,7 +38,7 @@ DOMAIN=scanner.yourdomain.com SSL_EMAIL=you@example.com \
 - **Infrastructure Recon** — full passive + active DNS recon with DNSDumpster enrichment, active subdomain brute-force, TCP port scanning across 30 services, HTTP directory enumeration, certificate transparency history, zone transfer attempts, SPF/DMARC/DKIM email security scoring, interactive subdomain node graph, per-IP port heatmap, and PDF export with world map
 - **OSINT Toolkit** — seven proxied OSINT tools (Shodan, Censys, GreyNoise, URLScan, MXToolbox, SecurityTrails, VirusTotal) accessible directly from the dashboard
 - **Web Check** — on-demand OSINT analysis for any domain: SSL, headers, open ports, tech stack, WHOIS, and more
-- **Ransomware Tracker** — live tracking of active ransomware groups with SEA/PH regional focus
+- **Ransomware Tracker** — live tracking of 324+ ransomware groups powered by ransomware.live PRO with SEA/PH regional focus, victim counts, and SEA-targeting flags
 - **Threat Actor Profiles** — structured APT and cybercriminal profiles relevant to Southeast Asia
 - **Daily Digest** — morning email with CISA KEV, OTX pulses, abuse.ch feeds, and curated RSS — delivered via Mailgun
 - **Authentication** — bcrypt passwords, TOTP 2FA, optional Google/GitHub OAuth, role-based access control
@@ -109,6 +112,9 @@ All configuration lives in `.env`. **Never commit this file.**
 
 | Variable | Description |
 |----------|-------------|
+| `RANSOMWARE_LIVE_API_KEY` | **ransomware.live PRO — free forever at my.ransomware.live** — unlocks IOCs, negotiations, ransom notes, YARA rules, 3000 calls/day |
+| `THREATFOX_API_KEY` | ThreatFox (abuse.ch) — free at threatfox.abuse.ch — live IOC feed |
+| `WHITEINTEL_API_KEY` | WhiteIntel — free tier at whiteintel.io — credential exposure monitoring |
 | `OTX_API_KEY` | AlienVault OTX — free at otx.alienvault.com |
 | `ABUSEIPDB_API_KEY` | AbuseIPDB — free tier: 1,000 checks/day |
 | `VIRUSTOTAL_API_KEY` | VirusTotal — free tier: 4 req/min |
@@ -187,14 +193,16 @@ src/darkweb_scanner/
   digest.py            # daily email digest
   dns_crawler.py       # DNS recon + subdomain brute-force + port scan + dir enum
   ip_lookup.py         # IP investigation module
+  ransomware_live.py   # ransomware.live PRO API client (NEW)
   telegram_scraper.py  # Telegram channel scraper (keyword hit pipeline)
   channel_monitor.py   # Telegram channel monitor (on-demand scrape + translate)
   threat_actors.py     # threat actor profile data
-  ransomware_data.py   # ransomware group data
+  ransomware_data.py   # local ransomware group data (merged with live API)
   dashboard/
     app.py             # Flask application factory
     auth_routes.py     # login, register, TOTP, OAuth
-    dashboard_routes.py # all API and dashboard routes
+    dashboard_routes.py # all API and dashboard routes + proxy endpoints
+    ransomware_live_routes.py # ransomware.live PRO API routes (NEW)
     channel_monitor_routes.py # Channel Monitor API routes + job runner
     templates/
       index.html       # single-page dashboard UI
@@ -224,11 +232,13 @@ make stop          # stop all containers
 
 ## 🗺️ Roadmap
 
+- WhiteIntel full dashboard integration (credential exposure per domain)
 - Breach data search (HIBP integration)
 - Custom port scan wordlist upload via dashboard
 - Scheduled / recurring DNS recon jobs
 - Mobile interface
 - Expanded SEA/PH threat actor profiles and keyword coverage
+- Ransomware group detail modal with full ransomware.live PRO data
 
 ---
 

@@ -3431,6 +3431,132 @@ def osint_username_check(username):
     return jsonify({"found": found, "checked": len(sites)})
 
 
+# ── ThreatFox proxy (avoids browser CORS) ─────────────────────────────────────
+
+@dashboard_bp.route("/api/proxy/threatfox", methods=["POST"])
+@require_login
+def proxy_threatfox():
+    """Proxy ThreatFox API — avoids CORS from browser."""
+    import json as _json
+    try:
+        body = request.get_data()
+        api_key = os.getenv("THREATFOX_API_KEY", "")
+        headers = {
+            "Content-Type": "application/json",
+            "User-Agent": "OSINTPH/1.0",
+        }
+        if api_key:
+            headers["Auth-Key"] = api_key
+        req = urllib.request.Request(
+            "https://threatfox-api.abuse.ch/api/v1/",
+            data=body,
+            headers=headers,
+            method="POST",
+        )
+        ctx = ssl.create_default_context()
+        ctx.check_hostname = False
+        ctx.verify_mode = ssl.CERT_NONE
+        with urllib.request.urlopen(req, timeout=15, context=ctx) as resp:
+            return Response(resp.read(), mimetype="application/json")
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@dashboard_bp.route("/api/proxy/urlhaus", methods=["POST"])
+@require_login
+def proxy_urlhaus():
+    """Proxy URLhaus recent URLs."""
+    import json as _json
+    try:
+        body = b"limit=200"
+        req = urllib.request.Request(
+            "https://urlhaus-api.abuse.ch/v1/urls/recent/",
+            data=body,
+            headers={"Content-Type": "application/x-www-form-urlencoded", "User-Agent": "OSINTPH/1.0"},
+            method="POST",
+        )
+        ctx = ssl.create_default_context()
+        ctx.check_hostname = False
+        ctx.verify_mode = ssl.CERT_NONE
+        with urllib.request.urlopen(req, timeout=15, context=ctx) as resp:
+            return Response(resp.read(), mimetype="application/json")
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@dashboard_bp.route("/api/proxy/feodo")
+@require_login
+def proxy_feodo():
+    """Proxy Feodo Tracker C2 blocklist."""
+    status, body = _fetch_url("https://feodotracker.abuse.ch/downloads/ipblocklist.json")
+    return Response(body, mimetype="application/json")
+
+
+# ── WhiteIntel proxy ───────────────────────────────────────────────────────────
+
+@dashboard_bp.route("/api/whiteintel/alerts")
+@require_login
+def whiteintel_alerts():
+    """
+    Fetch credential exposure alerts from WhiteIntel.
+    Requires WHITEINTEL_API_KEY in .env
+    GET /api/whiteintel/alerts?page=1&limit=50&severity=critical
+    """
+    import json as _json
+    api_key = os.getenv("WHITEINTEL_API_KEY", "")
+    if not api_key:
+        return jsonify({"ok": False, "error": "WHITEINTEL_API_KEY not set", "data": []}), 200
+
+    page     = request.args.get("page", "1")
+    limit    = request.args.get("limit", "50")
+    severity = request.args.get("severity", "")
+
+    params = f"?page={page}&limit={limit}"
+    if severity:
+        params += f"&severity={severity}"
+
+    status, body = _fetch_url(
+        f"https://whiteintel.io/api/v1/alerts{params}",
+        headers={
+            "Authorization": f"Bearer {api_key}",
+            "Accept": "application/json",
+            "User-Agent": "OSINTPH/1.0",
+        },
+    )
+    try:
+        data = _json.loads(body)
+        return jsonify({"ok": True, "data": data})
+    except Exception:
+        return jsonify({"ok": False, "error": f"HTTP {status}", "raw": body[:200].decode("utf-8", errors="replace")}), 200
+
+
+@dashboard_bp.route("/api/whiteintel/search")
+@require_login
+def whiteintel_search():
+    """Search WhiteIntel for a specific domain. ?domain=example.com"""
+    import json as _json
+    api_key = os.getenv("WHITEINTEL_API_KEY", "")
+    domain  = request.args.get("domain", "").strip()
+    if not domain:
+        return jsonify({"ok": False, "error": "domain parameter required"}), 400
+    if not api_key:
+        return jsonify({"ok": False, "error": "WHITEINTEL_API_KEY not set", "data": []}), 200
+
+    status, body = _fetch_url(
+        f"https://whiteintel.io/api/v1/search?domain={domain}",
+        headers={
+            "Authorization": f"Bearer {api_key}",
+            "Accept": "application/json",
+            "User-Agent": "OSINTPH/1.0",
+        },
+    )
+    try:
+        data = _json.loads(body)
+        return jsonify({"ok": True, "data": data})
+    except Exception:
+        return jsonify({"ok": False, "error": f"HTTP {status}"}), 200
+
+
 # ── Health ─────────────────────────────────────────────────────────────────────
 
 

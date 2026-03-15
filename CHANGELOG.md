@@ -3,6 +3,52 @@
 All notable changes to this project will be documented in this file.
 The format follows **Keep a Changelog**. This project adheres to **Semantic Versioning**.
 
+## [1.1.0] - 2026-03-15
+
+### Added
+- **Intelligence Dashboard (Home tab)** — new start page replacing the crawler stats as the default landing page
+  - Regional threat level indicator (HIGH/ELEVATED/MODERATE) based on live SEA victim counts
+  - KPI bar: RW groups, total victims, press reports, crawl hits, seeds, keywords
+  - Live recent victims feed from ransomware.live PRO
+  - Top active groups ranked by victim count with SEA targeting flags
+  - SEA victim breakdown bar chart by country (PH, ID, MY, TH, VN, SG) with real counts
+  - ThreatFox IOC mini-feed (latest 8 IOCs)
+  - Ransomware press feed filtered for SEA-relevant articles
+  - Quick actions grid for common workflows
+  - System status panel showing all API/service health
+- **ransomware.live PRO API integration** (`ransomware_live.py` + `ransomware_live_routes.py`)
+  - Full PRO API client covering all documented endpoints: groups, victims, IOCs, negotiations, press, ransom notes, YARA rules, SEC 8-K filings, CSIRT directory, sectors
+  - `/api/rwlive/*` Flask blueprint with 20+ endpoints
+  - Graceful fallback to unauthenticated v2 API when no PRO key is set
+  - Local `RANSOMWARE_GROUPS` data merged with live API data for SEA context enrichment
+  - Composite endpoints for single-call data bundles (`/api/rwlive/home-data`, `/api/rwlive/ransomware-tab-data`)
+  - SEA-specific convenience endpoints (`/api/rwlive/victims/sea`, `/api/rwlive/press/recent?sea=1`)
+- **IOC Feed tab** — live indicators of compromise with sub-tabs for ThreatFox, URLhaus, and Feodo Tracker
+  - Stats bar: total IOCs, IPs, domains, URLs, hashes
+  - Searchable/filterable table with type chips, malware family, confidence bars, reporter
+  - All feeds proxied through backend to avoid CORS restrictions
+- **Backend proxy routes** in `dashboard_routes.py`
+  - `POST /api/proxy/threatfox` — ThreatFox API proxy with `Auth-Key` header injection
+  - `POST /api/proxy/urlhaus` — URLhaus recent URLs proxy
+  - `GET /api/proxy/feodo` — Feodo Tracker C2 blocklist proxy
+  - `GET /api/whiteintel/alerts` — WhiteIntel credential alerts proxy
+  - `GET /api/whiteintel/search` — WhiteIntel domain search proxy
+- **Crawls tab** — renamed from "Dashboard" tab, preserves all existing crawler session/stats UI
+- New environment variables: `RANSOMWARE_LIVE_API_KEY`, `THREATFOX_API_KEY`, `WHITEINTEL_API_KEY`
+
+### Changed
+- Default landing page is now the Intelligence Dashboard (Home tab) instead of the Crawls tab
+- Nav tab order updated: Dashboard (Home) → Crawls → Keywords → Seeds → ... → IOC Feed → ...
+- `ransomware_live.py` press endpoints now correctly unwrap `{results:[...]}` response wrapper from PRO API
+- SEA victim counts now fetch up to 500 victims per country instead of capped at 20
+- Group display on Home tab uses live victim counts from ransomware.live (not local static data)
+
+### Fixed
+- ThreatFox 401 errors — correct `Auth-Key` header now used (was `API-KEY`)
+- JS syntax errors from nested quotes in `querySelector` `onclick` attributes — replaced with `hdGoTo()` helper
+- Press feed returning empty — PRO API wraps response in `{results:[...]}` which is now unwrapped
+- SEA breakdown bars all showing 20 — removed per-country cap, now shows real counts
+
 ## [1.0.0] - 2026-03-10
 
 ### Added
@@ -103,4 +149,4 @@ The format follows **Keep a Changelog**. This project adheres to **Semantic Vers
 - Webhook and email alerting
 - Flask dashboard with real-time hit viewer
 - Docker Compose setup
-- CLI with `scan`, `stats`, `hits`, `check-tor` commands
+- CLI with `scan`, `stats`, `hits`, `check-tor` commands 

@@ -21,10 +21,12 @@ def create_app() -> Flask:
     from .auth_routes import auth_bp
     from .dashboard_routes import dashboard_bp
     from .channel_monitor_routes import channel_monitor_bp
+    from .ransomware_live_routes import rw_live_bp
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(dashboard_bp)
     app.register_blueprint(channel_monitor_bp)
+    app.register_blueprint(rw_live_bp)
 
     @app.route("/")
     def root():

@@ -465,7 +465,8 @@
     <span class="badge">THREAT INTEL</span>
   </div>
   <nav>
-    <button class="nav-tab active" onclick="switchTab('dashboard', this)">📊 Dashboard</button>
+    <button class="nav-tab active" onclick="switchTab('home', this)">🏠 Dashboard</button>
+    <button class="nav-tab" onclick="switchTab('dashboard', this)">🕷️ Crawls</button>
     <button class="nav-tab" onclick="switchTab('keywords', this)">🔑 Keywords</button>
     <button class="nav-tab" onclick="switchTab('seeds', this)">🌱 Seeds</button>
     <button class="nav-tab admin-only" id="tab-users" onclick="switchTab('users', this)">👥 Users</button>
@@ -473,6 +474,7 @@
     <button class="nav-tab" onclick="switchTab('iplookup', this)">🔎 IP Lookup</button>
     <button class="nav-tab" onclick="switchTab('ransomware', this)">☠️ Ransomware</button>
     <button class="nav-tab" onclick="switchTab('threatactors', this)">🕵️ Threat Actors</button>
+    <button class="nav-tab" onclick="switchTab('iocfeed', this)">🧪 IOC Feed</button>
     <button class="nav-tab" onclick="switchTab('projects', this)">📁 Projects</button>
     <button class="nav-tab" onclick="switchTab('paste', this)">📋 Paste Monitor</button>
     <button class="nav-tab" onclick="switchTab('dns', this)">🌐 DNS</button>
@@ -492,8 +494,276 @@
 
 <main>
 
-  <!-- ── Dashboard Tab ── -->
-  <div class="tab-panel active" id="panel-dashboard">
+
+  <!-- ══════════════════════ HOME DASHBOARD ══════════════════════ -->
+  <div class="tab-panel active" id="panel-home">
+  <style>
+    .hd-hero{background:linear-gradient(135deg,#0d1117 0%,#0d1a2e 60%,#0a1628 100%);border:1px solid var(--border);border-radius:12px;padding:28px 32px 24px;margin-bottom:20px;position:relative;overflow:hidden}
+    .hd-hero::before{content:'';position:absolute;top:-60px;right:-60px;width:300px;height:300px;background:radial-gradient(circle,rgba(88,166,255,.06) 0%,transparent 70%);border-radius:50%;pointer-events:none}
+    .hd-hero-top{display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:16px;margin-bottom:22px;position:relative;z-index:1}
+    .hd-platform-name{font-size:1.5rem;font-weight:800;letter-spacing:-.5px;margin-bottom:3px}
+    .hd-platform-name span{color:var(--accent)}
+    .hd-platform-sub{color:var(--muted);font-size:.82rem}
+    .hd-tl-wrap{display:flex;flex-direction:column;align-items:flex-end;gap:4px}
+    .hd-tl-label{font-size:.62rem;text-transform:uppercase;letter-spacing:.1em;color:var(--muted)}
+    .hd-tl-badge{font-size:.78rem;font-weight:700;padding:5px 14px;border-radius:6px;letter-spacing:.05em}
+    .hd-tl-elevated{background:rgba(240,136,62,.12);color:var(--orange);border:1px solid rgba(240,136,62,.35)}
+    .hd-tl-high{background:rgba(248,81,73,.12);color:var(--red);border:1px solid rgba(248,81,73,.35)}
+    .hd-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:12px;position:relative;z-index:1}
+    .hd-kpi{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);border-radius:8px;padding:12px 14px}
+    .hd-kpi-val{font-size:1.6rem;font-weight:800;line-height:1;margin-bottom:3px}
+    .hd-kpi-lbl{font-size:.65rem;color:var(--muted);text-transform:uppercase;letter-spacing:.07em}
+    .hd-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;margin-bottom:14px}
+    .hd-grid-wide{grid-column:span 2}
+    @media(max-width:1100px){.hd-grid{grid-template-columns:1fr 1fr}.hd-grid-wide{grid-column:span 1}}
+    @media(max-width:680px){.hd-grid{grid-template-columns:1fr}}
+    .hd-card{background:var(--surface);border:1px solid var(--border);border-radius:8px;overflow:hidden}
+    .hd-card-hdr{padding:11px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+    .hd-card-title{font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);display:flex;align-items:center;gap:6px}
+    .hd-card-title .live-dot{width:6px;height:6px;border-radius:50%;background:var(--green);animation:pulse 1.5s infinite;flex-shrink:0}
+    .hd-card-action{font-size:.72rem;color:var(--accent);cursor:pointer;background:none;border:none;font-family:var(--font)}
+    .hd-card-action:hover{text-decoration:underline}
+    .hd-card-body{padding:12px 14px}
+    /* Victim feed */
+    .hd-victim-row{display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid rgba(48,54,61,.5);font-size:.78rem}
+    .hd-victim-row:last-child{border-bottom:none}
+    .hd-victim-group{font-size:.62rem;font-weight:700;padding:1px 6px;border-radius:3px;background:rgba(248,81,73,.12);color:var(--red);white-space:nowrap;flex-shrink:0}
+    .hd-victim-name{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text)}
+    .hd-victim-country{font-size:.68rem;color:var(--muted);flex-shrink:0}
+    .hd-victim-date{font-size:.65rem;color:var(--muted);flex-shrink:0;font-family:var(--mono)}
+    /* Group list */
+    .hd-group-row{display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid rgba(48,54,61,.5);cursor:pointer}
+    .hd-group-row:last-child{border-bottom:none}
+    .hd-group-row:hover{background:rgba(88,166,255,.04);margin:0 -14px;padding-left:14px;padding-right:14px}
+    .hd-group-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+    .hd-group-name{font-size:.82rem;font-weight:600;flex:1}
+    .hd-group-victims{font-size:.72rem;font-weight:700;color:var(--accent)}
+    .hd-risk-tag{font-size:.6rem;padding:1px 5px;border-radius:3px;font-weight:700;flex-shrink:0}
+    .hd-risk-critical{background:rgba(248,81,73,.12);color:var(--red)}
+    .hd-risk-high{background:rgba(240,136,62,.12);color:var(--orange)}
+    .hd-risk-medium{background:rgba(210,153,34,.12);color:var(--yellow)}
+    /* IOC mini */
+    .hd-ioc-row{display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid rgba(48,54,61,.5);font-family:var(--mono);font-size:.72rem}
+    .hd-ioc-row:last-child{border-bottom:none}
+    .hd-ioc-type{font-size:.58rem;padding:1px 5px;border-radius:3px;font-weight:700;background:rgba(88,166,255,.12);color:var(--accent);white-space:nowrap;flex-shrink:0}
+    .hd-ioc-val{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text)}
+    .hd-ioc-malware{font-size:.6rem;color:var(--muted);white-space:nowrap}
+    /* Crawl stats mini */
+    .hd-crawl-stat{display:flex;align-items:center;justify-content:space-between;padding:7px 0;border-bottom:1px solid rgba(48,54,61,.5);font-size:.8rem}
+    .hd-crawl-stat:last-child{border-bottom:none}
+    .hd-crawl-stat-val{font-weight:700;color:var(--accent)}
+    /* Threat bars */
+    .hd-bar-row{display:flex;align-items:center;gap:10px;margin-bottom:7px}
+    .hd-bar-label{font-size:.72rem;color:var(--muted);width:85px;flex-shrink:0}
+    .hd-bar-track{flex:1;background:var(--surface2);border-radius:3px;height:5px;overflow:hidden}
+    .hd-bar-fill{height:100%;border-radius:3px;transition:width .5s ease}
+    .hd-bar-count{font-size:.7rem;font-weight:700;color:var(--text);width:30px;text-align:right;flex-shrink:0}
+    /* Quick actions */
+    .hd-qa-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+    .hd-qa-btn{background:var(--surface2);border:1px solid var(--border);border-radius:7px;padding:10px 12px;cursor:pointer;text-align:left;transition:all .15s;display:flex;align-items:center;gap:8px;font-family:var(--font)}
+    .hd-qa-btn:hover{border-color:var(--accent);background:rgba(88,166,255,.06)}
+    .hd-qa-icon{font-size:1.1rem}
+    .hd-qa-label{font-size:.75rem;font-weight:600;color:var(--text);display:block}
+    .hd-qa-sub{font-size:.65rem;color:var(--muted);display:block}
+    /* System status */
+    .hd-sys-row{display:flex;align-items:center;justify-content:space-between;padding:6px 0;border-bottom:1px solid rgba(48,54,61,.5);font-size:.78rem}
+    .hd-sys-row:last-child{border-bottom:none}
+    .hd-sys-val{display:flex;align-items:center;gap:5px;font-size:.72rem}
+    .hd-sys-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
+    .hd-ok{background:var(--green)}
+    .hd-warn{background:var(--yellow)}
+    .hd-err{background:var(--red)}
+    /* Press feed */
+    .hd-press-item{padding:7px 0;border-bottom:1px solid rgba(48,54,61,.5)}
+    .hd-press-item:last-child{border-bottom:none}
+    .hd-press-title{font-size:.78rem;color:var(--text);line-height:1.4;margin-bottom:2px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+    .hd-press-title a{color:var(--text);text-decoration:none}
+    .hd-press-title a:hover{color:var(--accent)}
+    .hd-press-meta{font-size:.66rem;color:var(--muted)}
+    /* SEA flag */
+    .hd-sea-tag{font-size:.58rem;padding:1px 5px;border-radius:3px;background:rgba(88,166,255,.1);color:var(--accent);font-weight:700;margin-left:4px}
+  </style>
+
+  <!-- Hero -->
+  <div class="hd-hero">
+    <div class="hd-hero-top">
+      <div>
+        <div class="hd-platform-name">OSINT<span>PH</span> Threat Intelligence</div>
+        <div class="hd-platform-sub">SEA-focused dark web monitoring · ransomware.live PRO · Real-time threat tracking</div>
+      </div>
+      <div class="hd-tl-wrap">
+        <div class="hd-tl-label">Regional Threat Level</div>
+        <div class="hd-tl-badge hd-tl-elevated" id="hdThreatLevel">⚠ ELEVATED</div>
+        <div style="font-size:.65rem;color:var(--muted);margin-top:3px" id="hdThreatSub">Loading threat data…</div>
+      </div>
+    </div>
+    <div class="hd-kpis">
+      <div class="hd-kpi"><div class="hd-kpi-val" style="color:var(--red)" id="hdKpiGroups">—</div><div class="hd-kpi-lbl">RW Groups</div></div>
+      <div class="hd-kpi"><div class="hd-kpi-val" style="color:var(--orange)" id="hdKpiVictims">—</div><div class="hd-kpi-lbl">Total Victims</div></div>
+      <div class="hd-kpi"><div class="hd-kpi-val" style="color:var(--yellow)" id="hdKpiPress">—</div><div class="hd-kpi-lbl">Press Reports</div></div>
+      <div class="hd-kpi"><div class="hd-kpi-val" id="hdKpiCrawlHits">—</div><div class="hd-kpi-lbl">Crawl Hits</div></div>
+      <div class="hd-kpi"><div class="hd-kpi-val" style="color:var(--green)" id="hdKpiSeeds">—</div><div class="hd-kpi-lbl">Seeds</div></div>
+      <div class="hd-kpi"><div class="hd-kpi-val" style="color:var(--purple)" id="hdKpiKeywords">—</div><div class="hd-kpi-lbl">Keywords</div></div>
+    </div>
+  </div>
+
+  <!-- Row 1: Victims + Top Groups -->
+  <div class="hd-grid">
+    <div class="hd-card hd-grid-wide">
+      <div class="hd-card-hdr">
+        <div class="hd-card-title"><span class="live-dot"></span>Recent Victims — ransomware.live</div>
+        <button class="hd-card-action" onclick="hdLoadVictims()">↻ Refresh</button>
+      </div>
+      <div class="hd-card-body" id="hdVictimFeed"><div style="color:var(--muted);font-size:.78rem">Loading victim data…</div></div>
+    </div>
+    <div class="hd-card">
+      <div class="hd-card-hdr">
+        <div class="hd-card-title">☠️ Top Active Groups</div>
+        <button class="hd-card-action" onclick="hdGoTo('ransomware')">Full intel →</button>
+      </div>
+      <div class="hd-card-body" id="hdGroupFeed"><div style="color:var(--muted);font-size:.78rem">Loading…</div></div>
+    </div>
+  </div>
+
+  <!-- Row 2: IOCs + SEA breakdown + Quick Actions -->
+  <div class="hd-grid">
+    <div class="hd-card">
+      <div class="hd-card-hdr">
+        <div class="hd-card-title">🧪 Latest IOCs — ThreatFox</div>
+        <button class="hd-card-action" onclick="hdGoTo('iocfeed')">IOC Feed →</button>
+      </div>
+      <div class="hd-card-body" id="hdIocMini"><div style="color:var(--muted);font-size:.78rem">Loading…</div></div>
+    </div>
+    <div class="hd-card">
+      <div class="hd-card-hdr">
+        <div class="hd-card-title">🌏 SEA Victim Breakdown</div>
+      </div>
+      <div class="hd-card-body" id="hdSeaBars">
+        <div class="hd-bar-row"><div class="hd-bar-label">Philippines</div><div class="hd-bar-track"><div class="hd-bar-fill" style="width:0%;background:var(--red)" id="hdBarPH"></div></div><div class="hd-bar-count" id="hdCntPH">—</div></div>
+        <div class="hd-bar-row"><div class="hd-bar-label">Indonesia</div><div class="hd-bar-track"><div class="hd-bar-fill" style="width:0%;background:var(--orange)" id="hdBarID"></div></div><div class="hd-bar-count" id="hdCntID">—</div></div>
+        <div class="hd-bar-row"><div class="hd-bar-label">Malaysia</div><div class="hd-bar-track"><div class="hd-bar-fill" style="width:0%;background:var(--yellow)" id="hdBarMY"></div></div><div class="hd-bar-count" id="hdCntMY">—</div></div>
+        <div class="hd-bar-row"><div class="hd-bar-label">Thailand</div><div class="hd-bar-track"><div class="hd-bar-fill" style="width:0%;background:var(--accent)" id="hdBarTH"></div></div><div class="hd-bar-count" id="hdCntTH">—</div></div>
+        <div class="hd-bar-row"><div class="hd-bar-label">Vietnam</div><div class="hd-bar-track"><div class="hd-bar-fill" style="width:0%;background:var(--accent)" id="hdBarVN"></div></div><div class="hd-bar-count" id="hdCntVN">—</div></div>
+        <div class="hd-bar-row"><div class="hd-bar-label">Singapore</div><div class="hd-bar-track"><div class="hd-bar-fill" style="width:0%;background:var(--accent)" id="hdBarSG"></div></div><div class="hd-bar-count" id="hdCntSG">—</div></div>
+        <div style="margin-top:8px;font-size:.65rem;color:var(--muted)">Based on ransomware.live victim data</div>
+      </div>
+    </div>
+    <div class="hd-card">
+      <div class="hd-card-hdr"><div class="hd-card-title">⚡ Quick Actions</div></div>
+      <div class="hd-card-body">
+        <div class="hd-qa-grid">
+          <button class="hd-qa-btn" onclick="toggleCrawl()"><span class="hd-qa-icon">🕷️</span><span><span class="hd-qa-label">Start Crawl</span><span class="hd-qa-sub">Dark web scan</span></span></button>
+          <button class="hd-qa-btn" onclick="hdGoTo('iocfeed')"><span class="hd-qa-icon">🧪</span><span><span class="hd-qa-label">IOC Feed</span><span class="hd-qa-sub">ThreatFox live</span></span></button>
+          <button class="hd-qa-btn" onclick="hdGoTo('investigations')"><span class="hd-qa-icon">🔍</span><span><span class="hd-qa-label">Investigate</span><span class="hd-qa-sub">Add target/IOC</span></span></button>
+          <button class="hd-qa-btn" onclick="hdGoTo('ransomware')"><span class="hd-qa-icon">☠️</span><span><span class="hd-qa-label">Ransomware</span><span class="hd-qa-sub">Group intel</span></span></button>
+          <button class="hd-qa-btn" onclick="hdGoTo('iplookup')"><span class="hd-qa-icon">🌐</span><span><span class="hd-qa-label">IP Lookup</span><span class="hd-qa-sub">Enrich an IP</span></span></button>
+          <button class="hd-qa-btn" onclick="hdGoTo('dashboard')"><span class="hd-qa-icon">📊</span><span><span class="hd-qa-label">Crawl Stats</span><span class="hd-qa-sub">Sessions &amp; hits</span></span></button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Row 3: Press + System Status -->
+  <div class="hd-grid" style="grid-template-columns:1fr 1fr;margin-bottom:0">
+    <div class="hd-card">
+      <div class="hd-card-hdr">
+        <div class="hd-card-title">📰 Ransomware Press — SEA Focus</div>
+        <button class="hd-card-action" onclick="hdLoadPress()">↻</button>
+      </div>
+      <div class="hd-card-body" id="hdPressFeed"><div style="color:var(--muted);font-size:.78rem">Loading press…</div></div>
+    </div>
+    <div class="hd-card">
+      <div class="hd-card-hdr"><div class="hd-card-title">🔧 System Status</div></div>
+      <div class="hd-card-body">
+        <div class="hd-sys-row"><span>Tor Crawler</span><span class="hd-sys-val"><span class="hd-sys-dot" id="sysDotCrawler"></span><span id="sysValCrawler">Checking…</span></span></div>
+        <div class="hd-sys-row"><span>ransomware.live PRO</span><span class="hd-sys-val"><span class="hd-sys-dot" id="sysDotRwLive"></span><span id="sysValRwLive">Checking…</span></span></div>
+        <div class="hd-sys-row"><span>ThreatFox</span><span class="hd-sys-val"><span class="hd-sys-dot hd-ok"></span><span>Free API</span></span></div>
+        <div class="hd-sys-row"><span>Database</span><span class="hd-sys-val"><span class="hd-sys-dot hd-ok"></span><span>Connected</span></span></div>
+        <div class="hd-sys-row"><span>Last RW Update</span><span class="hd-sys-val" id="sysRwUpdate" style="font-family:var(--mono);font-size:.68rem">—</span></div>
+        <div class="hd-sys-row"><span>Logged in as</span><span class="hd-sys-val">{{ username }}</span></div>
+      </div>
+    </div>
+  </div>
+
+  </div><!-- /panel-home -->
+
+  <!-- ══════════════════════ IOC FEED TAB ══════════════════════ -->
+  <div class="tab-panel" id="panel-iocfeed">
+  <style>
+    .ioc-stats-bar{display:grid;grid-template-columns:repeat(auto-fit,minmax(100px,1fr));gap:10px;margin-bottom:16px}
+    .ioc-stat-pill{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:10px 12px;text-align:center}
+    .ioc-stat-pill .val{font-size:1.3rem;font-weight:800;color:var(--accent)}
+    .ioc-stat-pill .lbl{font-size:.62rem;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+    .ioc-controls{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;align-items:center}
+    .ioc-search{padding:7px 12px;background:var(--surface);border:1px solid var(--border);color:var(--text);border-radius:6px;font-size:.82rem;font-family:var(--mono);min-width:220px}
+    .ioc-search:focus{outline:none;border-color:var(--accent)}
+    .ioc-select{padding:6px 10px;background:var(--surface);border:1px solid var(--border);color:var(--text);border-radius:6px;font-size:.8rem}
+    .ioc-src-btn{padding:5px 12px;font-size:.74rem;background:var(--surface);border:1px solid var(--border);color:var(--muted);cursor:pointer;border-radius:20px;transition:all .15s}
+    .ioc-src-btn.active{border-color:var(--accent);color:var(--accent);background:rgba(88,166,255,.08)}
+    .ioc-table-wrap{background:var(--surface);border:1px solid var(--border);border-radius:8px;overflow:hidden}
+    .ioc-table-hdr{padding:10px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+    .ioc-table{width:100%;border-collapse:collapse;font-size:.78rem}
+    .ioc-table th{text-align:left;padding:8px 12px;color:var(--muted);font-weight:600;font-size:.68rem;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid var(--border);background:var(--surface2)}
+    .ioc-table td{padding:8px 12px;border-bottom:1px solid rgba(48,54,61,.4);vertical-align:middle}
+    .ioc-table tr:last-child td{border-bottom:none}
+    .ioc-table tr:hover td{background:rgba(88,166,255,.03)}
+    .ioc-type-chip{display:inline-block;font-size:.6rem;padding:1px 5px;border-radius:3px;font-weight:700;font-family:var(--mono)}
+    .ioc-chip-ip{background:rgba(88,166,255,.12);color:var(--accent)}
+    .ioc-chip-domain{background:rgba(188,140,255,.12);color:var(--purple)}
+    .ioc-chip-url{background:rgba(240,136,62,.12);color:var(--orange)}
+    .ioc-chip-md5,.ioc-chip-sha256{background:rgba(63,185,80,.12);color:var(--green)}
+    .ioc-chip-email{background:rgba(210,153,34,.12);color:var(--yellow)}
+    .ioc-val-cell{font-family:var(--mono);font-size:.72rem;max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .ioc-malware-chip{font-size:.62rem;padding:1px 5px;border-radius:3px;background:rgba(248,81,73,.12);color:var(--red);font-weight:700}
+    .ioc-conf-bar{display:inline-flex;align-items:center;gap:4px}
+    .ioc-conf-track{width:40px;height:4px;background:var(--surface2);border-radius:2px;overflow:hidden}
+    .ioc-conf-fill{height:100%;border-radius:2px;background:var(--green)}
+    .ioc-abuse-tabs{display:flex;gap:0;border-bottom:1px solid var(--border);margin-bottom:14px}
+    .ioc-abuse-tab{padding:9px 16px;font-size:.78rem;font-weight:500;color:var(--muted);cursor:pointer;border-bottom:2px solid transparent}
+    .ioc-abuse-tab.active{color:var(--accent);border-bottom-color:var(--accent)}
+  </style>
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px">
+    <div>
+      <div style="font-size:1.05rem;font-weight:700">🧪 IOC Feed</div>
+      <div style="font-size:.78rem;color:var(--muted);margin-top:2px">Live indicators from ThreatFox, URLhaus &amp; Feodo Tracker — all free, no key required</div>
+    </div>
+    <button class="btn btn-secondary" onclick="iocLoadAll()">↻ Refresh All</button>
+  </div>
+  <div class="ioc-stats-bar">
+    <div class="ioc-stat-pill"><div class="val" id="iocStatTotal">—</div><div class="lbl">Total IOCs</div></div>
+    <div class="ioc-stat-pill"><div class="val" id="iocStatIP">—</div><div class="lbl">IPs</div></div>
+    <div class="ioc-stat-pill"><div class="val" id="iocStatDomain">—</div><div class="lbl">Domains</div></div>
+    <div class="ioc-stat-pill"><div class="val" id="iocStatURL">—</div><div class="lbl">URLs</div></div>
+    <div class="ioc-stat-pill"><div class="val" id="iocStatHash">—</div><div class="lbl">Hashes</div></div>
+  </div>
+  <div class="ioc-abuse-tabs">
+    <div class="ioc-abuse-tab active" onclick="iocSwitchFeed('threatfox',this)">ThreatFox</div>
+    <div class="ioc-abuse-tab" onclick="iocSwitchFeed('urlhaus',this)">URLhaus</div>
+    <div class="ioc-abuse-tab" onclick="iocSwitchFeed('feodo',this)">Feodo C2s</div>
+  </div>
+  <div class="ioc-controls">
+    <input type="text" class="ioc-search" id="iocSearch" placeholder="🔍 Search IOC value, malware, tag…" oninput="iocRenderTable()"/>
+    <select class="ioc-select" id="iocTypeFilter" onchange="iocRenderTable()">
+      <option value="">All Types</option>
+      <option value="ip:port">ip:port</option>
+      <option value="domain">domain</option>
+      <option value="url">url</option>
+      <option value="md5_hash">md5</option>
+      <option value="sha256_hash">sha256</option>
+    </select>
+    <span id="iocTableCount" style="font-size:.72rem;color:var(--muted);margin-left:auto"></span>
+  </div>
+  <div class="ioc-table-wrap">
+    <div class="ioc-table-hdr">
+      <span style="font-size:.78rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em" id="iocFeedLabel">ThreatFox — Recent IOCs</span>
+      <span id="iocLastRefresh" style="font-size:.68rem;color:var(--muted)"></span>
+    </div>
+    <div id="iocTableContainer"><div style="text-align:center;padding:40px;color:var(--muted)">⏳ Loading IOC data…</div></div>
+  </div>
+  </div><!-- /panel-iocfeed -->
+
+  <!-- ── Dashboard Tab (Crawls) ── -->
+  <div class="tab-panel" id="panel-dashboard">
 
     <!-- Live crawl card -->
     <div class="crawl-card" id="crawlCard">
@@ -1348,6 +1618,7 @@
   document.addEventListener('DOMContentLoaded', () => {
     if (isAdmin) document.getElementById('tab-users').classList.add('visible');
     fetchStats();
+    hdInit();
     loadSessions();
     pollCrawlStatus();
     setInterval(() => { fetchStats(); if (crawlActive) loadSessions(); }, 15000);
@@ -1392,6 +1663,8 @@
     if (tab === 'reports') { loadReportPreview(); if (isAdmin) loadSubscribers(); }
     if (tab === 'settings') loadSettings();
     if (tab === 'channelmonitor') cmInit();
+    if (tab === 'home') hdInit();
+    if (tab === 'iocfeed') iocLoadAll();
   }
 
   // ── Stats ──────────────────────────────────────────────────────────────────
@@ -4970,6 +5243,354 @@
         </div>
         <div class="osint-resource-card-desc">${esc(r.desc)}</div>
       </a>`).join('');
+  }
+
+
+  // ══════════════════════════════════════════════════════════════
+  // HOME DASHBOARD
+  // ══════════════════════════════════════════════════════════════
+
+  let hdVictimsData = [];
+  let hdGroupsData  = [];
+  let hdIocData     = [];
+  let hdPressData   = [];
+
+  function hdGoTo(tab) {
+    const btn = Array.from(document.querySelectorAll('.nav-tab')).find(b => b.getAttribute('onclick') && b.getAttribute('onclick').includes("'" + tab + "'"));
+    if (btn) switchTab(tab, btn);
+  }
+
+  async function hdInit() {
+    hdLoadStats();
+    hdLoadVictims();
+    hdLoadGroups();
+    hdLoadIocMini();
+    hdLoadPress();
+    hdCheckStatus();
+  }
+
+  async function hdLoadStats() {
+    try {
+      // Crawl stats
+      const cs = await (await fetch('/api/stats')).json();
+      document.getElementById('hdKpiCrawlHits').textContent = (cs.total_hits||0).toLocaleString();
+      // Seeds count
+      try {
+        const sk = await (await fetch('/api/seeds')).json();
+        const seedCount = Array.isArray(sk) ? sk.length : (sk.seeds ? sk.seeds.length : 0);
+        document.getElementById('hdKpiSeeds').textContent = seedCount.toLocaleString();
+      } catch(e) { document.getElementById('hdKpiSeeds').textContent = '—'; }
+      // Keywords count
+      try {
+        const kw = await (await fetch('/api/keywords')).json();
+        let kwCount = 0;
+        if (kw.categories) Object.values(kw.categories).forEach(arr => kwCount += arr.length);
+        document.getElementById('hdKpiKeywords').textContent = kwCount.toLocaleString();
+      } catch(e) { document.getElementById('hdKpiKeywords').textContent = '—'; }
+      // RW stats
+      const rw = await (await fetch('/api/rwlive/stats')).json();
+      if (rw.ok && rw.data && rw.data.stats) {
+        const s = rw.data.stats;
+        document.getElementById('hdKpiGroups').textContent  = (s.groups||0).toLocaleString();
+        document.getElementById('hdKpiVictims').textContent = (s.victims||0).toLocaleString();
+        document.getElementById('hdKpiPress').textContent   = (s.press||0).toLocaleString();
+        const upd = rw.data.last_update ? rw.data.last_update.slice(0,16) : '—';
+        const el = document.getElementById('sysRwUpdate');
+        if (el) el.textContent = upd;
+      }
+    } catch(e) { console.warn('hdLoadStats', e); }
+  }
+
+  async function hdLoadVictims() {
+    const el = document.getElementById('hdVictimFeed');
+    try {
+      const r = await fetch('/api/rwlive/victims/recent?limit=12');
+      const d = await r.json();
+      if (!d.ok || !d.data.length) { el.innerHTML = '<div style="color:var(--muted);font-size:.78rem">No victim data</div>'; return; }
+      hdVictimsData = d.data;
+      // Build SEA counts — fetch per country for accurate totals
+      const seaCounts = {};
+      try {
+        const seaReq = await fetch('/api/rwlive/victims/sea?limit=500');
+        const seaD   = await seaReq.json();
+        if (seaD.ok) {
+          seaD.data.forEach(v => {
+            const c = (v.country||'').toUpperCase();
+            seaCounts[c] = (seaCounts[c]||0) + 1;
+          });
+          hdRenderSeaBars(seaCounts);
+        }
+      } catch(e) { console.warn('SEA counts failed', e); }
+      el.innerHTML = d.data.slice(0,10).map(v => {
+        const date = (v.attackdate||'').slice(0,10);
+        const sea  = ['PH','TH','ID','MY','VN','SG','MM','KH','LA','BN'].includes((v.country||'').toUpperCase());
+        return `<div class="hd-victim-row">
+          <span class="hd-victim-group">${esc(v.group||'?')}</span>
+          <span class="hd-victim-name" title="${esc(v.victim||'')}">
+            ${esc(v.victim||v.website||'Unknown')}${sea ? '<span class="hd-sea-tag">SEA</span>' : ''}
+          </span>
+          <span class="hd-victim-country">${esc(v.country||'')}</span>
+          <span class="hd-victim-date">${esc(date)}</span>
+        </div>`;
+      }).join('');
+      // Update threat level
+      const seaCount = Object.values(seaCounts).reduce((a,b)=>a+b,0);
+      const tlEl  = document.getElementById('hdThreatLevel');
+      const tlSub = document.getElementById('hdThreatSub');
+      if (seaCount > 20) {
+        tlEl.className = 'hd-tl-badge hd-tl-high'; tlEl.textContent = '🔴 HIGH';
+        tlSub.textContent = seaCount + ' recent SEA victims detected';
+      } else if (seaCount > 5) {
+        tlEl.className = 'hd-tl-badge hd-tl-elevated'; tlEl.textContent = '⚠ ELEVATED';
+        tlSub.textContent = seaCount + ' recent SEA victims detected';
+      } else {
+        tlSub.textContent = seaCount + ' recent SEA victims';
+      }
+    } catch(e) { el.innerHTML = '<div style="color:var(--red);font-size:.78rem">Error loading victims: ' + esc(String(e)) + '</div>'; }
+  }
+
+  function hdRenderSeaBars(counts) {
+    const map = {PH:'PH',ID:'ID',MY:'MY',TH:'TH',VN:'VN',SG:'SG'};
+    const max = Math.max(1, ...Object.values(counts));
+    for (const [iso, id] of Object.entries(map)) {
+      const c = counts[iso]||0;
+      const bar = document.getElementById('hdBar'+id);
+      const cnt = document.getElementById('hdCnt'+id);
+      if (bar) bar.style.width = Math.round(c/max*100) + '%';
+      if (cnt) cnt.textContent = c;
+    }
+  }
+
+  async function hdLoadGroups() {
+    const el = document.getElementById('hdGroupFeed');
+    try {
+      const r = await fetch('/api/rwlive/groups');
+      const d = await r.json();
+      if (!d.ok || !d.data.length) { el.innerHTML = '<div style="color:var(--muted);font-size:.78rem">No group data</div>'; return; }
+      // Sort by victim count desc, skip groups with 0, take top 10
+      const groups = d.data
+        .filter(g => (g.victims||0) > 0)
+        .sort((a,b) => (b.victims||0)-(a.victims||0))
+        .slice(0,10);
+      const seaSlugs = ['lockbit3','lockbit','ransomhub','akira','dragonforce','clop','cl0p','play','blackbasta','medusa','8base','hunters'];
+      el.innerHTML = groups.map(g => {
+        const vc    = (g.victims||0).toLocaleString();
+        const slug  = (g.group||g.name||'').toLowerCase();
+        const isSEA = g._sea_targeting || seaSlugs.includes(slug);
+        const dot   = (g.victims||0) > 500 ? 'var(--red)' : (g.victims||0) > 100 ? 'var(--orange)' : 'var(--green)';
+        return `<div class="hd-group-row" onclick="hdGoTo('ransomware')">
+          <span class="hd-group-dot" style="background:${dot}"></span>
+          <span class="hd-group-name">${esc(g.group||g.name||'')}</span>
+          ${isSEA ? '<span class="hd-sea-tag">SEA</span>' : ''}
+          <span class="hd-group-victims">${vc}</span>
+        </div>`;
+      }).join('');
+    } catch(e) { el.innerHTML = '<div style="color:var(--muted);font-size:.78rem">Error: '+esc(String(e))+'</div>'; }
+  }
+
+  async function hdLoadIocMini() {
+    const el = document.getElementById('hdIocMini');
+    try {
+      const r = await fetch('/api/proxy/threatfox', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({query: 'get_iocs', days: 1})
+      });
+      const d = await r.json();
+      const iocs = (d.data||[]).slice(0,8);
+      if (!iocs.length) { el.innerHTML = '<div style="color:var(--muted);font-size:.78rem">No IOC data</div>'; return; }
+      el.innerHTML = iocs.map(ioc => {
+        const type = (ioc.ioc_type||'').replace('_hash','');
+        const cls  = 'ioc-chip-' + type.replace(':','');
+        return `<div class="hd-ioc-row">
+          <span class="hd-ioc-type">${esc(type)}</span>
+          <span class="hd-ioc-val" title="${esc(ioc.ioc||'')}"> ${esc((ioc.ioc||'').slice(0,45))}</span>
+          <span class="hd-ioc-malware">${esc(ioc.malware||'')}</span>
+        </div>`;
+      }).join('');
+      hdIocData = d.data||[];
+    } catch(e) { el.innerHTML = '<div style="color:var(--muted);font-size:.78rem">ThreatFox unavailable</div>'; }
+  }
+
+  async function hdLoadPress() {
+    const el = document.getElementById('hdPressFeed');
+    try {
+      const r = await fetch('/api/rwlive/press/recent?sea=1');
+      const d = await r.json();
+      const items = (d.ok ? d.data : []).slice(0,6);
+      if (!items.length) {
+        // fallback to global recent
+        const r2 = await fetch('/api/rwlive/press/recent');
+        const d2 = await r2.json();
+        const fb = (d2.ok ? d2.data : []).slice(0,6);
+        el.innerHTML = fb.map(p => hdPressItem(p)).join('') || '<div style="color:var(--muted);font-size:.78rem">No press data</div>';
+        return;
+      }
+      el.innerHTML = items.map(p => hdPressItem(p)).join('');
+    } catch(e) { el.innerHTML = '<div style="color:var(--muted);font-size:.78rem">Error loading press</div>'; }
+  }
+
+  function hdPressItem(p) {
+    const title = p.title || p.headline || 'Untitled';
+    const url   = p.url || p.link || '#';
+    const date  = (p.date||p.published||'').slice(0,10);
+    const src   = p.source || p.group || '';
+    return `<div class="hd-press-item">
+      <div class="hd-press-title"><a href="${esc(url)}" target="_blank" rel="noopener">${esc(title)}</a></div>
+      <div class="hd-press-meta">${esc(src)}${src && date ? ' · ' : ''}${esc(date)}</div>
+    </div>`;
+  }
+
+  async function hdCheckStatus() {
+    try {
+      const r = await fetch('/api/rwlive/status');
+      const d = await r.json();
+      const dotEl = document.getElementById('sysDotRwLive');
+      const valEl = document.getElementById('sysValRwLive');
+      if (d.ok && d.data.key_valid) {
+        if (dotEl) { dotEl.className = 'hd-sys-dot hd-ok'; }
+        if (valEl) valEl.textContent = 'PRO Key Valid';
+      } else {
+        if (dotEl) { dotEl.className = 'hd-sys-dot hd-warn'; }
+        if (valEl) valEl.textContent = 'No PRO Key';
+      }
+      // Crawler status from existing stats
+      const cs = await (await fetch('/api/stats')).json();
+      const crawlDot = document.getElementById('sysDotCrawler');
+      const crawlVal = document.getElementById('sysValCrawler');
+      if (crawlDot) crawlDot.className = 'hd-sys-dot hd-ok';
+      if (crawlVal) crawlVal.textContent = 'Operational';
+    } catch(e) {
+      const dotEl = document.getElementById('sysDotRwLive');
+      if (dotEl) dotEl.className = 'hd-sys-dot hd-err';
+    }
+  }
+
+  // ══════════════════════════════════════════════════════════════
+  // IOC FEED TAB
+  // ══════════════════════════════════════════════════════════════
+
+  let iocCurrentFeed = 'threatfox';
+  let iocAllData     = [];
+
+  function iocSwitchFeed(feed, btn) {
+    iocCurrentFeed = feed;
+    document.querySelectorAll('.ioc-abuse-tab').forEach(t => t.classList.remove('active'));
+    btn.classList.add('active');
+    const labels = {threatfox: 'ThreatFox — Recent IOCs', urlhaus: 'URLhaus — Malicious URLs', feodo: 'Feodo Tracker — Active C2s'};
+    document.getElementById('iocFeedLabel').textContent = labels[feed] || feed;
+    iocAllData = [];
+    iocLoadAll();
+  }
+
+  async function iocLoadAll() {
+    document.getElementById('iocTableContainer').innerHTML = '<div style="text-align:center;padding:40px;color:var(--muted)">⏳ Loading…</div>';
+    if (iocCurrentFeed === 'threatfox') await iocLoadThreatfox();
+    else if (iocCurrentFeed === 'urlhaus') await iocLoadUrlhaus();
+    else if (iocCurrentFeed === 'feodo') await iocLoadFeodo();
+    const ts = new Date().toLocaleTimeString();
+    document.getElementById('iocLastRefresh').textContent = 'Updated ' + ts;
+    iocUpdateStats();
+    iocRenderTable();
+  }
+
+  async function iocLoadThreatfox() {
+    try {
+      const r = await fetch('/api/proxy/threatfox', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({query: 'get_iocs', days: 1})
+      });
+      const d = await r.json();
+      iocAllData = (d.data||[]).map(ioc => ({
+        type:       ioc.ioc_type || '',
+        value:      ioc.ioc || '',
+        malware:    ioc.malware || '',
+        confidence: ioc.confidence_level || 0,
+        tags:       ioc.tags || [],
+        first_seen: ioc.first_seen || '',
+        reporter:   ioc.reporter || '',
+        _source:    'ThreatFox',
+      }));
+    } catch(e) { console.warn('ThreatFox error', e); iocAllData = []; }
+  }
+
+  async function iocLoadUrlhaus() {
+    try {
+      const r = await fetch('/api/proxy/urlhaus', {
+        method: 'POST', body: 'limit=100',
+        headers: {'Content-Type': 'application/x-www-form-urlencoded'}
+      });
+      const d = await r.json();
+      iocAllData = (d.urls||[]).map(u => ({
+        type:       'url',
+        value:      u.url || '',
+        malware:    (u.tags||[]).join(', '),
+        confidence: 80,
+        tags:       u.tags||[],
+        first_seen: u.date_added||'',
+        reporter:   u.host||'',
+        _source:    'URLhaus',
+        status:     u.url_status||'',
+      }));
+    } catch(e) { console.warn('URLhaus error', e); iocAllData = []; }
+  }
+
+  async function iocLoadFeodo() {
+    try {
+      const r = await fetch('/api/proxy/feodo');
+      const d = await r.json();
+      iocAllData = (Array.isArray(d) ? d : []).slice(0,200).map(e => ({
+        type:       'ip:port',
+        value:      (e.ip_address||'') + ':' + (e.port||''),
+        malware:    e.malware||'',
+        confidence: 95,
+        tags:       [e.country||''],
+        first_seen: e.first_seen||'',
+        reporter:   e.country||'',
+        _source:    'Feodo',
+      }));
+    } catch(e) { console.warn('Feodo error', e); iocAllData = []; }
+  }
+
+  function iocUpdateStats() {
+    const data = iocAllData;
+    document.getElementById('iocStatTotal').textContent  = data.length.toLocaleString();
+    document.getElementById('iocStatIP').textContent     = data.filter(i=>i.type==='ip:port').length;
+    document.getElementById('iocStatDomain').textContent = data.filter(i=>i.type==='domain').length;
+    document.getElementById('iocStatURL').textContent    = data.filter(i=>i.type==='url').length;
+    document.getElementById('iocStatHash').textContent   = data.filter(i=>i.type==='md5_hash'||i.type==='sha256_hash').length;
+  }
+
+  function iocRenderTable() {
+    const q       = (document.getElementById('iocSearch')?.value||'').toLowerCase();
+    const typeF   = document.getElementById('iocTypeFilter')?.value||'';
+    let filtered  = iocAllData;
+    if (typeF) filtered = filtered.filter(i=>i.type===typeF);
+    if (q)     filtered = filtered.filter(i=>(i.value+i.malware+(i.tags||[]).join(' ')).toLowerCase().includes(q));
+    document.getElementById('iocTableCount').textContent = filtered.length + ' IOCs';
+    if (!filtered.length) {
+      document.getElementById('iocTableContainer').innerHTML = '<div style="text-align:center;padding:30px;color:var(--muted)">No IOCs match filter</div>';
+      return;
+    }
+    const rows = filtered.slice(0,200).map(ioc => {
+      const typeCls = 'ioc-chip-' + (ioc.type||'').replace('_hash','').replace(':','');
+      const conf    = Math.round(ioc.confidence||0);
+      const date    = (ioc.first_seen||'').slice(0,10);
+      return `<tr>
+        <td><span class="ioc-type-chip ${typeCls}">${esc(ioc.type||'')}</span></td>
+        <td class="ioc-val-cell" title="${esc(ioc.value||'')}">${esc((ioc.value||'').slice(0,60))}</td>
+        <td><span class="ioc-malware-chip">${esc(ioc.malware||'—')}</span></td>
+        <td><div class="ioc-conf-bar"><div class="ioc-conf-track"><div class="ioc-conf-fill" style="width:${conf}%"></div></div><span style="font-size:.65rem;color:var(--muted)">${conf}%</span></div></td>
+        <td style="font-size:.68rem;color:var(--muted)">${esc(date)}</td>
+        <td style="font-size:.68rem;color:var(--muted)">${esc(ioc.reporter||'')}</td>
+      </tr>`;
+    }).join('');
+    document.getElementById('iocTableContainer').innerHTML = `
+      <table class="ioc-table">
+        <thead><tr><th>Type</th><th>IOC Value</th><th>Malware</th><th>Confidence</th><th>First Seen</th><th>Reporter</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>`;
   }
 
 </script>
